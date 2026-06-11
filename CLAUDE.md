@@ -76,7 +76,7 @@ Full design in `docs/SAD.md`. Key design constraints (violating any one blocks l
 ### Frontend / 前端
 | Component | Choice |
 |---|---|
-| Framework | Next.js 14 (App Router) |
+| Framework | Next.js 15 (App Router) |
 | Language | TypeScript |
 | Styling | Tailwind CSS + shadcn/ui |
 | AI Chat | Vercel AI SDK (`useChat`) + assistant-ui |

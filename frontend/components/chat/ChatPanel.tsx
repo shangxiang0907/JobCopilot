@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUIStore } from "@/lib/store"
 
-function getAuthHeaders(): HeadersInit {
+function getAuthHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {}
   return {
     Authorization: `Bearer ${localStorage.getItem("auth_token") ?? ""}`,
