@@ -208,6 +208,34 @@ TEMPORAL_NAMESPACE=jobcopilot
 - No `logging.debug(credential)` or any credential in log output
 - `gitleaks` blocks commits containing secrets patterns
 
+### Dependency Version Integrity / 依赖版本完整性
+
+**EN:**  
+LLMs generate version numbers from training data, not from live registry lookups. A version that looks plausible may not exist, or may exist for one package but not its sibling. Every version written into a dependency file must be verifiable.
+
+Rules:
+- **Before writing any version number**, verify it exists: `npm view <pkg>@<ver> version`, `pip index versions <pkg>`, or `docker pull <image>:<tag>`.
+- **Lock files are mandatory and must be committed**. They are the primary defence against version hallucinations — a missing or non-existent version causes an immediate install failure rather than a silent runtime surprise.
+  - npm: generate and commit `package-lock.json` (`npm install` inside the target Node image) at the same time the code is scaffolded.
+  - Python: `uv.lock` is already committed at the workspace root. Always run `uv sync` after changing any `pyproject.toml` so the lock file stays current.
+  - Docker Compose: run `docker pull <image>:<tag>` to confirm every image tag exists before committing.
+- **Version–feature consistency**: when using a feature that belongs to a specific version (e.g. `next.config.ts` requires Next.js 15+), pin the package to that version — never mix a feature from version N with a pin at version N-1.
+- **Align sibling packages**: related packages (e.g. `temporalio/auto-setup` and `temporalio/admin-tools`) must use the same version tag. Never assume version parity across packages with independent release cadences.
+
+**中文：**  
+LLM 生成的版本号来源于训练数据，而非实时查询包注册表。看起来合理的版本号可能并不存在，或者在某个包中存在但在其兄弟包中不存在。所有写入依赖文件的版本号都必须可以验证。
+
+规则：
+- **写任何版本号前**，先验证其存在：`npm view <pkg>@<ver> version`、`pip index versions <pkg>` 或 `docker pull <image>:<tag>`。
+- **锁文件必须存在且必须提交**。锁文件是防止版本幻觉的第一道防线——不存在的版本会在安装时立即报错，而不是在运行时悄悄出问题。
+  - npm：在脚手架代码生成的同时，在目标 Node 镜像内执行 `npm install` 并提交 `package-lock.json`。
+  - Python：`uv.lock` 已在工作区根目录提交 ✅。每次修改任何 `pyproject.toml` 后都必须运行 `uv sync` 保持锁文件更新。
+  - Docker Compose：提交前执行 `docker pull <image>:<tag>` 确认每个镜像 tag 确实存在。
+- **版本–功能一致性**：使用某个特定版本才有的功能（如 `next.config.ts` 需要 Next.js 15+），就必须将包固定到该版本，不得将版本 N 的功能与版本 N-1 的 pin 混用。
+- **兄弟包版本对齐**：相关联的包（如 `temporalio/auto-setup` 与 `temporalio/admin-tools`）必须使用相同的版本 tag。不得假设发版节奏独立的包之间版本号对等。
+
+---
+
 ### Engineering Philosophy / 工程原则
 
 **EN:**  
