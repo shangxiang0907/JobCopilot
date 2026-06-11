@@ -26,7 +26,7 @@ async def list_applications(
     status_filter: str | None = Query(default=None, alias="status"),
 ) -> PaginatedResponse[ApplicationResponse]:
     repo = ApplicationRepository(session)
-    apps, total = await repo.list(user_id, page=page, size=size, status=status_filter)
+    apps, total = await repo.get_all(user_id, page=page, size=size, status=status_filter)
     items = [ApplicationResponse.model_validate(a) for a in apps]
     return PaginatedResponse(
         items=items, total=total, page=page, size=size, has_next=(page * size < total)

@@ -39,7 +39,7 @@ class CompanyRepository:
             raise NotFoundError(f"Company {company_id} not found")
         return company
 
-    async def list(
+    async def get_all(
         self,
         tenant_id: uuid.UUID,
         page: int = 1,

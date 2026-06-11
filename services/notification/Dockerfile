@@ -1,29 +1,32 @@
-FROM python:3.11-slim
-
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+# Build context: repository root
+FROM python:3.11-slim AS build
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Copy workspace files needed for the shared package
-COPY packages/shared /workspace/packages/shared
-COPY pyproject.toml uv.lock* /workspace/
+WORKDIR /app
 
-COPY services/notification/pyproject.toml /app/
+COPY pyproject.toml uv.lock ./
+COPY packages/shared ./packages/shared/
+COPY services/notification ./services/notification/
 
-RUN cd /workspace && uv pip install --system /workspace/packages/shared
-RUN uv pip install --system -r /app/pyproject.toml --no-deps || true
-RUN cd /app && uv pip install --system .
+RUN uv sync --frozen --package notification-service --no-dev --no-editable --compile-bytecode
 
-COPY services/notification/ /app/
+# ---- runtime ----
+FROM python:3.11-slim
 
-RUN useradd -m -u 1000 appuser && chown -R appuser /app
+RUN useradd -u 1000 -m appuser
+WORKDIR /app
+
+COPY --from=build /app/.venv /app/.venv
+COPY services/notification .
+
+ENV PATH="/app/.venv/bin:$PATH"
+ENV VIRTUAL_ENV="/app/.venv"
+
 USER appuser
-
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-    CMD curl -f http://localhost:8000/healthz/live || exit 1
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz/live')"
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

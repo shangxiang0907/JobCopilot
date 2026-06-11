@@ -1,32 +1,29 @@
 # Build context: repository root
 FROM python:3.11-slim AS build
 
-WORKDIR /build
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-RUN pip install --no-cache-dir uv
+WORKDIR /app
 
-# Install shared package
-COPY packages/shared /build/packages/shared
-RUN uv pip install --system --no-cache /build/packages/shared
+COPY pyproject.toml uv.lock ./
+COPY packages/shared ./packages/shared/
+COPY services/job ./services/job/
 
-# Install service
-COPY services/job /build/services/job
-RUN uv pip install --system --no-cache /build/services/job
+RUN uv sync --frozen --package job-service --no-dev --no-editable --compile-bytecode
 
 # ---- runtime ----
 FROM python:3.11-slim
 
 RUN useradd -u 1000 -m appuser
-
 WORKDIR /app
 
-COPY --from=build /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=build /usr/local/bin/uvicorn /usr/local/bin/uvicorn
+COPY --from=build /app/.venv /app/.venv
+COPY services/job .
 
-COPY services/job /app
+ENV PATH="/app/.venv/bin:$PATH"
+ENV VIRTUAL_ENV="/app/.venv"
 
 USER appuser
-
 EXPOSE 8000
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \

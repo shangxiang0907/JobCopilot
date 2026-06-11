@@ -50,7 +50,7 @@ class ApplicationRepository:
             raise NotFoundError(f"Application {application_id} not found")
         return app
 
-    async def list(
+    async def get_all(
         self,
         user_id: uuid.UUID,
         page: int = 1,

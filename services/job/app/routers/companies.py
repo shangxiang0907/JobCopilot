@@ -18,7 +18,7 @@ async def list_companies(
     size: int = 20,
 ) -> PaginatedResponse[CompanyResponse]:
     repo = CompanyRepository(session)
-    companies, total = await repo.list(tenant_id, page=page, size=size)
+    companies, total = await repo.get_all(tenant_id, page=page, size=size)
     items = [CompanyResponse.model_validate(c) for c in companies]
     return PaginatedResponse(
         items=items, total=total, page=page, size=size, has_next=(page * size < total)

@@ -21,7 +21,7 @@ async def list_jobs(
     job_type: str | None = Query(default=None),
 ) -> PaginatedResponse[JobResponse]:
     repo = JobRepository(session)
-    jobs, total = await repo.list(
+    jobs, total = await repo.get_all(
         tenant_id, page=page, size=size, source=source, location=location, job_type=job_type
     )
     items = [JobResponse.model_validate(j) for j in jobs]

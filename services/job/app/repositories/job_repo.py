@@ -78,7 +78,7 @@ class JobRepository:
             raise NotFoundError(f"Job {job_id} not found")
         return job
 
-    async def list(
+    async def get_all(
         self,
         tenant_id: uuid.UUID,
         page: int = 1,

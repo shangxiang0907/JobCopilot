@@ -1,23 +1,24 @@
 # Build context: repository root
 FROM python:3.11-slim AS build
 
-WORKDIR /build
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-RUN pip install --no-cache-dir uv
+WORKDIR /app
 
-COPY packages/shared /build/packages/shared
-RUN uv pip install --system --no-cache /build/packages/shared
+COPY pyproject.toml uv.lock ./
+COPY packages/shared ./packages/shared/
+COPY services/discovery ./services/discovery/
 
-COPY services/discovery /build/services/discovery
-RUN uv pip install --system --no-cache /build/services/discovery
+RUN uv sync --frozen --package discovery-service --no-dev --no-editable --compile-bytecode
 
-# Install Playwright and Chromium browser
-RUN playwright install --with-deps chromium
+# Download Chromium to a fixed path (independent of which user runs the container)
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+RUN /app/.venv/bin/playwright install chromium
 
 # ---- runtime ----
 FROM python:3.11-slim
 
-# Install runtime deps for Chromium
+# Runtime system libs required by Chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
     libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
@@ -25,19 +26,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -u 1000 -m appuser
-
 WORKDIR /app
 
-COPY --from=build /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=build /usr/local/bin/uvicorn /usr/local/bin/uvicorn
-COPY --from=build /root/.cache/ms-playwright /home/appuser/.cache/ms-playwright
+COPY --from=build /app/.venv /app/.venv
+COPY --from=build /opt/playwright /opt/playwright
+COPY services/discovery .
 
-COPY services/discovery /app
-
-RUN chown -R appuser:appuser /home/appuser/.cache
+ENV PATH="/app/.venv/bin:$PATH"
+ENV VIRTUAL_ENV="/app/.venv"
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 USER appuser
-
 EXPOSE 8000
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=15s --retries=3 \
