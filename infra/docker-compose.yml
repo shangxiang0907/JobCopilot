@@ -1,0 +1,417 @@
+name: jobcopilot
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Local development environment.
+#
+# Usage:
+#   cp .env.example .env          # fill in at least ENCRYPTION_KEY
+#   docker compose up --build -d
+#
+# Service ports on the host:
+#   Kong proxy      http://localhost:8000   (all /v1/* API traffic)
+#   Kong admin      http://localhost:8001
+#   Keycloak        http://localhost:8080   (admin: admin/admin)
+#   RabbitMQ UI     http://localhost:15672  (guest/guest)
+#   Temporal UI     http://localhost:8233
+#   Frontend        http://localhost:3000
+#
+# Direct service ports (debugging only, bypass Kong):
+#   profile-service   :8010    job-service       :8011
+#   discovery-service :8012    agent-service     :8013
+#   notification-svc  :8014
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: jobcopilot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.2-alpine
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.9.2
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgresql
+      DB_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PWD: postgres
+      POSTGRES_SEEDS: postgres
+      TEMPORAL_BROADCAST_ADDRESS: temporal
+      LOG_LEVEL: warn
+    ports:
+      - "7233:7233"
+    healthcheck:
+      test: ["CMD-SHELL", "temporal operator cluster health 2>&1 | grep -q SERVING"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  temporal-ui:
+    image: temporalio/ui:2.26.2
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:8233
+    ports:
+      - "8233:8080"
+    restart: unless-stopped
+
+  # One-shot container: creates the `jobcopilot` Temporal namespace after server boots.
+  temporal-namespace-init:
+    image: temporalio/admin-tools:1.24.2
+    depends_on:
+      temporal:
+        condition: service_healthy
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    command: >
+      sh -c "temporal operator namespace create jobcopilot --retention 7 2>/dev/null
+             && echo 'Namespace jobcopilot created'
+             || echo 'Namespace jobcopilot already exists or creation skipped'"
+    restart: "no"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    command: start-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_LOG_LEVEL: WARN
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  kong:
+    image: kong:3.6-alpine
+    depends_on:
+      profile-service:
+        condition: service_healthy
+      job-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+      agent-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_LOG_LEVEL: warn
+    volumes:
+      - ./kong/kong.yml:/etc/kong/kong.yml:ro
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Application Services ────────────────────────────────────────────────────
+  #
+  # Each service runs `alembic upgrade head` before starting uvicorn so schemas
+  # are always up-to-date on container boot.
+
+  profile-service:
+    build:
+      context: ..
+      dockerfile: services/profile/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: profile-service
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobcopilot
+      REDIS_URL: redis://redis:6379
+      QDRANT_URL: http://qdrant:6333
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: jobcopilot
+      KEYCLOAK_CLIENT_ID: api
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      EMBEDDING_MODEL: text-embedding-v3
+      EMBEDDING_DIMENSIONS: "1024"
+      RESUME_STORAGE_PATH: /data/resumes
+      MAX_RESUME_SIZE_MB: "10"
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+    volumes:
+      - resume_data:/data/resumes
+    ports:
+      - "8010:8000"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz/live')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  job-service:
+    build:
+      context: ..
+      dockerfile: services/job/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: job-service
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobcopilot
+      REDIS_URL: redis://redis:6379
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: jobcopilot
+      KEYCLOAK_CLIENT_ID: api
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+    ports:
+      - "8011:8000"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz/live')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  discovery-service:
+    build:
+      context: ..
+      dockerfile: services/discovery/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: discovery-service
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobcopilot
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      TEMPORAL_HOST: temporal:7233
+      TEMPORAL_NAMESPACE: jobcopilot
+      PROFILE_SERVICE_URL: http://profile-service:8000
+      PLAYWRIGHT_HEADLESS: "true"
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: jobcopilot
+      KEYCLOAK_CLIENT_ID: api
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+    ports:
+      - "8012:8000"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz/live')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  agent-service:
+    build:
+      context: ..
+      dockerfile: services/agent/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: agent-service
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobcopilot
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      LLM_MODEL: ${LLM_MODEL:-qwen-max}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2:-false}
+      PROFILE_SERVICE_URL: http://profile-service:8000
+      JOB_SERVICE_URL: http://job-service:8000
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: jobcopilot
+      KEYCLOAK_CLIENT_ID: api
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+    ports:
+      - "8013:8000"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/healthz/live || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: ..
+      dockerfile: services/notification/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: notification-service
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobcopilot
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: jobcopilot
+      KEYCLOAK_CLIENT_ID: api
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-noreply@jobcopilot.ai}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+    ports:
+      - "8014:8000"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/healthz/live || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        KONG_URL: http://kong:8000
+    depends_on:
+      kong:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+# ── Volumes ─────────────────────────────────────────────────────────────────
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  qdrant_data:
+  resume_data:
