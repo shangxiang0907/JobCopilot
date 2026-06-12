@@ -1,9 +1,9 @@
 import asyncio
 from logging.config import fileConfig
 
-import app.models  # noqa: F401  — registers models on Base.metadata
+import jobcopilot_discovery.models  # noqa: F401  — registers models on Base.metadata
 from alembic import context
-from app.config import settings
+from jobcopilot_discovery.config import settings
 from jobcopilot_shared.models.base import Base
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine

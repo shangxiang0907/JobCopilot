@@ -40,7 +40,7 @@ spec:
       containers:
         - name: notification-service
           image: ghcr.io/YOUR_ORG/jobcopilot-notification:latest
-          command: ["/bin/sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+          command: ["/bin/sh", "-c", "alembic upgrade head && uvicorn jobcopilot_notification.main:app --host 0.0.0.0 --port 8000"]
           ports:
             - containerPort: 8000
           envFrom:

@@ -1,8 +1,7 @@
 """Unit tests for pure scraper utility functions (no Playwright, no network)."""
 
 import pytest
-
-from app.services.linkedin_scraper import _normalise_url
+from jobcopilot_discovery.services.linkedin_scraper import _normalise_url
 
 
 class TestNormaliseUrl:
@@ -57,6 +56,8 @@ class TestWorkflowStatusTransitions:
 
     VALID_STATUSES = {"pending", "running", "completed", "failed", "cookie_expired"}
 
-    @pytest.mark.parametrize("status", ["pending", "running", "completed", "failed", "cookie_expired"])
+    @pytest.mark.parametrize(
+        "status", ["pending", "running", "completed", "failed", "cookie_expired"]
+    )
     def test_status_in_valid_set(self, status: str):
         assert status in self.VALID_STATUSES

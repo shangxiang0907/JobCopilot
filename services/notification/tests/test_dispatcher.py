@@ -4,7 +4,10 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from app.services.dispatcher import dispatch
+from jobcopilot_notification.services.dispatcher import dispatch
+
+_REPO = "jobcopilot_notification.services.dispatcher.NotificationRepository"
+_SEND_EMAIL = "jobcopilot_notification.services.dispatcher.send_email"
 
 
 @pytest.fixture()
@@ -33,7 +36,7 @@ async def test_dispatch_in_app_no_preference(mock_session, mock_repo):
     fake_notification = MagicMock(id=uuid.uuid4())
     mock_repo.create.return_value = fake_notification
 
-    with patch("app.services.dispatcher.NotificationRepository", return_value=mock_repo):
+    with patch(_REPO, return_value=mock_repo):
         result = await dispatch(
             mock_session,
             tenant_id=tenant_id,
@@ -56,7 +59,7 @@ async def test_dispatch_email_without_preference_marks_failed(mock_session, mock
     mock_repo.create.return_value = fake_notification
     mock_repo.get_preference.return_value = None
 
-    with patch("app.services.dispatcher.NotificationRepository", return_value=mock_repo):
+    with patch(_REPO, return_value=mock_repo):
         await dispatch(
             mock_session,
             tenant_id=uuid.uuid4(),
@@ -87,8 +90,8 @@ async def test_dispatch_email_with_preference_sends(mock_session, mock_repo):
     mock_repo.get_preference.return_value = pref
 
     with (
-        patch("app.services.dispatcher.NotificationRepository", return_value=mock_repo),
-        patch("app.services.dispatcher.send_email", new_callable=AsyncMock) as mock_email,
+        patch(_REPO, return_value=mock_repo),
+        patch(_SEND_EMAIL, new_callable=AsyncMock) as mock_email,
     ):
         await dispatch(
             mock_session,
@@ -113,7 +116,7 @@ async def test_dispatch_multiple_channels(mock_session, mock_repo):
     mock_repo.create.side_effect = notifications
     mock_repo.get_preference.return_value = None
 
-    with patch("app.services.dispatcher.NotificationRepository", return_value=mock_repo):
+    with patch(_REPO, return_value=mock_repo):
         result = await dispatch(
             mock_session,
             tenant_id=uuid.uuid4(),

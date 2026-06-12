@@ -37,7 +37,9 @@ def upgrade() -> None:
         sa.Column("updated_at", _TS, nullable=False, server_default=_NOW),
         schema=_SCHEMA,
     )
-    op.create_index("ix_discovery_configs_user_id", "discovery_configs", ["user_id"], schema=_SCHEMA)
+    op.create_index(
+        "ix_discovery_configs_user_id", "discovery_configs", ["user_id"], schema=_SCHEMA
+    )
 
     op.create_table(
         "discovery_runs",

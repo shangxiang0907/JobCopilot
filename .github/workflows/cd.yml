@@ -46,7 +46,7 @@ jobs:
             context: frontend
             build_args: "KONG_URL=http://kong:8000"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
@@ -107,7 +107,7 @@ jobs:
     needs: image-scan
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Apply manifests
         run: |

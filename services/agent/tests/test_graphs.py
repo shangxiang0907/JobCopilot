@@ -4,9 +4,9 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from app.graphs.analyzer_graph import AnalyzerState, analyzer_graph
-from app.graphs.interview_graph import InterviewState, interview_graph
-from app.graphs.resume_graph import ResumeState, resume_graph
+from jobcopilot_agent.graphs.analyzer_graph import AnalyzerState, analyzer_graph
+from jobcopilot_agent.graphs.interview_graph import InterviewState, interview_graph
+from jobcopilot_agent.graphs.resume_graph import ResumeState, resume_graph
 
 
 def _make_llm_response(content: dict) -> MagicMock:
@@ -33,17 +33,18 @@ async def test_analyzer_graph_extracts_structure():
         "salary_range": None,
     }
     match = {
-        "match_score": 82, "matched_skills": ["Python"], "missing_skills": [], "summary": "Good fit"
+        "match_score": 82,
+        "matched_skills": ["Python"],
+        "missing_skills": [],
+        "summary": "Good fit",
     }
 
     with (
-        patch("app.graphs.analyzer_graph.get_llm") as mock_get_llm,
-        patch("app.graphs.analyzer_graph.httpx.AsyncClient") as mock_client_cls,
+        patch("jobcopilot_agent.graphs.analyzer_graph.get_llm") as mock_get_llm,
+        patch("jobcopilot_agent.graphs.analyzer_graph.httpx.AsyncClient") as mock_client_cls,
     ):
         llm = AsyncMock()
-        llm.ainvoke = AsyncMock(
-            side_effect=[_make_llm_response(jd), _make_llm_response(match)]
-        )
+        llm.ainvoke = AsyncMock(side_effect=[_make_llm_response(jd), _make_llm_response(match)])
         mock_get_llm.return_value = llm
 
         mock_resp = MagicMock()
@@ -79,13 +80,22 @@ async def test_analyzer_graph_extracts_structure():
 
 @pytest.mark.asyncio
 async def test_analyzer_graph_handles_missing_resume():
-    jd = {"title": "Engineer", "company": "Corp", "location": "", "employment_type": "",
-          "experience_years": None, "skills_required": ["Python"], "skills_preferred": [],
-          "responsibilities": [], "qualifications": [], "salary_range": None}
+    jd = {
+        "title": "Engineer",
+        "company": "Corp",
+        "location": "",
+        "employment_type": "",
+        "experience_years": None,
+        "skills_required": ["Python"],
+        "skills_preferred": [],
+        "responsibilities": [],
+        "qualifications": [],
+        "salary_range": None,
+    }
 
     with (
-        patch("app.graphs.analyzer_graph.get_llm") as mock_get_llm,
-        patch("app.graphs.analyzer_graph.httpx.AsyncClient") as mock_client_cls,
+        patch("jobcopilot_agent.graphs.analyzer_graph.get_llm") as mock_get_llm,
+        patch("jobcopilot_agent.graphs.analyzer_graph.httpx.AsyncClient") as mock_client_cls,
     ):
         llm = AsyncMock()
         llm.ainvoke = AsyncMock(return_value=_make_llm_response(jd))
@@ -100,11 +110,19 @@ async def test_analyzer_graph_handles_missing_resume():
         mock_client_cls.return_value = mock_client
 
         state: AnalyzerState = {
-            "job_id": "job-2", "user_id": "user-2", "tenant_id": "tenant-1",
-            "url": "https://linkedin.com/jobs/2", "title": "Engineer",
-            "company_name": "Corp", "location": "", "raw_text": "Job desc",
-            "resume_text": "", "jd_structured": {}, "skills_required": [],
-            "match_score": 0.0, "error": None,
+            "job_id": "job-2",
+            "user_id": "user-2",
+            "tenant_id": "tenant-1",
+            "url": "https://linkedin.com/jobs/2",
+            "title": "Engineer",
+            "company_name": "Corp",
+            "location": "",
+            "raw_text": "Job desc",
+            "resume_text": "",
+            "jd_structured": {},
+            "skills_required": [],
+            "match_score": 0.0,
+            "error": None,
         }
         result = await analyzer_graph.ainvoke(state)
 
@@ -134,18 +152,24 @@ async def test_resume_graph_gap_analysis():
         ],
     }
 
-    with patch("app.graphs.resume_graph.get_llm") as mock_get_llm:
+    with patch("jobcopilot_agent.graphs.resume_graph.get_llm") as mock_get_llm:
         llm = AsyncMock()
         llm.ainvoke = AsyncMock(return_value=_make_llm_response(analysis_result))
         mock_get_llm.return_value = llm
 
         state: ResumeState = {
-            "job_id": "job-1", "user_id": "user-1", "tenant_id": "tenant-1",
+            "job_id": "job-1",
+            "user_id": "user-1",
+            "tenant_id": "tenant-1",
             "jd_structured": {
-                "title": "Senior Engineer", "skills_required": ["Python", "Kubernetes"]
+                "title": "Senior Engineer",
+                "skills_required": ["Python", "Kubernetes"],
             },
             "resume_text": "Python developer with 3 years experience",
-            "match_score": 0.0, "gap_analysis": {}, "suggestions": [], "error": None,
+            "match_score": 0.0,
+            "gap_analysis": {},
+            "suggestions": [],
+            "error": None,
         }
         result = await resume_graph.ainvoke(state)
 
@@ -166,7 +190,8 @@ async def test_interview_graph_generates_questions():
                 "intent": "problem solving",
                 "reference_answer": "Use STAR",
             }
-        ] * 5
+        ]
+        * 5
     }
     technical = {
         "questions": [
@@ -176,27 +201,35 @@ async def test_interview_graph_generates_questions():
                 "topic": "Python async",
                 "reference_answer": "Event loop...",
             }
-        ] * 5
+        ]
+        * 5
     }
 
-    with patch("app.graphs.interview_graph.get_llm") as mock_get_llm:
+    with patch("jobcopilot_agent.graphs.interview_graph.get_llm") as mock_get_llm:
         llm = AsyncMock()
-        llm.ainvoke = AsyncMock(side_effect=[
-            _make_llm_response(behavioral),
-            _make_llm_response(technical),
-        ])
+        llm.ainvoke = AsyncMock(
+            side_effect=[
+                _make_llm_response(behavioral),
+                _make_llm_response(technical),
+            ]
+        )
         mock_get_llm.return_value = llm
 
         state: InterviewState = {
-            "job_id": "job-1", "user_id": "user-1", "tenant_id": "tenant-1",
+            "job_id": "job-1",
+            "user_id": "user-1",
+            "tenant_id": "tenant-1",
             "jd_structured": {
-                "title": "Python Engineer", "company": "Acme",
+                "title": "Python Engineer",
+                "company": "Acme",
                 "skills_required": ["Python", "asyncio"],
                 "skills_preferred": ["FastAPI"],
                 "responsibilities": ["Build services"],
                 "experience_years": 3,
             },
-            "behavioral_questions": [], "technical_questions": [], "error": None,
+            "behavioral_questions": [],
+            "technical_questions": [],
+            "error": None,
         }
         result = await interview_graph.ainvoke(state)
 

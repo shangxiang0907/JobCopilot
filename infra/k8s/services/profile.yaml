@@ -59,7 +59,7 @@ spec:
         - name: profile-service
           # Build with: docker build -f services/profile/Dockerfile -t ghcr.io/YOUR_ORG/jobcopilot-profile:latest .
           image: ghcr.io/YOUR_ORG/jobcopilot-profile:latest
-          command: ["/bin/sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"]
+          command: ["/bin/sh", "-c", "alembic upgrade head && uvicorn jobcopilot_profile.main:app --host 0.0.0.0 --port 8000 --workers 2"]
           ports:
             - containerPort: 8000
           envFrom:

@@ -40,7 +40,7 @@ spec:
       containers:
         - name: job-service
           image: ghcr.io/YOUR_ORG/jobcopilot-job:latest
-          command: ["/bin/sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"]
+          command: ["/bin/sh", "-c", "alembic upgrade head && uvicorn jobcopilot_job.main:app --host 0.0.0.0 --port 8000 --workers 2"]
           ports:
             - containerPort: 8000
           envFrom:

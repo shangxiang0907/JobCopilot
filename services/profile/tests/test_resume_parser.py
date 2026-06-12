@@ -1,6 +1,6 @@
 """Unit tests for resume_parser — no filesystem or network required."""
 
-from app.services.resume_parser import _detect_sections, _match_section
+from jobcopilot_profile.services.resume_parser import _detect_sections, _match_section
 
 
 def test_match_section_experience() -> None:

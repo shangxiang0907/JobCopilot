@@ -1,7 +1,7 @@
 """Unit tests for application status state machine — no DB required."""
 
 import pytest
-from app.models.application import VALID_TRANSITIONS
+from jobcopilot_job.models.application import VALID_TRANSITIONS
 
 
 def all_statuses() -> list[str]:

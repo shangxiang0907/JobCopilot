@@ -22,6 +22,7 @@ class PermissionDeniedError(JobCopilotError):
 
 class TenantIsolationError(JobCopilotError):
     """Raised when a query would access data outside the caller's tenant."""
+
     status_code = HTTPStatus.FORBIDDEN
     error_code = "tenant_isolation_violation"
 
@@ -43,6 +44,7 @@ class ExternalServiceError(JobCopilotError):
 
 class CookieExpiredError(ExternalServiceError):
     """LinkedIn session cookie has expired or been invalidated."""
+
     error_code = "linkedin_cookie_expired"
 
 

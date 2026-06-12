@@ -1,9 +1,9 @@
 import asyncio
 from logging.config import fileConfig
 
-import app.models  # noqa: F401
+import jobcopilot_agent.models  # noqa: F401
 from alembic import context
-from app.config import settings
+from jobcopilot_agent.config import settings
 from jobcopilot_shared.models.base import Base
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
