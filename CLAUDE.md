@@ -10,9 +10,11 @@ All documentation in this repo is **bilingual (English / Chinese)** in a single-
 
 ## Project Status / 项目状态
 
-**No application code exists yet.** The repository currently contains only architecture and product documents. Implementation follows `docs/SAD.md` for architecture decisions and `docs/PRD.md` for product requirements.
+**EN:**  
+All application code is implemented and running locally. The full stack — 5 backend microservices, shared library, Next.js 15 frontend, and Docker Compose infrastructure (PostgreSQL, Redis, RabbitMQ, Qdrant, Temporal, Kong, Keycloak) — is committed, pushed, and healthy. Implementation follows `docs/SAD.md` for architecture decisions and `docs/PRD.md` for product requirements. **Next milestone: Kubernetes manifests (`infra/k8s/`).**
 
-**尚无应用代码。** 仓库目前仅包含架构与产品文档。实现以 `docs/SAD.md` 架构决策和 `docs/PRD.md` 产品需求为准。
+**中文：**  
+所有应用代码已实现并在本地正常运行。完整技术栈——5 个后端微服务、共享库、Next.js 15 前端、Docker Compose 基础设施（PostgreSQL、Redis、RabbitMQ、Qdrant、Temporal、Kong、Keycloak）——均已提交推送并处于健康状态。实现以 `docs/SAD.md` 架构决策和 `docs/PRD.md` 产品需求为准。**下一里程碑：Kubernetes 清单文件（`infra/k8s/`）。**
 
 ---
 
