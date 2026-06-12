@@ -8,12 +8,11 @@ import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncEngine
-
 from jobcopilot_job.repositories.job_repo import JobRepository
 from jobcopilot_job.schemas.job import InternalJobCreate
 from jobcopilot_shared.db import build_engine, build_session_factory
 from jobcopilot_shared.exceptions import NotFoundError
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 
 @pytest.fixture

@@ -8,11 +8,10 @@ import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncEngine
-
 from jobcopilot_profile.repositories.profile_repo import ProfileRepository
 from jobcopilot_profile.schemas.profile import PersonalInfo, ProfileUpsert
 from jobcopilot_shared.db import build_engine, build_session_factory
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 
 @pytest.fixture
@@ -30,7 +29,9 @@ async def test_profile_upsert_and_get(db_engine: AsyncEngine) -> None:
         async with session.begin():
             profile = await ProfileRepository(session).upsert(
                 user_id,
-                ProfileUpsert(personal_info=PersonalInfo(name="Test User", email="test@example.com")),
+                ProfileUpsert(
+                    personal_info=PersonalInfo(name="Test User", email="test@example.com")
+                ),
             )
             assert profile.user_id == user_id
             assert profile.personal_info is not None

@@ -8,10 +8,9 @@ import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncEngine
-
 from jobcopilot_notification.repositories.notification_repo import NotificationRepository
 from jobcopilot_shared.db import build_engine, build_session_factory
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 
 @pytest.fixture

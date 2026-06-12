@@ -4,7 +4,6 @@ import os
 
 import aio_pika
 import pytest
-
 from jobcopilot_shared.redis_client import build_redis
 
 
