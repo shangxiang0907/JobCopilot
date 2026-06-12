@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jobcopilot-config
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/part-of: jobcopilot
+data:
+  ENVIRONMENT: "production"
+
+  # Auth
+  KEYCLOAK_URL: "http://keycloak:8080"
+  KEYCLOAK_REALM: "jobcopilot"
+  KEYCLOAK_CLIENT_ID: "api"
+
+  # Data stores (non-secret)
+  REDIS_URL: "redis://redis:6379"
+  QDRANT_URL: "http://qdrant:6333"
+
+  # Workflow
+  TEMPORAL_HOST: "temporal:7233"
+  TEMPORAL_NAMESPACE: "jobcopilot"
+
+  # LLM
+  DASHSCOPE_BASE_URL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  LLM_MODEL: "qwen-max"
+  LANGCHAIN_TRACING_V2: "false"
+
+  # Embeddings
+  EMBEDDING_MODEL: "text-embedding-v3"
+  EMBEDDING_DIMENSIONS: "1024"
+
+  # Profile service
+  RESUME_STORAGE_PATH: "/data/resumes"
+  MAX_RESUME_SIZE_MB: "10"
+
+  # Discovery service
+  PLAYWRIGHT_HEADLESS: "true"
+
+  # Internal service URLs (used for inter-service calls)
+  PROFILE_SERVICE_URL: "http://profile-service:8000"
+  JOB_SERVICE_URL: "http://job-service:8000"
+
+  # Notification
+  SMTP_PORT: "587"
+  SMTP_FROM_ADDRESS: "noreply@jobcopilot.ai"
+  SMTP_USE_TLS: "true"

@@ -1,0 +1,75 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discovery-service
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: discovery-service
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  selector:
+    app.kubernetes.io/name: discovery-service
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discovery-service
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: discovery-service
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: discovery-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: discovery-service
+        app.kubernetes.io/part-of: jobcopilot
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: discovery-service
+          image: ghcr.io/YOUR_ORG/jobcopilot-discovery:latest
+          command: ["/bin/sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: jobcopilot-config
+            - secretRef:
+                name: jobcopilot-secrets
+          env:
+            - name: SERVICE_NAME
+              value: discovery-service
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8000
+            initialDelaySeconds: 35
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz/live
+              port: 8000
+            initialDelaySeconds: 50
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            # Playwright requires more CPU/memory than typical FastAPI services.
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi

@@ -1,0 +1,112 @@
+# Prerequisite: KEDA must be installed in the cluster.
+# Install: https://keda.sh/docs/latest/deploy/
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-service
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: agent-service
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  selector:
+    app.kubernetes.io/name: agent-service
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-service
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: agent-service
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agent-service
+        app.kubernetes.io/part-of: jobcopilot
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: agent-service
+          image: ghcr.io/YOUR_ORG/jobcopilot-agent:latest
+          command: ["/bin/sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: jobcopilot-config
+            - secretRef:
+                name: jobcopilot-secrets
+          env:
+            - name: SERVICE_NAME
+              value: agent-service
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8000
+            initialDelaySeconds: 25
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz/live
+              port: 8000
+            initialDelaySeconds: 40
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            # LangGraph + LLM calls require ample memory.
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+---
+# TriggerAuthentication feeds the RabbitMQ AMQP URL to KEDA without embedding credentials.
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: rabbitmq-trigger-auth
+  namespace: jobcopilot
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: jobcopilot-secrets
+      key: RABBITMQ_URL
+---
+# ScaledObject: scale agent-service based on the `job.discovered` queue depth.
+# 1 replica per 10 messages; min 1, max 10.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: agent-service
+  namespace: jobcopilot
+spec:
+  scaleTargetRef:
+    name: agent-service
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  pollingInterval: 15
+  cooldownPeriod: 60
+  triggers:
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        queueName: job.discovered
+        queueLength: "10"
+      authenticationRef:
+        name: rabbitmq-trigger-auth

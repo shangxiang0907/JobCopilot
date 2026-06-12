@@ -1,0 +1,120 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: profile-service
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: profile-service
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  selector:
+    app.kubernetes.io/name: profile-service
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+# resume-data requires a StorageClass that supports ReadWriteMany
+# (e.g. EFS on EKS, Azure Files on AKS, NFS for bare-metal).
+# For object storage (S3/MinIO) instead, replace this PVC with the appropriate SDK config.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: resume-data
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: profile-service
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: profile-service
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: profile-service
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: profile-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: profile-service
+        app.kubernetes.io/part-of: jobcopilot
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: profile-service
+          # Build with: docker build -f services/profile/Dockerfile -t ghcr.io/YOUR_ORG/jobcopilot-profile:latest .
+          image: ghcr.io/YOUR_ORG/jobcopilot-profile:latest
+          command: ["/bin/sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"]
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: jobcopilot-config
+            - secretRef:
+                name: jobcopilot-secrets
+          env:
+            - name: SERVICE_NAME
+              value: profile-service
+          volumeMounts:
+            - name: resume-data
+              mountPath: /data/resumes
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8000
+            initialDelaySeconds: 25
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz/live
+              port: 8000
+            initialDelaySeconds: 40
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: resume-data
+          persistentVolumeClaim:
+            claimName: resume-data
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: profile-service
+  namespace: jobcopilot
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: profile-service
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

@@ -1,0 +1,266 @@
+# Kong API Gateway — DB-less mode, same declarative config as Docker Compose.
+# Service hostnames (profile-service, job-service, etc.) resolve to K8s ClusterIP Services
+# within the jobcopilot namespace.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: jobcopilot
+data:
+  kong.yml: |
+    _format_version: "3.0"
+    _transform: true
+
+    services:
+      - name: profile-svc
+        host: profile-service
+        port: 8000
+        protocol: http
+        connect_timeout: 5000
+        read_timeout: 60000
+        write_timeout: 60000
+        routes:
+          - name: profile-routes
+            paths:
+              - /v1/profiles
+              - /v1/resumes
+            strip_path: false
+            preserve_host: false
+
+      - name: job-svc
+        host: job-service
+        port: 8000
+        protocol: http
+        connect_timeout: 5000
+        read_timeout: 60000
+        write_timeout: 60000
+        routes:
+          - name: job-routes
+            paths:
+              - /v1/jobs
+              - /v1/companies
+              - /v1/applications
+            strip_path: false
+            preserve_host: false
+
+      - name: discovery-svc
+        host: discovery-service
+        port: 8000
+        protocol: http
+        connect_timeout: 5000
+        read_timeout: 120000
+        write_timeout: 120000
+        routes:
+          - name: discovery-routes
+            paths:
+              - /v1/discovery
+            strip_path: false
+            preserve_host: false
+
+      - name: agent-svc
+        host: agent-service
+        port: 8000
+        protocol: http
+        connect_timeout: 5000
+        read_timeout: 300000
+        write_timeout: 300000
+        routes:
+          - name: agent-routes
+            paths:
+              - /v1/agent
+            strip_path: false
+            preserve_host: false
+
+      - name: notification-svc
+        host: notification-service
+        port: 8000
+        protocol: http
+        connect_timeout: 5000
+        read_timeout: 60000
+        write_timeout: 60000
+        routes:
+          - name: notification-routes
+            paths:
+              - /v1/notifications
+            strip_path: false
+            preserve_host: false
+
+      - name: profile-health-svc
+        host: profile-service
+        port: 8000
+        protocol: http
+        path: /healthz/ready
+        routes:
+          - name: profile-health-route
+            paths:
+              - /healthz/profile-service
+            strip_path: true
+            methods: [GET]
+
+      - name: job-health-svc
+        host: job-service
+        port: 8000
+        protocol: http
+        path: /healthz/ready
+        routes:
+          - name: job-health-route
+            paths:
+              - /healthz/job-service
+            strip_path: true
+            methods: [GET]
+
+      - name: discovery-health-svc
+        host: discovery-service
+        port: 8000
+        protocol: http
+        path: /healthz/ready
+        routes:
+          - name: discovery-health-route
+            paths:
+              - /healthz/discovery-service
+            strip_path: true
+            methods: [GET]
+
+      - name: agent-health-svc
+        host: agent-service
+        port: 8000
+        protocol: http
+        path: /healthz/ready
+        routes:
+          - name: agent-health-route
+            paths:
+              - /healthz/agent-service
+            strip_path: true
+            methods: [GET]
+
+      - name: notification-health-svc
+        host: notification-service
+        port: 8000
+        protocol: http
+        path: /healthz/ready
+        routes:
+          - name: notification-health-route
+            paths:
+              - /healthz/notification-service
+            strip_path: true
+            methods: [GET]
+---
+# External-facing proxy service — provisions a cloud load balancer.
+# Change type to NodePort for local/bare-metal clusters.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/component: proxy
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: kong
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+    - name: https
+      port: 443
+      targetPort: 8443
+---
+# Internal admin API — never expose externally.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-admin
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/component: admin
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  selector:
+    app.kubernetes.io/name: kong
+  ports:
+    - name: admin
+      port: 8001
+      targetPort: 8001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kong
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kong
+        app.kubernetes.io/part-of: jobcopilot
+    spec:
+      containers:
+        - name: kong
+          image: kong:3.9
+          ports:
+            - name: proxy
+              containerPort: 8000
+            - name: proxy-ssl
+              containerPort: 8443
+            - name: admin
+              containerPort: 8001
+          env:
+            - name: KONG_DATABASE
+              value: "off"
+            - name: KONG_DECLARATIVE_CONFIG
+              value: /etc/kong/kong.yml
+            - name: KONG_PROXY_ACCESS_LOG
+              value: /dev/stdout
+            - name: KONG_ADMIN_ACCESS_LOG
+              value: /dev/stdout
+            - name: KONG_PROXY_ERROR_LOG
+              value: /dev/stderr
+            - name: KONG_ADMIN_ERROR_LOG
+              value: /dev/stderr
+            - name: KONG_ADMIN_LISTEN
+              value: "0.0.0.0:8001"
+            - name: KONG_LOG_LEVEL
+              value: warn
+          volumeMounts:
+            - name: kong-config
+              mountPath: /etc/kong
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: 8001
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+      volumes:
+        - name: kong-config
+          configMap:
+            name: kong-config

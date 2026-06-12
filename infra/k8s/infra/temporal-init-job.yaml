@@ -1,0 +1,47 @@
+# One-shot Job: creates the `jobcopilot` Temporal namespace after the server is healthy.
+# Apply after the temporal Deployment is ready.
+# ttlSecondsAfterFinished: 300 — the Job (and its pod) auto-deletes 5 minutes after completion.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: temporal-namespace-init
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: temporal-namespace-init
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-temporal
+          image: temporalio/admin-tools:1.29.6
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Temporal to be healthy..."
+              until temporal operator cluster health --address temporal:7233 2>&1 | grep -q SERVING; do
+                sleep 5
+              done
+              echo "Temporal is healthy."
+          env:
+            - name: TEMPORAL_ADDRESS
+              value: temporal:7233
+      containers:
+        - name: create-namespace
+          image: temporalio/admin-tools:1.29.6
+          env:
+            - name: TEMPORAL_ADDRESS
+              value: temporal:7233
+          command:
+            - sh
+            - -c
+            - |
+              temporal operator namespace create \
+                -n jobcopilot \
+                --retention 7d \
+                --address temporal:7233 2>/dev/null \
+              && echo "Namespace jobcopilot created." \
+              || echo "Namespace jobcopilot already exists — skipping."

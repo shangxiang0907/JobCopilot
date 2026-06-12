@@ -1,0 +1,85 @@
+# IMPORTANT: The frontend image must be built with KONG_URL=http://kong (the K8s internal
+# service name for the Kong proxy). This value is baked in at image build time by next.config.ts.
+#
+#   docker build \
+#     --build-arg KONG_URL=http://kong \
+#     -f frontend/Dockerfile \
+#     -t ghcr.io/YOUR_ORG/jobcopilot-frontend:latest \
+#     frontend/
+#
+# The frontend pod reaches Kong via the ClusterIP service (server-side rewrites / SSR).
+# Browser clients reach the frontend via the LoadBalancer IP or an Ingress in front of it.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: frontend
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: frontend
+        app.kubernetes.io/part-of: jobcopilot
+    spec:
+      # node:20-alpine uses the built-in `node` user (uid=1000)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: frontend
+          image: ghcr.io/YOUR_ORG/jobcopilot-frontend:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "3000"
+            - name: HOSTNAME
+              value: "0.0.0.0"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
