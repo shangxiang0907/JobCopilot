@@ -75,7 +75,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen
-      - run: uv run pytest packages/ services/ -v -x
+      - run: uv run pytest packages/ services/ -v -x -m "not integration"
 
   # ── 5. Integration Tests (real PostgreSQL + Redis + RabbitMQ) ────────────────
   integration-test:
@@ -130,4 +130,9 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen
+      - name: Run database migrations
+        run: |
+          (cd services/profile      && uv run alembic upgrade head)
+          (cd services/job          && uv run alembic upgrade head)
+          (cd services/notification && uv run alembic upgrade head)
       - run: uv run pytest packages/ services/ -v -x -m integration
