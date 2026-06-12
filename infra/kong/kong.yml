@@ -77,3 +77,66 @@ services:
           - /v1/notifications
         strip_path: false
         preserve_host: false
+
+# Health-check routes (no auth, for smoke testing and external monitoring).
+# Kong service.path (/healthz/ready) is prepended after strip_path removes the
+# route prefix, so GET /healthz/profile-service → upstream GET /healthz/ready.
+  - name: profile-health-svc
+    host: profile-service
+    port: 8000
+    protocol: http
+    path: /healthz/ready
+    routes:
+      - name: profile-health-route
+        paths:
+          - /healthz/profile-service
+        strip_path: true
+        methods: [GET]
+
+  - name: job-health-svc
+    host: job-service
+    port: 8000
+    protocol: http
+    path: /healthz/ready
+    routes:
+      - name: job-health-route
+        paths:
+          - /healthz/job-service
+        strip_path: true
+        methods: [GET]
+
+  - name: discovery-health-svc
+    host: discovery-service
+    port: 8000
+    protocol: http
+    path: /healthz/ready
+    routes:
+      - name: discovery-health-route
+        paths:
+          - /healthz/discovery-service
+        strip_path: true
+        methods: [GET]
+
+  - name: agent-health-svc
+    host: agent-service
+    port: 8000
+    protocol: http
+    path: /healthz/ready
+    routes:
+      - name: agent-health-route
+        paths:
+          - /healthz/agent-service
+        strip_path: true
+        methods: [GET]
+
+  - name: notification-health-svc
+    host: notification-service
+    port: 8000
+    protocol: http
+    path: /healthz/ready
+    routes:
+      - name: notification-health-route
+        paths:
+          - /healthz/notification-service
+        strip_path: true
+        methods: [GET]
