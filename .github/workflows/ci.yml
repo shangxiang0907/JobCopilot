@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Lint ──────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  # ── 2. Secret Scan ───────────────────────────────────────────────────────────
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 3. Type Check (per-service matrix) ──────────────────────────────────────
+  typecheck:
+    name: Type Check / ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - packages/shared
+          - services/profile
+          - services/job
+          - services/discovery
+          - services/agent
+          - services/notification
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run mypy ${{ matrix.target }}
+
+  # ── 4. Unit Tests (no real DB / queue) ──────────────────────────────────────
+  unit-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      REDIS_URL: redis://localhost:6379
+      RABBITMQ_URL: amqp://guest:guest@localhost:5672/
+      DASHSCOPE_API_KEY: test-key
+      LANGCHAIN_TRACING_V2: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run pytest packages/ services/ -v -x
+
+  # ── 5. Integration Tests (real PostgreSQL + Redis + RabbitMQ) ────────────────
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [lint, secret-scan, typecheck, unit-test]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: jobcopilot
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7.2-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        options: >-
+          --health-cmd "rabbitmq-diagnostics ping"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 5
+        ports:
+          - 5672:5672
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/jobcopilot
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      REDIS_URL: redis://localhost:6379
+      RABBITMQ_URL: amqp://guest:guest@localhost:5672/
+      DASHSCOPE_API_KEY: test-key
+      LANGCHAIN_TRACING_V2: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run pytest packages/ services/ -v -x

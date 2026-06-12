@@ -1,0 +1,130 @@
+name: CD
+
+# Runs on every push to main.
+# Prerequisite: configure GitHub branch protection to require CI to pass
+# before merging pull requests, so this workflow only fires on green commits.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: cd-main
+  cancel-in-progress: false
+
+jobs:
+  # ── 1. Build & Push all images to ghcr.io ────────────────────────────────────
+  build-push:
+    name: Build & Push / ${{ matrix.service.name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: profile
+            dockerfile: services/profile/Dockerfile
+            context: .
+          - name: job
+            dockerfile: services/job/Dockerfile
+            context: .
+          - name: discovery
+            dockerfile: services/discovery/Dockerfile
+            context: .
+          - name: agent
+            dockerfile: services/agent/Dockerfile
+            context: .
+          - name: notification
+            dockerfile: services/notification/Dockerfile
+            context: .
+          - name: frontend
+            dockerfile: frontend/Dockerfile
+            context: frontend
+            build_args: "KONG_URL=http://kong:8000"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service.name }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service.name }}:latest
+          build-args: ${{ matrix.service.build_args }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 2. Trivy image scan — Critical CVE blocks the pipeline ───────────────────
+  image-scan:
+    name: Image Scan / ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: build-push
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [profile, job, discovery, agent, notification, frontend]
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan ${{ matrix.service }} for Critical CVEs
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service }}:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          vuln-type: os,library
+          severity: CRITICAL
+
+  # ── 3. Deploy to Kubernetes ───────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: image-scan
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply manifests
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          # To activate this step:
+          #   1. Add a KUBECONFIG repository secret (Settings → Secrets → Actions).
+          #   2. Uncomment the lines below.
+          #
+          # echo "${{ secrets.KUBECONFIG }}" > /tmp/kubeconfig.yaml
+          # chmod 600 /tmp/kubeconfig.yaml
+          #
+          # for svc in profile job discovery agent notification; do
+          #   kubectl --kubeconfig /tmp/kubeconfig.yaml \
+          #     set image deployment/${svc}-service ${svc}=ghcr.io/${REPO_OWNER}/jobcopilot-${svc}:${IMAGE_TAG} \
+          #     -n jobcopilot
+          # done
+          # kubectl --kubeconfig /tmp/kubeconfig.yaml \
+          #   set image deployment/frontend frontend=ghcr.io/${REPO_OWNER}/jobcopilot-frontend:${IMAGE_TAG} \
+          #   -n jobcopilot
+          #
+          # kubectl --kubeconfig /tmp/kubeconfig.yaml rollout status deployment -n jobcopilot --timeout=5m
+          echo "Deploy step ready. Add KUBECONFIG secret and uncomment kubectl commands to activate."
