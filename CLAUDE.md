@@ -295,6 +295,24 @@ Concretely:
 
 ---
 
+## Git Commit Convention / Git 提交规范
+
+**EN:**  
+All commit messages must be **bilingual (English / Chinese)**. Write the subject line in English (following Conventional Commits), then add a Chinese summary in the body.
+
+```
+feat(service): add feature X
+
+新增功能 X 的描述（中文）。
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+```
+
+**中文：**  
+所有提交信息必须**中英双语**。标题行用英文（遵循 Conventional Commits），正文中附上中文说明。
+
+---
+
 ## Docs Convention / 文档规范
 
 All documentation files use **bilingual single-file format**:
