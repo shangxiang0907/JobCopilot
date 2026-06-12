@@ -7,6 +7,7 @@ from jobcopilot_shared.crypto import decrypt
 from jobcopilot_shared.exceptions import NotFoundError
 from jobcopilot_shared.logging import get_logger
 
+from jobcopilot_profile.config import settings
 from jobcopilot_profile.deps import SessionDep
 from jobcopilot_profile.repositories.profile_repo import ProfileRepository
 from jobcopilot_profile.repositories.resume_repo import ResumeRepository
@@ -62,7 +63,7 @@ def _safe_decrypt(encrypted: str | None) -> str | None:
     if not encrypted:
         return None
     try:
-        return decrypt(encrypted)
+        return decrypt(encrypted, settings.encryption_key)
     except Exception as exc:
         logger.error("decrypt_failed", error=str(exc))
         return None

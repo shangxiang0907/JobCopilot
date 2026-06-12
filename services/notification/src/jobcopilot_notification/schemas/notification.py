@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, field_validator
 
@@ -11,7 +12,7 @@ class NotificationOut(BaseModel):
     body: str
     channel: str
     status: str
-    metadata_: dict
+    metadata_: dict[str, Any]
     read_at: datetime | None
     created_at: datetime
 
@@ -66,4 +67,4 @@ class InternalNotifyRequest(BaseModel):
     title: str
     body: str
     channels: list[str] = ["in_app"]
-    metadata: dict = {}
+    metadata: dict[str, Any] = {}

@@ -115,7 +115,7 @@ async def get_applications(config: RunnableConfig, status: str = "") -> str:
                 rejected, withdrawn). Leave empty to get all applications.
     """
     user_id, tenant_id = _ctx(config)
-    params: dict = {"user_id": user_id, "tenant_id": tenant_id, "limit": 10}
+    params: dict[str, str | int] = {"user_id": user_id, "tenant_id": tenant_id, "limit": 10}
     if status:
         params["status"] = status
     try:

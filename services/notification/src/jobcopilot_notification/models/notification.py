@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from jobcopilot_shared.models.base import Base
 from sqlalchemy import Boolean, DateTime, String, Text, func
@@ -31,7 +32,9 @@ class Notification(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Extra context (job_id, run_id, etc.)
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, default=dict
+    )
 
     # In-app read tracking
     read_at: Mapped[datetime | None] = mapped_column(_TS, nullable=True)

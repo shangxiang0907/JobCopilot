@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Sequence
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,11 +47,11 @@ class AnalysisRepository:
         self,
         analysis: JobAnalysis,
         *,
-        jd_structured: dict | None = None,
-        skills_required: list | None = None,
+        jd_structured: dict[str, Any] | None = None,
+        skills_required: list[Any] | None = None,
         match_score: float | None = None,
-        resume_suggestions: dict | None = None,
-        interview_questions: dict | None = None,
+        resume_suggestions: dict[str, Any] | None = None,
+        interview_questions: dict[str, Any] | None = None,
         status: str | None = None,
         error_message: str | None = None,
     ) -> JobAnalysis:

@@ -119,7 +119,7 @@ async def validate_cookie_activity(inp: ValidateCookieInput) -> ValidateCookieRe
     if not cookie_enc:
         return ValidateCookieResult(is_valid=False, cookie="")
 
-    cookie = decrypt(settings.encryption_key, cookie_enc)
+    cookie = decrypt(cookie_enc, settings.encryption_key)
     is_valid = await linkedin_scraper.validate_cookie(cookie)
 
     log.info("cookie_validated", user_id=inp.user_id, is_valid=is_valid)

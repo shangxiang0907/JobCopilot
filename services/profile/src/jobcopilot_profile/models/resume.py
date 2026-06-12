@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from jobcopilot_shared.models.base import Base
 from sqlalchemy import Boolean, DateTime, Integer, String, func
@@ -21,7 +22,7 @@ class Resume(Base):
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_url: Mapped[str] = mapped_column(String(1000), nullable=False)
     # Extracted text + basic section structure; embedding lives in Qdrant
-    parsed_data: Mapped[dict | None] = mapped_column(JSONB)
+    parsed_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(_TS, server_default=func.now(), nullable=False)

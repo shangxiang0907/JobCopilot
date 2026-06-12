@@ -1,6 +1,7 @@
 """Unit tests for LangGraph graphs — LLM calls are mocked."""
 
 import json
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -9,7 +10,7 @@ from jobcopilot_agent.graphs.interview_graph import InterviewState, interview_gr
 from jobcopilot_agent.graphs.resume_graph import ResumeState, resume_graph
 
 
-def _make_llm_response(content: dict) -> MagicMock:
+def _make_llm_response(content: dict[str, Any]) -> MagicMock:
     msg = MagicMock()
     msg.content = json.dumps(content)
     return msg
@@ -19,7 +20,7 @@ def _make_llm_response(content: dict) -> MagicMock:
 
 
 @pytest.mark.asyncio
-async def test_analyzer_graph_extracts_structure():
+async def test_analyzer_graph_extracts_structure() -> None:
     jd = {
         "title": "Senior Python Engineer",
         "company": "Acme Corp",
@@ -44,6 +45,7 @@ async def test_analyzer_graph_extracts_structure():
         patch("jobcopilot_agent.graphs.analyzer_graph.httpx.AsyncClient") as mock_client_cls,
     ):
         llm = AsyncMock()
+        llm.bind = MagicMock(return_value=llm)
         llm.ainvoke = AsyncMock(side_effect=[_make_llm_response(jd), _make_llm_response(match)])
         mock_get_llm.return_value = llm
 
@@ -79,7 +81,7 @@ async def test_analyzer_graph_extracts_structure():
 
 
 @pytest.mark.asyncio
-async def test_analyzer_graph_handles_missing_resume():
+async def test_analyzer_graph_handles_missing_resume() -> None:
     jd = {
         "title": "Engineer",
         "company": "Corp",
@@ -98,6 +100,7 @@ async def test_analyzer_graph_handles_missing_resume():
         patch("jobcopilot_agent.graphs.analyzer_graph.httpx.AsyncClient") as mock_client_cls,
     ):
         llm = AsyncMock()
+        llm.bind = MagicMock(return_value=llm)
         llm.ainvoke = AsyncMock(return_value=_make_llm_response(jd))
         mock_get_llm.return_value = llm
 
@@ -135,7 +138,7 @@ async def test_analyzer_graph_handles_missing_resume():
 
 
 @pytest.mark.asyncio
-async def test_resume_graph_gap_analysis():
+async def test_resume_graph_gap_analysis() -> None:
     analysis_result = {
         "match_score": 75,
         "hard_skills_gap": ["Kubernetes"],
@@ -154,6 +157,7 @@ async def test_resume_graph_gap_analysis():
 
     with patch("jobcopilot_agent.graphs.resume_graph.get_llm") as mock_get_llm:
         llm = AsyncMock()
+        llm.bind = MagicMock(return_value=llm)
         llm.ainvoke = AsyncMock(return_value=_make_llm_response(analysis_result))
         mock_get_llm.return_value = llm
 
@@ -182,7 +186,7 @@ async def test_resume_graph_gap_analysis():
 
 
 @pytest.mark.asyncio
-async def test_interview_graph_generates_questions():
+async def test_interview_graph_generates_questions() -> None:
     behavioral = {
         "questions": [
             {
@@ -207,6 +211,7 @@ async def test_interview_graph_generates_questions():
 
     with patch("jobcopilot_agent.graphs.interview_graph.get_llm") as mock_get_llm:
         llm = AsyncMock()
+        llm.bind = MagicMock(return_value=llm)
         llm.ainvoke = AsyncMock(
             side_effect=[
                 _make_llm_response(behavioral),

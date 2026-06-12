@@ -9,6 +9,7 @@ import json
 import logging
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 import aio_pika
 import httpx
@@ -25,7 +26,7 @@ _QUEUE = "agent.job.discovered"
 _ROUTING_KEY = "job.discovered"
 
 
-async def _process_job_message(body: dict) -> None:
+async def _process_job_message(body: dict[str, Any]) -> None:
     """Run AnalyzerGraph for a single discovered job and persist results."""
     user_id = body.get("user_id", "")
     tenant_id = body.get("tenant_id", "")
@@ -136,5 +137,5 @@ async def start_consumer() -> None:
             await asyncio.sleep(5)
 
 
-def start_consumer_background() -> asyncio.Task:
+def start_consumer_background() -> asyncio.Task[None]:
     return asyncio.ensure_future(start_consumer())

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from jobcopilot_shared.models.base import Base
 from sqlalchemy import DateTime, Integer, String, Text, func
@@ -25,7 +26,7 @@ class Job(Base):
     source: Mapped[str] = mapped_column(String(50), nullable=False, default="manual")
     raw_jd: Mapped[str | None] = mapped_column(Text)
     # Structured analysis produced by AnalyzerGraph (Agent Service writes via internal API)
-    analysis: Mapped[dict | None] = mapped_column(JSONB)
+    analysis: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     salary_min: Mapped[int | None] = mapped_column(Integer)
     salary_max: Mapped[int | None] = mapped_column(Integer)
     location: Mapped[str | None] = mapped_column(String(255))

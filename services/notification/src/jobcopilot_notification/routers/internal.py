@@ -13,7 +13,7 @@ router = APIRouter(prefix="/internal", tags=["internal"])
 async def internal_notify(
     payload: InternalNotifyRequest,
     session: SessionDep,
-) -> dict:
+) -> dict[str, int]:
     notifications = await dispatch(
         session,
         tenant_id=payload.tenant_id,

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -59,7 +60,7 @@ class AnalyzeJobResponse(BaseModel):
 
 class ResumeSuggestions(BaseModel):
     match_score: float
-    gap_analysis: dict
+    gap_analysis: dict[str, Any]
     suggestions: list[str]
 
 
@@ -88,11 +89,11 @@ class AnalysisResponse(BaseModel):
     analysis_id: uuid.UUID
     job_id: uuid.UUID
     user_id: uuid.UUID
-    jd_structured: dict | None
-    skills_required: list | None
+    jd_structured: dict[str, Any] | None
+    skills_required: list[Any] | None
     match_score: float | None
-    resume_suggestions: dict | None
-    interview_questions: dict | None
+    resume_suggestions: dict[str, Any] | None
+    interview_questions: dict[str, Any] | None
     status: str
     created_at: datetime
     updated_at: datetime

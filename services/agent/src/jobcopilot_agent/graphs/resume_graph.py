@@ -7,7 +7,7 @@ Nodes:
 
 import json
 import logging
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
@@ -17,24 +17,26 @@ from jobcopilot_agent.services.llm import get_llm
 
 log = logging.getLogger(__name__)
 
+_JSON_MODE = {"response_format": {"type": "json_object"}}
+
 
 class ResumeState(TypedDict):
     # Inputs
     job_id: str
     user_id: str
     tenant_id: str
-    jd_structured: dict
+    jd_structured: dict[str, Any]
     resume_text: str
     # Outputs
     match_score: float
-    gap_analysis: dict
-    suggestions: list[dict]
+    gap_analysis: dict[str, Any]
+    suggestions: list[dict[str, Any]]
     error: str | None
 
 
-async def _gap_analysis_node(state: ResumeState) -> dict:
+async def _gap_analysis_node(state: ResumeState) -> dict[str, Any]:
     """Run LLM gap analysis and generate tailored suggestions."""
-    llm = get_llm()
+    llm = get_llm().bind(**_JSON_MODE)
     messages = [
         SystemMessage(content=GAP_ANALYSIS_SYSTEM),
         HumanMessage(
@@ -45,7 +47,8 @@ async def _gap_analysis_node(state: ResumeState) -> dict:
         ),
     ]
     try:
-        response = await llm.ainvoke(messages, config={"response_format": {"type": "json_object"}})
+        response = await llm.ainvoke(messages)
+        assert isinstance(response.content, str)
         result = json.loads(response.content)
         return {
             "match_score": float(result.get("match_score", 0)),
@@ -68,8 +71,8 @@ async def _gap_analysis_node(state: ResumeState) -> dict:
         }
 
 
-def _build_graph() -> StateGraph:
-    g = StateGraph(ResumeState)
+def _build_graph() -> StateGraph[ResumeState]:
+    g: StateGraph[ResumeState] = StateGraph(ResumeState)
     g.add_node("gap_analysis", _gap_analysis_node)
     g.set_entry_point("gap_analysis")
     g.add_edge("gap_analysis", END)

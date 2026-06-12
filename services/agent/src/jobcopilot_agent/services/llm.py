@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from jobcopilot_agent.config import settings
 
@@ -9,7 +10,7 @@ from jobcopilot_agent.config import settings
 def get_llm() -> ChatOpenAI:
     return ChatOpenAI(
         model=settings.llm_model,
-        openai_api_key=settings.dashscope_api_key or "placeholder",
-        openai_api_base=settings.dashscope_base_url,
+        api_key=SecretStr(settings.dashscope_api_key or "placeholder"),
+        base_url=settings.dashscope_base_url,
         temperature=0.1,
     )

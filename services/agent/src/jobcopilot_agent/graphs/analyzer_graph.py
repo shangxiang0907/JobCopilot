@@ -8,7 +8,7 @@ Nodes:
 
 import json
 import logging
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import httpx
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -25,6 +25,8 @@ from jobcopilot_agent.services.llm import get_llm
 
 log = logging.getLogger(__name__)
 
+_JSON_MODE = {"response_format": {"type": "json_object"}}
+
 
 class AnalyzerState(TypedDict):
     # Inputs
@@ -39,13 +41,13 @@ class AnalyzerState(TypedDict):
     # Intermediate
     resume_text: str
     # Outputs
-    jd_structured: dict
+    jd_structured: dict[str, Any]
     skills_required: list[str]
     match_score: float
     error: str | None
 
 
-async def _fetch_resume_node(state: AnalyzerState) -> dict:
+async def _fetch_resume_node(state: AnalyzerState) -> dict[str, Any]:
     """Fetch the user's active resume from Profile Service."""
     if not state.get("raw_text"):
         return {"error": "No raw_text provided", "resume_text": ""}
@@ -64,9 +66,9 @@ async def _fetch_resume_node(state: AnalyzerState) -> dict:
     return {"resume_text": ""}
 
 
-async def _extract_structure_node(state: AnalyzerState) -> dict:
+async def _extract_structure_node(state: AnalyzerState) -> dict[str, Any]:
     """Use LLM to extract structured fields from raw JD text."""
-    llm = get_llm()
+    llm = get_llm().bind(**_JSON_MODE)
     messages = [
         SystemMessage(content=EXTRACT_STRUCTURE_SYSTEM),
         HumanMessage(
@@ -79,7 +81,8 @@ async def _extract_structure_node(state: AnalyzerState) -> dict:
         ),
     ]
     try:
-        response = await llm.ainvoke(messages, config={"response_format": {"type": "json_object"}})
+        response = await llm.ainvoke(messages)
+        assert isinstance(response.content, str)
         jd = json.loads(response.content)
         return {
             "jd_structured": jd,
@@ -94,13 +97,13 @@ async def _extract_structure_node(state: AnalyzerState) -> dict:
         }
 
 
-async def _compute_match_node(state: AnalyzerState) -> dict:
+async def _compute_match_node(state: AnalyzerState) -> dict[str, Any]:
     """Compute quick match score comparing JD skills against resume."""
     resume_text = state.get("resume_text", "")
     if not resume_text or not state.get("jd_structured"):
         return {"match_score": 0.0}
 
-    llm = get_llm()
+    llm = get_llm().bind(**_JSON_MODE)
     messages = [
         SystemMessage(content=MATCH_SCORE_SYSTEM),
         HumanMessage(
@@ -111,7 +114,8 @@ async def _compute_match_node(state: AnalyzerState) -> dict:
         ),
     ]
     try:
-        response = await llm.ainvoke(messages, config={"response_format": {"type": "json_object"}})
+        response = await llm.ainvoke(messages)
+        assert isinstance(response.content, str)
         result = json.loads(response.content)
         return {"match_score": float(result.get("match_score", 0))}
     except Exception as exc:
@@ -119,8 +123,8 @@ async def _compute_match_node(state: AnalyzerState) -> dict:
         return {"match_score": 0.0}
 
 
-def _build_graph() -> StateGraph:
-    g = StateGraph(AnalyzerState)
+def _build_graph() -> StateGraph[AnalyzerState]:
+    g: StateGraph[AnalyzerState] = StateGraph(AnalyzerState)
     g.add_node("fetch_resume", _fetch_resume_node)
     g.add_node("extract_structure", _extract_structure_node)
     g.add_node("compute_match", _compute_match_node)

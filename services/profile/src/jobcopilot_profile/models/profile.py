@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from jobcopilot_shared.models.base import Base
 from sqlalchemy import DateTime, Text, func
@@ -20,8 +21,8 @@ class Profile(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), nullable=False, unique=True, index=True
     )
-    personal_info: Mapped[dict | None] = mapped_column(JSONB)
-    preferences: Mapped[dict | None] = mapped_column(JSONB)
+    personal_info: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    preferences: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     # AES-256-GCM encrypted; never returned in external API responses
     linkedin_cookie_enc: Mapped[str | None] = mapped_column(Text)
     llm_api_key_enc: Mapped[str | None] = mapped_column(Text)

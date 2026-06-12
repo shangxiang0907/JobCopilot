@@ -8,7 +8,7 @@ Nodes:
 
 import json
 import logging
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
@@ -23,16 +23,18 @@ from jobcopilot_agent.services.llm import get_llm
 
 log = logging.getLogger(__name__)
 
+_JSON_MODE = {"response_format": {"type": "json_object"}}
+
 
 class InterviewState(TypedDict):
     # Inputs
     job_id: str
     user_id: str
     tenant_id: str
-    jd_structured: dict
+    jd_structured: dict[str, Any]
     # Outputs
-    behavioral_questions: list[dict]
-    technical_questions: list[dict]
+    behavioral_questions: list[dict[str, Any]]
+    technical_questions: list[dict[str, Any]]
     error: str | None
 
 
@@ -40,8 +42,8 @@ def _jd_field(state: InterviewState, key: str, default: object = "") -> object:
     return state.get("jd_structured", {}).get(key, default)
 
 
-async def _gen_behavioral_node(state: InterviewState) -> dict:
-    llm = get_llm()
+async def _gen_behavioral_node(state: InterviewState) -> dict[str, Any]:
+    llm = get_llm().bind(**_JSON_MODE)
     messages = [
         SystemMessage(content=BEHAVIORAL_SYSTEM),
         HumanMessage(
@@ -58,7 +60,8 @@ async def _gen_behavioral_node(state: InterviewState) -> dict:
         ),
     ]
     try:
-        response = await llm.ainvoke(messages, config={"response_format": {"type": "json_object"}})
+        response = await llm.ainvoke(messages)
+        assert isinstance(response.content, str)
         result = json.loads(response.content)
         return {"behavioral_questions": result.get("questions", [])}
     except Exception as exc:
@@ -66,8 +69,8 @@ async def _gen_behavioral_node(state: InterviewState) -> dict:
         return {"behavioral_questions": [], "error": str(exc)}
 
 
-async def _gen_technical_node(state: InterviewState) -> dict:
-    llm = get_llm()
+async def _gen_technical_node(state: InterviewState) -> dict[str, Any]:
+    llm = get_llm().bind(**_JSON_MODE)
     messages = [
         SystemMessage(content=TECHNICAL_SYSTEM),
         HumanMessage(
@@ -85,7 +88,8 @@ async def _gen_technical_node(state: InterviewState) -> dict:
         ),
     ]
     try:
-        response = await llm.ainvoke(messages, config={"response_format": {"type": "json_object"}})
+        response = await llm.ainvoke(messages)
+        assert isinstance(response.content, str)
         result = json.loads(response.content)
         return {"technical_questions": result.get("questions", [])}
     except Exception as exc:
@@ -93,8 +97,8 @@ async def _gen_technical_node(state: InterviewState) -> dict:
         return {"technical_questions": [], "error": str(exc)}
 
 
-def _build_graph() -> StateGraph:
-    g = StateGraph(InterviewState)
+def _build_graph() -> StateGraph[InterviewState]:
+    g: StateGraph[InterviewState] = StateGraph(InterviewState)
     g.add_node("gen_behavioral", _gen_behavioral_node)
     g.add_node("gen_technical", _gen_technical_node)
     g.set_entry_point("gen_behavioral")

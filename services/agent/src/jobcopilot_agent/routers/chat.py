@@ -10,6 +10,7 @@ SSE format:  data: {"type": "token", "content": "..."}\n\n
 import json
 import logging
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/v1/agent/chat", tags=["chat"])
 
 
 async def _event_stream(
-    messages: list[dict],
+    messages: list[dict[str, Any]],
     user_id: str,
     tenant_id: str,
 ) -> AsyncGenerator[str, None]:

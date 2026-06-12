@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import uuid
+from typing import Any
 
 import aio_pika
 
@@ -23,7 +24,7 @@ _QUEUE = "notification.events"
 _ROUTING_KEYS = ["cookie.expired", "notification.trigger"]
 
 
-async def _handle_cookie_expired(body: dict) -> None:
+async def _handle_cookie_expired(body: dict[str, Any]) -> None:
     tenant_id = uuid.UUID(body["tenant_id"])
     user_id = uuid.UUID(body["user_id"])
     await dispatch_standalone(
@@ -40,7 +41,7 @@ async def _handle_cookie_expired(body: dict) -> None:
     )
 
 
-async def _handle_notification_trigger(body: dict) -> None:
+async def _handle_notification_trigger(body: dict[str, Any]) -> None:
     tenant_id = uuid.UUID(body["tenant_id"])
     user_id = uuid.UUID(body["user_id"])
     await dispatch_standalone(
@@ -100,5 +101,5 @@ async def start_consumer() -> None:
             await asyncio.sleep(5)
 
 
-def start_consumer_background() -> asyncio.Task:
+def start_consumer_background() -> asyncio.Task[None]:
     return asyncio.ensure_future(start_consumer())

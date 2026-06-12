@@ -5,6 +5,7 @@ Called by the RabbitMQ consumer and the /internal/notify endpoint.
 
 import logging
 import uuid
+from typing import Any
 
 from jobcopilot_shared.crypto import decrypt as _decrypt
 from jobcopilot_shared.db import build_engine, build_session_factory
@@ -28,7 +29,7 @@ async def dispatch(
     title: str,
     body: str,
     channels: list[str],
-    metadata: dict | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> list[Notification]:
     repo = NotificationRepository(session)
     pref = await repo.get_preference(user_id)
@@ -95,7 +96,7 @@ async def dispatch_standalone(
     title: str,
     body: str,
     channels: list[str],
-    metadata: dict | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     """Convenience wrapper that creates its own DB session — used by the MQ consumer."""
     engine = build_engine(settings.database_url)

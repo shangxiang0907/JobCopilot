@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +21,7 @@ class NotificationRepository:
         title: str,
         body: str,
         channel: str,
-        metadata: dict | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Notification:
         n = Notification(
             tenant_id=tenant_id,

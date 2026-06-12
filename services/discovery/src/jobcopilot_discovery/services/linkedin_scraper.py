@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from urllib.parse import quote_plus
 
 import httpx
-from playwright.async_api import async_playwright
+from playwright.async_api import ElementHandle, Page, async_playwright
 
 log = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ async def scrape_jobs(config: SearchConfig, headless: bool = True) -> list[RawJo
 
 
 async def _scrape_keyword_location(
-    page, keyword: str, location: str, config: SearchConfig, headless: bool
+    page: Page, keyword: str, location: str, config: SearchConfig, headless: bool
 ) -> list[RawJob]:
     jobs: list[RawJob] = []
 
@@ -145,7 +145,7 @@ async def _scrape_keyword_location(
     return jobs
 
 
-async def _extract_job_cards(page) -> list[RawJob]:
+async def _extract_job_cards(page: Page) -> list[RawJob]:
     """Extract job data from the current search results page."""
     jobs: list[RawJob] = []
 
@@ -168,7 +168,7 @@ async def _extract_job_cards(page) -> list[RawJob]:
     return jobs
 
 
-async def _parse_card(card) -> RawJob | None:
+async def _parse_card(card: ElementHandle) -> RawJob | None:
     # Title + link — try multiple selector variants
     link_el = await card.query_selector("a.job-card-container__link")
     if not link_el:

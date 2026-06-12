@@ -11,14 +11,14 @@ _SEND_EMAIL = "jobcopilot_notification.services.dispatcher.send_email"
 
 
 @pytest.fixture()
-def mock_session():
+def mock_session() -> AsyncMock:
     session = AsyncMock()
     session.flush = AsyncMock()
     return session
 
 
 @pytest.fixture()
-def mock_repo():
+def mock_repo() -> MagicMock:
     repo = MagicMock()
     repo.create = AsyncMock()
     repo.mark_sent = AsyncMock()
@@ -28,7 +28,7 @@ def mock_repo():
 
 
 @pytest.mark.asyncio
-async def test_dispatch_in_app_no_preference(mock_session, mock_repo):
+async def test_dispatch_in_app_no_preference(mock_session: AsyncMock, mock_repo: MagicMock) -> None:
     """in_app channel should be marked sent even when preference row is absent."""
     tenant_id = uuid.uuid4()
     user_id = uuid.uuid4()
@@ -53,7 +53,9 @@ async def test_dispatch_in_app_no_preference(mock_session, mock_repo):
 
 
 @pytest.mark.asyncio
-async def test_dispatch_email_without_preference_marks_failed(mock_session, mock_repo):
+async def test_dispatch_email_without_preference_marks_failed(
+    mock_session: AsyncMock, mock_repo: MagicMock
+) -> None:
     """email channel with no preference should be marked failed."""
     fake_notification = MagicMock(id=uuid.uuid4())
     mock_repo.create.return_value = fake_notification
@@ -76,7 +78,9 @@ async def test_dispatch_email_without_preference_marks_failed(mock_session, mock
 
 
 @pytest.mark.asyncio
-async def test_dispatch_email_with_preference_sends(mock_session, mock_repo):
+async def test_dispatch_email_with_preference_sends(
+    mock_session: AsyncMock, mock_repo: MagicMock
+) -> None:
     """email channel sends when preference has email_enabled + address."""
     fake_notification = MagicMock(id=uuid.uuid4())
     mock_repo.create.return_value = fake_notification
@@ -110,7 +114,7 @@ async def test_dispatch_email_with_preference_sends(mock_session, mock_repo):
 
 
 @pytest.mark.asyncio
-async def test_dispatch_multiple_channels(mock_session, mock_repo):
+async def test_dispatch_multiple_channels(mock_session: AsyncMock, mock_repo: MagicMock) -> None:
     """Multiple channels each get their own Notification row."""
     notifications = [MagicMock(id=uuid.uuid4()), MagicMock(id=uuid.uuid4())]
     mock_repo.create.side_effect = notifications

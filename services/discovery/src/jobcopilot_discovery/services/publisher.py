@@ -2,6 +2,7 @@
 
 import json
 from datetime import UTC, datetime
+from typing import Any
 
 import aio_pika
 
@@ -15,7 +16,7 @@ async def _get_connection() -> aio_pika.abc.AbstractConnection:
 
 
 async def publish_jobs_discovered(
-    jobs: list[dict],
+    jobs: list[dict[str, Any]],
     user_id: str,
     tenant_id: str,
     run_id: str,

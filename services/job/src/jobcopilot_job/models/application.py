@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from jobcopilot_shared.models.base import Base
 from sqlalchemy import DateTime, Float, String, Text, func
@@ -33,7 +34,7 @@ class Application(Base):
     job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="discovered")
     match_score: Mapped[float | None] = mapped_column(Float)
-    resume_suggestions: Mapped[dict | None] = mapped_column(JSONB)
+    resume_suggestions: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     notes: Mapped[str | None] = mapped_column(Text)
     applied_at: Mapped[datetime | None] = mapped_column(_TS)
     created_at: Mapped[datetime] = mapped_column(_TS, server_default=func.now(), nullable=False)

@@ -90,7 +90,7 @@ async def update_preferences(
     tenant_id: TenantIdDep,
     user_id: UserIdDep,
 ) -> PreferenceOut:
-    updates: dict = {}
+    updates: dict[str, object] = {}
     if payload.in_app_enabled is not None:
         updates["in_app_enabled"] = payload.in_app_enabled
     if payload.email_enabled is not None:

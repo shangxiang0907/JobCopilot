@@ -11,8 +11,8 @@ class BaseServiceSettings(BaseSettings):
     environment: str = Field(default="development")
     version: str = "0.1.0"
 
-    # Database
-    database_url: str
+    # Database (required; populated from DATABASE_URL env var at runtime)
+    database_url: str = Field(default="")
 
     # Redis
     redis_url: str = "redis://localhost:6379"
@@ -32,4 +32,4 @@ class BaseServiceSettings(BaseSettings):
     langchain_tracing_v2: bool = False
 
     # AES-256-GCM key for encrypting LinkedIn cookies and API keys (32-byte hex = 64 chars)
-    encryption_key: str
+    encryption_key: str = Field(default="")
