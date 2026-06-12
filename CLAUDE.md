@@ -178,6 +178,30 @@ TEMPORAL_HOST=localhost:7233
 TEMPORAL_NAMESPACE=jobcopilot
 ```
 
+### Running Python Commands / 运行 Python 命令
+
+**EN:**  
+This project uses a **uv workspace** with a single `.venv` at the repo root shared by all services. Always run Python commands through `uv run` — never call `python` directly or use `uv run --package`.
+
+```bash
+# Run tests (add env vars as needed)
+~/.local/bin/uv run pytest services/<name>/tests/ -v
+DATABASE_URL=postgresql+asyncpg://... ENCRYPTION_KEY=... ~/.local/bin/uv run pytest services/job/tests/ -v
+
+# Lint and format
+~/.local/bin/uv run ruff check .
+~/.local/bin/uv run ruff format .
+
+# Type check
+~/.local/bin/uv run mypy services/<name>/
+
+# After changing any pyproject.toml, sync the lock file
+~/.local/bin/uv sync
+```
+
+**中文：**  
+本项目使用 **uv workspace**，所有服务共享仓库根目录的单一 `.venv`。始终通过 `uv run` 运行 Python 命令——不得直接调用 `python`，也不得使用 `uv run --package`。
+
 ### Code Style / 代码规范
 - Ruff for linting and formatting (`ruff check .` + `ruff format .`)
 - mypy for type checking (strict mode per service)
