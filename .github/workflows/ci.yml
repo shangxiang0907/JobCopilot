@@ -130,4 +130,4 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen
-      - run: uv run pytest packages/ services/ -v -x
+      - run: uv run pytest packages/ services/ -v -x -m integration

@@ -1,11 +1,12 @@
 name: CD
 
-# Runs on every push to main.
-# Prerequisite: configure GitHub branch protection to require CI to pass
-# before merging pull requests, so this workflow only fires on green commits.
+# Triggered only after the CI workflow completes successfully on main.
+# This guarantees CD never runs on a red commit, even on direct pushes.
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
 
 concurrency:
@@ -17,6 +18,7 @@ jobs:
   build-push:
     name: Build & Push / ${{ matrix.service.name }}
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
       packages: write
@@ -45,6 +47,8 @@ jobs:
             build_args: "KONG_URL=http://kong:8000"
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: docker/setup-buildx-action@v3
 
@@ -61,7 +65,7 @@ jobs:
           file: ${{ matrix.service.dockerfile }}
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service.name }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service.name }}:${{ github.event.workflow_run.head_sha }}
             ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service.name }}:latest
           build-args: ${{ matrix.service.build_args }}
           cache-from: type=gha
@@ -90,7 +94,7 @@ jobs:
       - name: Scan ${{ matrix.service }} for Critical CVEs
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service }}:${{ github.sha }}
+          image-ref: ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service }}:${{ github.event.workflow_run.head_sha }}
           format: table
           exit-code: "1"
           vuln-type: os,library
@@ -106,9 +110,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Apply manifests
-        env:
-          IMAGE_TAG: ${{ github.sha }}
-          REPO_OWNER: ${{ github.repository_owner }}
         run: |
           # To activate this step:
           #   1. Add a KUBECONFIG repository secret (Settings → Secrets → Actions).
@@ -117,14 +118,12 @@ jobs:
           # echo "${{ secrets.KUBECONFIG }}" > /tmp/kubeconfig.yaml
           # chmod 600 /tmp/kubeconfig.yaml
           #
-          # for svc in profile job discovery agent notification; do
-          #   kubectl --kubeconfig /tmp/kubeconfig.yaml \
-          #     set image deployment/${svc}-service ${svc}=ghcr.io/${REPO_OWNER}/jobcopilot-${svc}:${IMAGE_TAG} \
-          #     -n jobcopilot
-          # done
-          # kubectl --kubeconfig /tmp/kubeconfig.yaml \
-          #   set image deployment/frontend frontend=ghcr.io/${REPO_OWNER}/jobcopilot-frontend:${IMAGE_TAG} \
-          #   -n jobcopilot
+          # Apply the full declarative manifests — keeps cluster state in sync with repo.
+          # kubectl --kubeconfig /tmp/kubeconfig.yaml apply -f infra/k8s/
           #
+          # Force a rolling restart so pods pull the new :latest image.
+          # kubectl --kubeconfig /tmp/kubeconfig.yaml rollout restart deployment -n jobcopilot
+          #
+          # Block until all deployments are healthy (fail CD if rollout gets stuck).
           # kubectl --kubeconfig /tmp/kubeconfig.yaml rollout status deployment -n jobcopilot --timeout=5m
           echo "Deploy step ready. Add KUBECONFIG secret and uncomment kubectl commands to activate."
