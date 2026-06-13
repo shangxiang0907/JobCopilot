@@ -39,9 +39,13 @@ spec:
       containers:
         - name: keycloak
           image: quay.io/keycloak/keycloak:24.0
-          command: ["start-dev"]
+          command: ["start-dev", "--import-realm"]
           ports:
             - containerPort: 8080
+          volumeMounts:
+            - name: realm-config
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
           env:
             - name: KEYCLOAK_ADMIN
               valueFrom:
@@ -93,3 +97,7 @@ spec:
             limits:
               cpu: "2"
               memory: 1Gi
+      volumes:
+        - name: realm-config
+          configMap:
+            name: keycloak-realm
