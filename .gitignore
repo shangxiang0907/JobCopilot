@@ -21,6 +21,8 @@ htmlcov/
 node_modules/
 frontend/.next/
 frontend/out/
+frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
 
 # IDE
 .idea/

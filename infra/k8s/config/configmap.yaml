@@ -8,10 +8,16 @@ metadata:
 data:
   ENVIRONMENT: "production"
 
-  # Auth
+  # Auth — backend services use the internal ClusterIP hostname
   KEYCLOAK_URL: "http://keycloak:8080"
   KEYCLOAK_REALM: "jobcopilot"
   KEYCLOAK_CLIENT_ID: "api"
+
+  # Auth — browser-accessible URL for the frontend (window.__ENV__ injection)
+  # KEYCLOAK_PUBLIC_URL must be reachable by end-user browsers.
+  # Replace with your external Keycloak URL before deploying.
+  KEYCLOAK_PUBLIC_URL: "https://REPLACE_WITH_PRODUCTION_DOMAIN/auth"
+  KEYCLOAK_CLIENT_ID_FRONTEND: "frontend"
 
   # Data stores (non-secret)
   REDIS_URL: "redis://redis:6379"

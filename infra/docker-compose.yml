@@ -405,6 +405,12 @@ services:
     depends_on:
       kong:
         condition: service_healthy
+    environment:
+      # Runtime env vars — injected into window.__ENV__ by layout.tsx at request time.
+      # The browser reaches Keycloak via the host-exposed port, not the internal Docker hostname.
+      KEYCLOAK_PUBLIC_URL: http://localhost:8080
+      KEYCLOAK_REALM: jobcopilot
+      KEYCLOAK_CLIENT_ID: frontend
     ports:
       - "3000:3000"
     restart: unless-stopped

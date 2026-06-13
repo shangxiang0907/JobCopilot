@@ -8,14 +8,22 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUIStore } from "@/lib/store"
+import { getKeycloak } from "@/lib/keycloak"
 
-function getAuthHeaders(): Record<string, string> {
-  if (typeof window === "undefined") return {}
-  return {
-    Authorization: `Bearer ${localStorage.getItem("auth_token") ?? ""}`,
-    "X-Tenant-ID": localStorage.getItem("tenant_id") ?? "",
-    "X-User-ID": localStorage.getItem("user_id") ?? "",
+async function fetchWithAuth(url: URL | RequestInfo, options?: RequestInit): Promise<Response> {
+  const kc = getKeycloak()
+  if (kc.authenticated) {
+    await kc.updateToken(30).catch(() => kc.login())
   }
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options?.headers,
+      Authorization: `Bearer ${kc.token ?? ""}`,
+      "X-Tenant-ID": (kc.tokenParsed?.tenant_id as string | undefined) ?? "",
+      "X-User-ID": kc.tokenParsed?.sub ?? "",
+    },
+  })
 }
 
 export function ChatPanel() {
@@ -24,7 +32,7 @@ export function ChatPanel() {
 
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     api: "/api/chat",
-    headers: getAuthHeaders(),
+    fetch: fetchWithAuth,
   })
 
   useEffect(() => {

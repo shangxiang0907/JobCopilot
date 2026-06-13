@@ -1,18 +1,21 @@
 import axios from "axios"
+import { getKeycloak } from "@/lib/keycloak"
 
 const api = axios.create({
   baseURL: typeof window !== "undefined" ? "" : (process.env.KONG_URL ?? "http://kong:8000"),
   timeout: 30_000,
 })
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("auth_token")
-    if (token) config.headers.Authorization = `Bearer ${token}`
-    const tenantId = localStorage.getItem("tenant_id")
-    if (tenantId) config.headers["X-Tenant-ID"] = tenantId
-    const userId = localStorage.getItem("user_id")
-    if (userId) config.headers["X-User-ID"] = userId
+    const kc = getKeycloak()
+    if (kc.authenticated) {
+      await kc.updateToken(30).catch(() => kc.login())
+      if (kc.token) config.headers.Authorization = `Bearer ${kc.token}`
+      const parsed = kc.tokenParsed
+      if (parsed?.tenant_id) config.headers["X-Tenant-ID"] = parsed.tenant_id as string
+      if (parsed?.sub) config.headers["X-User-ID"] = parsed.sub
+    }
   }
   return config
 })

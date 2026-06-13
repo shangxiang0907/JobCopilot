@@ -1,14 +1,12 @@
-# IMPORTANT: The frontend image must be built with KONG_URL=http://kong (the K8s internal
-# service name for the Kong proxy). This value is baked in at image build time by next.config.ts.
+# Build-time args (baked into the JS bundle):
+#   KONG_URL=http://kong:8000   (server-side rewrite target, stays internal)
 #
-#   docker build \
-#     --build-arg KONG_URL=http://kong \
-#     -f frontend/Dockerfile \
-#     -t ghcr.io/YOUR_ORG/jobcopilot-frontend:latest \
-#     frontend/
+# Runtime env vars (read by layout.tsx at request time, injected as window.__ENV__):
+#   KEYCLOAK_PUBLIC_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID
+#   These let the same image work in every environment without rebuilding.
 #
-# The frontend pod reaches Kong via the ClusterIP service (server-side rewrites / SSR).
-# Browser clients reach the frontend via the LoadBalancer IP or an Ingress in front of it.
+#   docker build --build-arg KONG_URL=http://kong:8000 -f frontend/Dockerfile \
+#     -t ghcr.io/YOUR_ORG/jobcopilot-frontend:latest frontend/
 ---
 apiVersion: v1
 kind: Service
@@ -62,6 +60,21 @@ spec:
               value: "3000"
             - name: HOSTNAME
               value: "0.0.0.0"
+            - name: KEYCLOAK_PUBLIC_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: jobcopilot-config
+                  key: KEYCLOAK_PUBLIC_URL
+            - name: KEYCLOAK_REALM
+              valueFrom:
+                configMapKeyRef:
+                  name: jobcopilot-config
+                  key: KEYCLOAK_REALM
+            - name: KEYCLOAK_CLIENT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: jobcopilot-config
+                  key: KEYCLOAK_CLIENT_ID_FRONTEND
           readinessProbe:
             httpGet:
               path: /
