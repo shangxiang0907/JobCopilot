@@ -80,7 +80,6 @@ jobs:
       contents: read
       packages: read
       security-events: write
-      actions: read
     strategy:
       fail-fast: false
       matrix:
@@ -102,23 +101,16 @@ jobs:
           severity: CRITICAL
           ignore-unfixed: true
 
-      - name: Scan ${{ matrix.service }} for all CVEs (SARIF upload)
+      - name: Report all CVEs including unfixed (non-blocking)
         uses: aquasecurity/trivy-action@v0.36.0
         if: always()
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service }}:${{ github.event.workflow_run.head_sha }}
-          format: sarif
-          output: trivy-${{ matrix.service }}.sarif
+          format: table
           exit-code: "0"
           vuln-type: os,library
           severity: CRITICAL,HIGH
-
-      - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4.36.2
-        if: always()
-        with:
-          sarif_file: trivy-${{ matrix.service }}.sarif
-          category: trivy-${{ matrix.service }}
+          ignore-unfixed: false
 
   # ── 3. Deploy to Kubernetes ───────────────────────────────────────────────────
   deploy:
