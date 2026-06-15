@@ -2,7 +2,8 @@ _format_version: "3.0"
 _transform: true
 
 # DB-less declarative config for Kong 3.x.
-# Internal /internal/* paths are not routed here — Kong never exposes them externally.
+# JWT validation is handled at the FastAPI service layer via jobcopilot_shared.auth.
+# Kong is responsible only for routing and rate-limiting; no JWT plugin needed here.
 
 services:
   - name: profile-svc
@@ -79,8 +80,6 @@ services:
         preserve_host: false
 
 # Health-check routes (no auth, for smoke testing and external monitoring).
-# Kong service.path (/healthz/ready) is prepended after strip_path removes the
-# route prefix, so GET /healthz/profile-service → upstream GET /healthz/ready.
   - name: profile-health-svc
     host: profile-service
     port: 8000

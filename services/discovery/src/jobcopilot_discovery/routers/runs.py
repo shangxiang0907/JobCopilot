@@ -1,10 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, status
 from temporalio.client import Client
 
 from jobcopilot_discovery.config import settings
-from jobcopilot_discovery.deps import SessionDep, UserIdDep
+from jobcopilot_discovery.deps import SessionDep, TenantIdDep, UserIdDep
 from jobcopilot_discovery.repositories.config_repo import ConfigRepository
 from jobcopilot_discovery.repositories.run_repo import RunRepository
 from jobcopilot_discovery.schemas.discovery import DiscoveryRunResponse, TriggerRunRequest
@@ -18,11 +18,8 @@ async def trigger_run(
     body: TriggerRunRequest,
     session: SessionDep,
     user_id: UserIdDep,
-    x_tenant_id: str | None = Header(default=None),
+    tenant_id: TenantIdDep,
 ) -> DiscoveryRunResponse:
-    if not x_tenant_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing X-Tenant-Id")
-
     config_repo = ConfigRepository(session)
     config = await config_repo.get(user_id, body.config_id)
 
@@ -35,7 +32,7 @@ async def trigger_run(
 
     workflow_input = DiscoveryWorkflowInput(
         user_id=str(user_id),
-        tenant_id=x_tenant_id,
+        tenant_id=str(tenant_id),
         config_id=str(config.config_id),
         run_id=str(run.run_id),
         keywords=config.keywords,

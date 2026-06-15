@@ -1,6 +1,6 @@
-# Kong API Gateway — DB-less mode, same declarative config as Docker Compose.
-# Service hostnames (profile-service, job-service, etc.) resolve to K8s ClusterIP Services
-# within the jobcopilot namespace.
+# Kong API Gateway — DB-less mode.
+# JWT validation is handled at the FastAPI service layer (jobcopilot_shared.auth).
+# Kong routes traffic only; no JWT plugin or consumer configuration needed.
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -14,50 +14,6 @@ data:
   kong.yml: |
     _format_version: "3.0"
     _transform: true
-
-    # ---------------------------------------------------------------------------
-    # Keycloak JWT consumer — key matches the `iss` claim in Keycloak-issued JWTs.
-    # Run infra/scripts/update-kong-jwt-key.sh to populate rsa_public_key from a
-    # live Keycloak instance and restart Kong pods.
-    # ---------------------------------------------------------------------------
-    consumers:
-      - username: keycloak-issuer
-        jwt_secrets:
-          - algorithm: RS256
-            key: "http://keycloak:8080/realms/jobcopilot"
-            rsa_public_key: |
-              -----BEGIN PUBLIC KEY-----
-              REPLACE_WITH_KEYCLOAK_RS256_PUBLIC_KEY
-              (run infra/scripts/update-kong-jwt-key.sh)
-              -----END PUBLIC KEY-----
-
-    # ---------------------------------------------------------------------------
-    # Global plugin: extract tenant_id and sub claims from the validated JWT and
-    # forward them as X-Tenant-Id / X-User-Id headers consumed by all services.
-    # Runs before the jwt plugin (pre-function priority 1000000 > jwt priority 1005);
-    # the jwt plugin will still reject tokens with invalid signatures.
-    # ---------------------------------------------------------------------------
-    plugins:
-      - name: pre-function
-        config:
-          access:
-            - |
-              local auth = kong.request.get_header("authorization")
-              if not auth then return end
-              local tok = auth:match("Bearer%s+(.+)")
-              if not tok then return end
-              local parts = {}
-              for p in tok:gmatch("[^.]+") do table.insert(parts, p) end
-              if #parts < 3 then return end
-              local b64 = parts[2]:gsub("-", "+"):gsub("_", "/")
-              local pad = #b64 % 4
-              if pad == 2 then b64 = b64 .. "==" elseif pad == 3 then b64 = b64 .. "=" end
-              local raw = ngx.decode_base64(b64)
-              if not raw then return end
-              local ok, claims = pcall(require("cjson").decode, raw)
-              if not ok then return end
-              if claims.sub then kong.service.request.set_header("X-User-Id", claims.sub) end
-              if claims.tenant_id then kong.service.request.set_header("X-Tenant-Id", claims.tenant_id) end
 
     services:
       - name: profile-svc
@@ -74,11 +30,6 @@ data:
               - /v1/resumes
             strip_path: false
             preserve_host: false
-        plugins:
-          - name: jwt
-            config:
-              claims_to_verify: [exp]
-              key_claim_name: iss
 
       - name: job-svc
         host: job-service
@@ -95,11 +46,6 @@ data:
               - /v1/applications
             strip_path: false
             preserve_host: false
-        plugins:
-          - name: jwt
-            config:
-              claims_to_verify: [exp]
-              key_claim_name: iss
 
       - name: discovery-svc
         host: discovery-service
@@ -114,11 +60,6 @@ data:
               - /v1/discovery
             strip_path: false
             preserve_host: false
-        plugins:
-          - name: jwt
-            config:
-              claims_to_verify: [exp]
-              key_claim_name: iss
 
       - name: agent-svc
         host: agent-service
@@ -133,11 +74,6 @@ data:
               - /v1/agent
             strip_path: false
             preserve_host: false
-        plugins:
-          - name: jwt
-            config:
-              claims_to_verify: [exp]
-              key_claim_name: iss
 
       - name: notification-svc
         host: notification-service
@@ -152,11 +88,6 @@ data:
               - /v1/notifications
             strip_path: false
             preserve_host: false
-        plugins:
-          - name: jwt
-            config:
-              claims_to_verify: [exp]
-              key_claim_name: iss
 
       - name: profile-health-svc
         host: profile-service
@@ -218,8 +149,6 @@ data:
             strip_path: true
             methods: [GET]
 ---
-# External-facing proxy service — provisions a cloud load balancer.
-# Change type to NodePort for local/bare-metal clusters.
 apiVersion: v1
 kind: Service
 metadata:
@@ -241,7 +170,6 @@ spec:
       port: 443
       targetPort: 8443
 ---
-# Internal admin API — never expose externally.
 apiVersion: v1
 kind: Service
 metadata:

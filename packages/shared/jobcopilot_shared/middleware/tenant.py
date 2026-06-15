@@ -2,6 +2,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 
 import structlog
+from jose import jwt as jose_jwt
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -12,17 +13,27 @@ logger = structlog.get_logger(__name__)
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
-    """Extracts tenant_id and user_id from headers set by the Kong JWT plugin,
-    binds them into context vars for downstream logging and DB query guards."""
+    """Decodes JWT payload (without signature verification) to bind sub/tenant_id
+    into structlog context for logging. Security verification happens in route
+    dependencies via jobcopilot_shared.auth.verify_token."""
 
     async def dispatch(
         self,
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        # Kong's JWT validation plugin injects these after token verification
-        tenant_id = request.headers.get("X-Tenant-Id", "-")
-        user_id = request.headers.get("X-User-Id", "-")
+        user_id = "-"
+        tenant_id = "-"
+        auth = request.headers.get("authorization", "")
+        if auth.lower().startswith("bearer "):
+            try:
+                token = auth.split(" ", 1)[1]
+                payload = jose_jwt.get_unverified_claims(token)
+                user_id = payload.get("sub", "-")
+                tenant_id = payload.get("tenant_id", "-")
+            except Exception:  # noqa: BLE001
+                pass
+
         trace_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
 
         tenant_id_ctx.set(tenant_id)

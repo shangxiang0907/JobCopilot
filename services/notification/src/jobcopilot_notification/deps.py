@@ -2,7 +2,8 @@ import uuid
 from collections.abc import AsyncGenerator
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends
+from jobcopilot_shared.auth import TokenClaimsDep
 from jobcopilot_shared.db import build_engine, build_session_factory
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,26 +19,12 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
             yield session
 
 
-async def get_tenant_id(x_tenant_id: Annotated[str | None, Header()] = None) -> uuid.UUID:
-    if not x_tenant_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing X-Tenant-Id")
-    try:
-        return uuid.UUID(x_tenant_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid X-Tenant-Id format"
-        ) from exc
+async def get_tenant_id(claims: TokenClaimsDep) -> uuid.UUID:
+    return claims.tenant_id
 
 
-async def get_current_user(x_user_id: Annotated[str | None, Header()] = None) -> uuid.UUID:
-    if not x_user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing X-User-Id")
-    try:
-        return uuid.UUID(x_user_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid X-User-Id format"
-        ) from exc
+async def get_current_user(claims: TokenClaimsDep) -> uuid.UUID:
+    return claims.sub
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
