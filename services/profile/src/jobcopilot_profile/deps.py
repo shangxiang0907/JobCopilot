@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator
 from typing import Annotated
 
 from fastapi import Depends
-from jobcopilot_shared.auth import TokenClaimsDep, TokenClaims
+from jobcopilot_shared.auth import TokenClaimsDep
 from jobcopilot_shared.db import build_engine, build_session_factory
 from sqlalchemy.ext.asyncio import AsyncSession
 

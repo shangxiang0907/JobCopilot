@@ -31,7 +31,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 payload = jose_jwt.get_unverified_claims(token)
                 user_id = payload.get("sub", "-")
                 tenant_id = payload.get("tenant_id", "-")
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001,S110
                 pass
 
         trace_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())

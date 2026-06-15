@@ -44,7 +44,8 @@ async def _fetch_jwks(force: bool = False) -> dict[str, Any]:
     if not force and _jwks_cache is not None and (now - _jwks_fetched_at) < _JWKS_TTL:
         return _jwks_cache
     async with _get_lock():
-        if not force and _jwks_cache is not None and (time.monotonic() - _jwks_fetched_at) < _JWKS_TTL:
+        elapsed = time.monotonic() - _jwks_fetched_at
+        if not force and _jwks_cache is not None and elapsed < _JWKS_TTL:
             return _jwks_cache
         async with httpx.AsyncClient() as client:
             resp = await client.get(_jwks_uri(), timeout=5.0)
@@ -77,13 +78,13 @@ async def verify_token(
                 options={"verify_aud": False},
             )
             break
-        except JWKError:
+        except JWKError as exc:
             if attempt > 0:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="No valid signing key found",
                     headers={"WWW-Authenticate": "Bearer"},
-                )
+                ) from exc
         except JWTError as exc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
