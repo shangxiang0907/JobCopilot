@@ -304,6 +304,39 @@ Concretely:
 
 ---
 
+## Pre-Push Checklist / 推送前必查清单
+
+**EN:**  
+Run these checks locally **before every `git push`**. CI runs the same steps — a push that fails CI wastes a round-trip and blocks the team. All checks must pass with exit code 0.
+
+```bash
+# 1. Lint — must produce zero errors
+~/.local/bin/uv run ruff check .
+
+# 2. Format — must produce zero diffs  
+~/.local/bin/uv run ruff format --check .
+
+# 3. Type check — run for every service you touched
+~/.local/bin/uv run mypy services/<name>/
+
+# 4. Unit tests — run for every service you touched (no real DB/queue needed)
+~/.local/bin/uv run pytest services/<name>/tests/ -v -m "not integration"
+
+# 5. Secret scan — must produce zero findings
+gitleaks detect --no-git
+```
+
+**Ruff per-file-ignores policy:**
+- New lint suppressions must go in `[tool.ruff.lint.per-file-ignores]` in `pyproject.toml`, not inline `# noqa` comments — this keeps suppression rationale in one place.
+- Adding a new per-file-ignore requires a one-line comment explaining *why* the rule is intentionally suppressed for that path.
+
+**CN:**  
+每次 `git push` 前在本地运行以上检查。CI 执行完全相同的步骤——推送后才发现 CI 失败等于浪费一次往返并影响协作。所有检查必须以退出码 0 通过。
+
+Ruff 规则豁免政策：新增 lint 豁免必须写入 `pyproject.toml` 的 `per-file-ignores`，不得使用行内 `# noqa` 注释；每条豁免必须附一行注释说明*为何*对该路径有意关闭该规则。
+
+---
+
 ## CI Requirements / CI 必须覆盖
 
 1. **Lint**: `ruff check .` + `ruff format --check .`

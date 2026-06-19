@@ -14,6 +14,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "N"]
+# Infrastructure init scripts use urllib stdlib for HTTP calls to admin-controlled
+# internal URLs; S310 (urlopen scheme audit) and S110 (except-pass) are intentional.
+"infra/keycloak/init-realm.py" = ["S310", "S110"]
 
 [tool.mypy]
 python_version = "3.11"

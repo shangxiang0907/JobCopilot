@@ -7,6 +7,7 @@ and include it in JWT access tokens.
 Run after Keycloak is healthy (Docker Compose: depends_on service_healthy;
 Kubernetes: initContainer or Job after readiness probe passes).
 """
+
 import json
 import os
 import sys
@@ -49,7 +50,7 @@ def wait_for_keycloak(max_wait: int = 120) -> None:
                 if resp.status == 200:
                     print("==> Keycloak is ready")
                     return
-        except Exception:
+        except OSError:
             pass
         time.sleep(3)
     print("ERROR: Keycloak did not become ready in time", file=sys.stderr)
@@ -58,12 +59,14 @@ def wait_for_keycloak(max_wait: int = 120) -> None:
 
 def get_admin_token() -> str:
     url = f"{KEYCLOAK_URL}/realms/master/protocol/openid-connect/token"
-    payload = urllib.parse.urlencode({
-        "grant_type": "password",
-        "client_id": "admin-cli",
-        "username": ADMIN_USER,
-        "password": ADMIN_PASS,
-    }).encode()
+    payload = urllib.parse.urlencode(
+        {
+            "grant_type": "password",
+            "client_id": "admin-cli",
+            "username": ADMIN_USER,
+            "password": ADMIN_PASS,
+        }
+    ).encode()
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
     with urllib.request.urlopen(req, timeout=10) as resp:
@@ -86,16 +89,18 @@ def main() -> None:
         print(f"==> '{ATTRIBUTE_NAME}' already declared in User Profile — nothing to do")
         return
 
-    attributes.append({
-        "name": ATTRIBUTE_NAME,
-        "displayName": "Tenant ID",
-        "permissions": {
-            "view": ["admin"],
-            "edit": ["admin"],
-        },
-        "validations": {},
-        "annotations": {},
-    })
+    attributes.append(
+        {
+            "name": ATTRIBUTE_NAME,
+            "displayName": "Tenant ID",
+            "permissions": {
+                "view": ["admin"],
+                "edit": ["admin"],
+            },
+            "validations": {},
+            "annotations": {},
+        }
+    )
     profile["attributes"] = attributes
 
     print(f"==> Adding '{ATTRIBUTE_NAME}' to User Profile ...")
