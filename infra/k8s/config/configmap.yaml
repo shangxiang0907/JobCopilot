@@ -8,15 +8,18 @@ metadata:
 data:
   ENVIRONMENT: "production"
 
-  # Auth — backend services use the internal ClusterIP hostname
+  # Auth — backend services use the internal ClusterIP hostname for JWKS fetch
   KEYCLOAK_URL: "http://keycloak:8080"
   KEYCLOAK_REALM: "jobcopilot"
   KEYCLOAK_CLIENT_ID: "api"
+  # Public-facing URL embedded in JWT iss claims; must match KC_HOSTNAME_URL on the Keycloak pod.
+  # Keycloak 17+ removed the /auth context path — do NOT append /auth here.
+  KEYCLOAK_ISSUER_URL: "https://REPLACE_WITH_PRODUCTION_DOMAIN"
 
   # Auth — browser-accessible URL for the frontend (window.__ENV__ injection)
   # KEYCLOAK_PUBLIC_URL must be reachable by end-user browsers.
   # Replace with your external Keycloak URL before deploying.
-  KEYCLOAK_PUBLIC_URL: "https://REPLACE_WITH_PRODUCTION_DOMAIN/auth"
+  KEYCLOAK_PUBLIC_URL: "https://REPLACE_WITH_PRODUCTION_DOMAIN"
   KEYCLOAK_CLIENT_ID_FRONTEND: "frontend"
 
   # Data stores (non-secret)

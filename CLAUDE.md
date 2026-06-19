@@ -202,6 +202,26 @@ DATABASE_URL=postgresql+asyncpg://... ENCRYPTION_KEY=... ~/.local/bin/uv run pyt
 **中文：**  
 本项目使用 **uv workspace**，所有服务共享仓库根目录的单一 `.venv`。始终通过 `uv run` 运行 Python 命令——不得直接调用 `python`，也不得使用 `uv run --package`。
 
+### Running Docker Commands / 运行 Docker 命令
+
+**EN:**  
+Never use `--parallel` with `docker compose build`. Use the plain form instead:
+
+```bash
+# Build all services (let Compose manage concurrency)
+docker compose build
+
+# Build specific services
+docker compose build profile-service job-service discovery-service agent-service notification-service
+```
+
+`--parallel` causes multiple build processes to simultaneously call the `desktop.exe` credential helper (configured via `credsStore` in `~/.docker/config.json`). Concurrent calls overwhelm the WSL–Docker Desktop vsock channel, producing `UtilAcceptVsock: accept4 failed 110` and credential errors for every registry pull — including public images that need no authentication. Docker Compose v2 already parallelizes builds intelligently without the flag.
+
+**中文：**  
+不得对 `docker compose build` 使用 `--parallel` 参数，直接使用不带该参数的形式：
+
+在 WSL2 + Docker Desktop 环境下，`--parallel` 会导致多个构建进程同时调用 `desktop.exe` 凭据助手，并发调用使 WSL 与 Docker Desktop 之间的 vsock 通道过载，即使是无需认证的公开镜像也会拉取失败。Docker Compose v2 本身已会自动智能并行，无需手动指定。
+
 ### Code Style / 代码规范
 - Ruff for linting and formatting (`ruff check .` + `ruff format .`)
 - mypy for type checking (strict mode per service)

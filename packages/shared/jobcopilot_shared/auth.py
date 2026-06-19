@@ -33,7 +33,9 @@ def _jwks_uri() -> str:
 
 
 def _expected_issuer() -> str:
-    url = os.getenv("KEYCLOAK_URL", "http://localhost:8080")
+    # KEYCLOAK_ISSUER_URL is the public-facing URL embedded in JWT iss claims.
+    # It may differ from KEYCLOAK_URL (internal Docker/K8s hostname used for JWKS fetch).
+    url = os.getenv("KEYCLOAK_ISSUER_URL") or os.getenv("KEYCLOAK_URL", "http://localhost:8080")
     realm = os.getenv("KEYCLOAK_REALM", "jobcopilot")
     return f"{url}/realms/{realm}"
 
@@ -71,11 +73,12 @@ async def verify_token(
     for attempt in range(2):
         try:
             jwks = await _fetch_jwks(force=attempt > 0)
+            audience = os.getenv("KEYCLOAK_CLIENT_ID", "api")
             raw = jwt.decode(
                 token,
                 jwks,
                 algorithms=["RS256"],
-                options={"verify_aud": False},
+                audience=audience,
             )
             break
         except JWKError as exc:

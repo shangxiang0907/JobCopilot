@@ -151,6 +151,7 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_URL: "http://localhost:8080"
     volumes:
       - ./keycloak/jobcopilot-realm.json:/opt/keycloak/data/import/jobcopilot-realm.json:ro
     ports:
@@ -220,6 +221,7 @@ services:
       REDIS_URL: redis://redis:6379
       QDRANT_URL: http://qdrant:6333
       KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: api
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
@@ -259,6 +261,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobcopilot
       REDIS_URL: redis://redis:6379
       KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: api
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
@@ -300,6 +303,7 @@ services:
       PROFILE_SERVICE_URL: http://profile-service:8000
       PLAYWRIGHT_HEADLESS: "true"
       KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: api
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
@@ -341,6 +345,7 @@ services:
       PROFILE_SERVICE_URL: http://profile-service:8000
       JOB_SERVICE_URL: http://job-service:8000
       KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: api
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
@@ -373,6 +378,7 @@ services:
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: api
       SMTP_HOST: ${SMTP_HOST:-}
