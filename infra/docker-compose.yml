@@ -420,6 +420,21 @@ services:
       - "3000:3000"
     restart: unless-stopped
 
+  keycloak-init:
+    image: python:3.11-alpine
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    volumes:
+      - ./keycloak/init-realm.py:/init-realm.py:ro
+    command: ["python3", "/init-realm.py"]
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: jobcopilot
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    restart: "no"
+
 # ── Volumes ─────────────────────────────────────────────────────────────────
 
 volumes:

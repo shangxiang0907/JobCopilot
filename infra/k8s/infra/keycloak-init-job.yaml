@@ -1,0 +1,118 @@
+---
+# ConfigMap: stores the init script so the Job can mount it without baking a custom image.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-init-script
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: keycloak-init
+    app.kubernetes.io/part-of: jobcopilot
+data:
+  init-realm.py: |
+    #!/usr/bin/env python3
+    import json, os, sys, time, urllib.error, urllib.parse, urllib.request
+
+    KEYCLOAK_URL = os.environ.get("KEYCLOAK_URL", "http://keycloak:8080")
+    REALM        = os.environ.get("KEYCLOAK_REALM", "jobcopilot")
+    ADMIN_USER   = os.environ.get("KEYCLOAK_ADMIN", "admin")
+    ADMIN_PASS   = os.environ.get("KEYCLOAK_ADMIN_PASSWORD", "admin")
+    ATTRIBUTE    = "tenant_id"
+
+    def _http(method, url, data=None, token=None):
+        headers = {}
+        if token: headers["Authorization"] = f"Bearer {token}"
+        if data:  headers["Content-Type"]  = "application/json"
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                body = r.read()
+                return json.loads(body) if body else {}
+        except urllib.error.HTTPError as e:
+            print(f"HTTP {e.code} {method} {url}: {e.read().decode(errors='replace')}", file=sys.stderr)
+            raise
+
+    def wait_for_keycloak(max_wait=180):
+        url = f"{KEYCLOAK_URL}/health/ready"
+        print(f"==> Waiting for Keycloak at {url} ...")
+        deadline = time.monotonic() + max_wait
+        while time.monotonic() < deadline:
+            try:
+                with urllib.request.urlopen(url, timeout=5) as r:
+                    if r.status == 200:
+                        print("==> Keycloak is ready"); return
+            except Exception: pass
+            time.sleep(5)
+        print("ERROR: Keycloak did not become ready", file=sys.stderr); sys.exit(1)
+
+    def get_token():
+        url = f"{KEYCLOAK_URL}/realms/master/protocol/openid-connect/token"
+        payload = urllib.parse.urlencode({"grant_type":"password","client_id":"admin-cli",
+                                          "username":ADMIN_USER,"password":ADMIN_PASS}).encode()
+        req = urllib.request.Request(url, data=payload, method="POST")
+        req.add_header("Content-Type","application/x-www-form-urlencoded")
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return json.loads(r.read())["access_token"]
+
+    wait_for_keycloak()
+    print("==> Fetching admin token ...")
+    token = get_token()
+    profile_url = f"{KEYCLOAK_URL}/admin/realms/{REALM}/users/profile"
+    profile = _http("GET", profile_url, token=token)
+    attrs = profile.get("attributes", [])
+    if any(a.get("name") == ATTRIBUTE for a in attrs):
+        print(f"==> '{ATTRIBUTE}' already declared — nothing to do"); sys.exit(0)
+    attrs.append({"name":ATTRIBUTE,"displayName":"Tenant ID",
+                  "permissions":{"view":["admin"],"edit":["admin"]},
+                  "validations":{},"annotations":{}})
+    profile["attributes"] = attrs
+    _http("PUT", profile_url, data=json.dumps(profile).encode(), token=token)
+    print(f"==> '{ATTRIBUTE}' User Profile attribute configured successfully")
+
+---
+# One-shot Job: configures the tenant_id Declarative User Profile attribute.
+# Apply after the Keycloak StatefulSet is ready.
+# ttlSecondsAfterFinished: 300 — the Job and its pod auto-delete 5 minutes after completion.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-init
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: keycloak-init
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: keycloak-init
+          image: python:3.11-alpine
+          command: ["python3", "/scripts/init-realm.py"]
+          env:
+            - name: KEYCLOAK_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: jobcopilot-config
+                  key: KEYCLOAK_URL
+            - name: KEYCLOAK_REALM
+              valueFrom:
+                configMapKeyRef:
+                  name: jobcopilot-config
+                  key: KEYCLOAK_REALM
+            - name: KEYCLOAK_ADMIN
+              value: "admin"
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-admin-secret
+                  key: password
+          volumeMounts:
+            - name: init-script
+              mountPath: /scripts
+      volumes:
+        - name: init-script
+          configMap:
+            name: keycloak-init-script
+            defaultMode: 0755
