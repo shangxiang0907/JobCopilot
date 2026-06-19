@@ -11,7 +11,6 @@ Kubernetes: initContainer or Job after readiness probe passes).
 import json
 import os
 import sys
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -40,23 +39,6 @@ def _http(method: str, url: str, data: bytes | None = None, token: str | None = 
         raise
 
 
-def wait_for_keycloak(max_wait: int = 120) -> None:
-    health_url = f"{KEYCLOAK_URL}/health/ready"
-    deadline = time.monotonic() + max_wait
-    print(f"==> Waiting for Keycloak at {health_url} ...")
-    while time.monotonic() < deadline:
-        try:
-            with urllib.request.urlopen(health_url, timeout=5) as resp:
-                if resp.status == 200:
-                    print("==> Keycloak is ready")
-                    return
-        except OSError:
-            pass
-        time.sleep(3)
-    print("ERROR: Keycloak did not become ready in time", file=sys.stderr)
-    sys.exit(1)
-
-
 def get_admin_token() -> str:
     url = f"{KEYCLOAK_URL}/realms/master/protocol/openid-connect/token"
     payload = urllib.parse.urlencode(
@@ -74,8 +56,6 @@ def get_admin_token() -> str:
 
 
 def main() -> None:
-    wait_for_keycloak()
-
     print("==> Fetching admin token ...")
     token = get_admin_token()
 

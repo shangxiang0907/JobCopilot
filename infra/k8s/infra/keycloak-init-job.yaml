@@ -11,7 +11,7 @@ metadata:
 data:
   init-realm.py: |
     #!/usr/bin/env python3
-    import json, os, sys, time, urllib.error, urllib.parse, urllib.request
+    import json, os, sys, urllib.error, urllib.parse, urllib.request
 
     KEYCLOAK_URL = os.environ.get("KEYCLOAK_URL", "http://keycloak:8080")
     REALM        = os.environ.get("KEYCLOAK_REALM", "jobcopilot")
@@ -32,19 +32,6 @@ data:
             print(f"HTTP {e.code} {method} {url}: {e.read().decode(errors='replace')}", file=sys.stderr)
             raise
 
-    def wait_for_keycloak(max_wait=180):
-        url = f"{KEYCLOAK_URL}/health/ready"
-        print(f"==> Waiting for Keycloak at {url} ...")
-        deadline = time.monotonic() + max_wait
-        while time.monotonic() < deadline:
-            try:
-                with urllib.request.urlopen(url, timeout=5) as r:
-                    if r.status == 200:
-                        print("==> Keycloak is ready"); return
-            except Exception: pass
-            time.sleep(5)
-        print("ERROR: Keycloak did not become ready", file=sys.stderr); sys.exit(1)
-
     def get_token():
         url = f"{KEYCLOAK_URL}/realms/master/protocol/openid-connect/token"
         payload = urllib.parse.urlencode({"grant_type":"password","client_id":"admin-cli",
@@ -54,7 +41,6 @@ data:
         with urllib.request.urlopen(req, timeout=10) as r:
             return json.loads(r.read())["access_token"]
 
-    wait_for_keycloak()
     print("==> Fetching admin token ...")
     token = get_token()
     profile_url = f"{KEYCLOAK_URL}/admin/realms/{REALM}/users/profile"
@@ -86,6 +72,17 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-keycloak
+          image: curlimages/curl:8.8.0
+          command:
+            - sh
+            - -c
+            - |
+              until curl -sf http://keycloak:9000/health/ready; do
+                echo "==> Keycloak not ready, retrying in 5s ..."; sleep 5;
+              done
+              echo "==> Keycloak is ready"
       containers:
         - name: keycloak-init
           image: python:3.11-alpine
