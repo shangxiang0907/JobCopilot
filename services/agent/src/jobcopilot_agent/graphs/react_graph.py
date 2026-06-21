@@ -22,5 +22,5 @@ def build_react_agent(user_id: str, tenant_id: str) -> Any:
     return create_react_agent(
         llm,
         tools=ALL_TOOLS,
-        state_modifier=SystemMessage(content=system_prompt),
+        prompt=SystemMessage(content=system_prompt),
     )

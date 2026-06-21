@@ -65,7 +65,7 @@ async def _event_stream(
                 yield f"data: {json.dumps({'type': 'tool_result', 'name': event.get('name')})}\n\n"
 
     except Exception as exc:
-        log.error("stream_failed", extra={"error": str(exc)})
+        log.exception("stream_failed: %s", exc)
         yield f"data: {json.dumps({'type': 'error', 'content': 'Stream error occurred'})}\n\n"
 
     yield f"data: {json.dumps({'type': 'done'})}\n\n"
