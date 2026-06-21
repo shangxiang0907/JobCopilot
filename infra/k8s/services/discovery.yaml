@@ -37,6 +37,11 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
+        # Chromium's process sandbox requires syscalls (clone, unshare) that the
+        # default RuntimeDefault seccomp profile blocks. Unconfined allows the
+        # kernel sandbox to work without needing --no-sandbox in Playwright config.
+        seccompProfile:
+          type: Unconfined
       containers:
         - name: discovery-service
           image: ghcr.io/YOUR_ORG/jobcopilot-discovery:latest

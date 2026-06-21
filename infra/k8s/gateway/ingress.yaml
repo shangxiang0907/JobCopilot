@@ -1,0 +1,182 @@
+# Ingress resources — one per service, preserving per-service timeout config.
+#
+# Replace REPLACE_WITH_API_DOMAIN with your actual API domain (e.g. api.example.com)
+# before applying. cert-manager will issue a TLS cert for that domain automatically
+# once the ClusterIssuer in cert-issuer.yaml is active.
+#
+# Timeout annotations (milliseconds):
+#   connect-timeout: TCP connection to upstream
+#   read-timeout:    waiting for upstream response (must cover SSE / long polling)
+#   write-timeout:   sending request to upstream
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: profile-ingress
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/part-of: jobcopilot
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    konghq.com/connect-timeout: "5000"
+    konghq.com/read-timeout: "60000"
+    konghq.com/write-timeout: "60000"
+spec:
+  ingressClassName: kong
+  tls:
+    - hosts:
+        - REPLACE_WITH_API_DOMAIN
+      secretName: kong-api-tls
+  rules:
+    - host: REPLACE_WITH_API_DOMAIN
+      http:
+        paths:
+          - path: /v1/profiles
+            pathType: Prefix
+            backend:
+              service:
+                name: profile-service
+                port:
+                  number: 8000
+          - path: /v1/resumes
+            pathType: Prefix
+            backend:
+              service:
+                name: profile-service
+                port:
+                  number: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: job-ingress
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/part-of: jobcopilot
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    konghq.com/connect-timeout: "5000"
+    konghq.com/read-timeout: "60000"
+    konghq.com/write-timeout: "60000"
+spec:
+  ingressClassName: kong
+  tls:
+    - hosts:
+        - REPLACE_WITH_API_DOMAIN
+      secretName: kong-api-tls
+  rules:
+    - host: REPLACE_WITH_API_DOMAIN
+      http:
+        paths:
+          - path: /v1/jobs
+            pathType: Prefix
+            backend:
+              service:
+                name: job-service
+                port:
+                  number: 8000
+          - path: /v1/companies
+            pathType: Prefix
+            backend:
+              service:
+                name: job-service
+                port:
+                  number: 8000
+          - path: /v1/applications
+            pathType: Prefix
+            backend:
+              service:
+                name: job-service
+                port:
+                  number: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: discovery-ingress
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/part-of: jobcopilot
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    konghq.com/connect-timeout: "5000"
+    konghq.com/read-timeout: "120000"
+    konghq.com/write-timeout: "120000"
+spec:
+  ingressClassName: kong
+  tls:
+    - hosts:
+        - REPLACE_WITH_API_DOMAIN
+      secretName: kong-api-tls
+  rules:
+    - host: REPLACE_WITH_API_DOMAIN
+      http:
+        paths:
+          - path: /v1/discovery
+            pathType: Prefix
+            backend:
+              service:
+                name: discovery-service
+                port:
+                  number: 8000
+---
+# Agent service needs 300s read-timeout to support SSE streaming responses.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agent-ingress
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/part-of: jobcopilot
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    konghq.com/connect-timeout: "5000"
+    konghq.com/read-timeout: "300000"
+    konghq.com/write-timeout: "300000"
+spec:
+  ingressClassName: kong
+  tls:
+    - hosts:
+        - REPLACE_WITH_API_DOMAIN
+      secretName: kong-api-tls
+  rules:
+    - host: REPLACE_WITH_API_DOMAIN
+      http:
+        paths:
+          - path: /v1/agent
+            pathType: Prefix
+            backend:
+              service:
+                name: agent-service
+                port:
+                  number: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: notification-ingress
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/part-of: jobcopilot
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    konghq.com/connect-timeout: "5000"
+    konghq.com/read-timeout: "60000"
+    konghq.com/write-timeout: "60000"
+spec:
+  ingressClassName: kong
+  tls:
+    - hosts:
+        - REPLACE_WITH_API_DOMAIN
+      secretName: kong-api-tls
+  rules:
+    - host: REPLACE_WITH_API_DOMAIN
+      http:
+        paths:
+          - path: /v1/notifications
+            pathType: Prefix
+            backend:
+              service:
+                name: notification-service
+                port:
+                  number: 8000

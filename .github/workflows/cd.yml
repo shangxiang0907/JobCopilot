@@ -129,13 +129,14 @@ jobs:
           #
           # echo "${{ secrets.KUBECONFIG }}" > /tmp/kubeconfig.yaml
           # chmod 600 /tmp/kubeconfig.yaml
+          # export KUBECONFIG=/tmp/kubeconfig.yaml
           #
-          # Apply the full declarative manifests — keeps cluster state in sync with repo.
-          # kubectl --kubeconfig /tmp/kubeconfig.yaml apply -f infra/k8s/
+          # Apply all manifests via kustomize (respects resource ordering in kustomization.yaml).
+          # kubectl apply -k infra/k8s/
           #
           # Force a rolling restart so pods pull the new :latest image.
-          # kubectl --kubeconfig /tmp/kubeconfig.yaml rollout restart deployment -n jobcopilot
+          # kubectl rollout restart deployment -n jobcopilot
           #
           # Block until all deployments are healthy (fail CD if rollout gets stuck).
-          # kubectl --kubeconfig /tmp/kubeconfig.yaml rollout status deployment -n jobcopilot --timeout=5m
+          # kubectl rollout status deployment -n jobcopilot --timeout=5m
           echo "Deploy step ready. Add KUBECONFIG secret and uncomment kubectl commands to activate."

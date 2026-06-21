@@ -1,0 +1,346 @@
+---
+# Default deny-all ingress for the entire namespace.
+# Every service must explicitly open what it needs via the policies below.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: jobcopilot
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+
+---
+# Kong: accepts traffic from the internet (no podSelector restriction on ingress).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-kong
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kong
+  policyTypes:
+    - Ingress
+  ingress:
+    - {}   # open to all — Kong is the public edge
+
+---
+# Frontend: accepts traffic from the internet.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-frontend
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  policyTypes:
+    - Ingress
+  ingress:
+    - {}
+
+---
+# Profile Service: accepts traffic from Kong and Agent Service (internal calls).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-profile-service
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: profile-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kong
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agent-service
+
+---
+# Job Service: accepts traffic from Kong and Agent Service.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-job-service
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: job-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kong
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agent-service
+
+---
+# Discovery Service: accepts traffic from Kong only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-discovery-service
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: discovery-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kong
+
+---
+# Agent Service: accepts traffic from Kong only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-agent-service
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: agent-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kong
+
+---
+# Notification Service: accepts traffic from Kong only.
+# (Notification is also triggered via RabbitMQ — that path carries no inbound HTTP.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-notification-service
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kong
+
+---
+# PostgreSQL: accepts traffic from all application services and Keycloak.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-postgres
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: profile-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: job-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: discovery-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agent-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: notification-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: keycloak
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: temporal
+        - podSelector:
+            matchLabels:
+              app: keycloak-init    # Job pod label
+
+---
+# Redis: accepts traffic from services that use it for caching/sessions.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-redis
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: profile-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: job-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: discovery-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agent-service
+
+---
+# RabbitMQ: accepts traffic from services that publish or consume messages.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-rabbitmq
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: job-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: discovery-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agent-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: notification-service
+
+---
+# Qdrant: accepts traffic from Agent Service (vector search).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-qdrant
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: qdrant
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agent-service
+
+---
+# Keycloak: accepts traffic from all services (JWKS endpoint for JWT validation)
+# and from the internet via Kong for OIDC login flows.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-keycloak
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kong
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: profile-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: job-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: discovery-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agent-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: notification-service
+        - podSelector:
+            matchLabels:
+              app: keycloak-init
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: frontend
+
+---
+# Temporal: accepts traffic from Discovery Service (worker + client).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-temporal
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: temporal
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: discovery-service
+        - podSelector:
+            matchLabels:
+              app: temporal-namespace-init   # Job pod label
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: temporal-ui
+
+---
+# Temporal UI: accepts traffic from Kong (internal admin access) or direct.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-temporal-ui
+  namespace: jobcopilot
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: temporal-ui
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kong

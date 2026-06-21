@@ -1,158 +1,117 @@
-# Kong API Gateway — DB-less mode.
-# JWT validation is handled at the FastAPI service layer (jobcopilot_shared.auth).
-# Kong routes traffic only; no JWT plugin or consumer configuration needed.
+# Kong Gateway + Kong Ingress Controller (KIC v3) — all-in-one deployment.
+#
+# Architecture:
+#   Pod contains two containers:
+#     - proxy:              Kong 3.9 data plane (handles traffic)
+#     - ingress-controller: KIC 3.4 control plane (watches Ingress resources,
+#                           configures Kong via localhost:8001 Admin API)
+#
+# Prerequisites (install before kubectl apply -k infra/k8s/):
+#   cert-manager:
+#     kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.yaml
+#     kubectl -n cert-manager rollout status deployment/cert-manager --timeout=3m
 ---
 apiVersion: v1
-kind: ConfigMap
+kind: ServiceAccount
 metadata:
-  name: kong-config
+  name: kong-serviceaccount
   namespace: jobcopilot
   labels:
     app.kubernetes.io/name: kong
     app.kubernetes.io/part-of: jobcopilot
-data:
-  kong.yml: |
-    _format_version: "3.0"
-    _transform: true
-
-    services:
-      - name: profile-svc
-        host: profile-service
-        port: 8000
-        protocol: http
-        connect_timeout: 5000
-        read_timeout: 60000
-        write_timeout: 60000
-        routes:
-          - name: profile-routes
-            paths:
-              - /v1/profiles
-              - /v1/resumes
-            strip_path: false
-            preserve_host: false
-
-      - name: job-svc
-        host: job-service
-        port: 8000
-        protocol: http
-        connect_timeout: 5000
-        read_timeout: 60000
-        write_timeout: 60000
-        routes:
-          - name: job-routes
-            paths:
-              - /v1/jobs
-              - /v1/companies
-              - /v1/applications
-            strip_path: false
-            preserve_host: false
-
-      - name: discovery-svc
-        host: discovery-service
-        port: 8000
-        protocol: http
-        connect_timeout: 5000
-        read_timeout: 120000
-        write_timeout: 120000
-        routes:
-          - name: discovery-routes
-            paths:
-              - /v1/discovery
-            strip_path: false
-            preserve_host: false
-
-      - name: agent-svc
-        host: agent-service
-        port: 8000
-        protocol: http
-        connect_timeout: 5000
-        read_timeout: 300000
-        write_timeout: 300000
-        routes:
-          - name: agent-routes
-            paths:
-              - /v1/agent
-            strip_path: false
-            preserve_host: false
-
-      - name: notification-svc
-        host: notification-service
-        port: 8000
-        protocol: http
-        connect_timeout: 5000
-        read_timeout: 60000
-        write_timeout: 60000
-        routes:
-          - name: notification-routes
-            paths:
-              - /v1/notifications
-            strip_path: false
-            preserve_host: false
-
-      - name: profile-health-svc
-        host: profile-service
-        port: 8000
-        protocol: http
-        path: /healthz/ready
-        routes:
-          - name: profile-health-route
-            paths:
-              - /healthz/profile-service
-            strip_path: true
-            methods: [GET]
-
-      - name: job-health-svc
-        host: job-service
-        port: 8000
-        protocol: http
-        path: /healthz/ready
-        routes:
-          - name: job-health-route
-            paths:
-              - /healthz/job-service
-            strip_path: true
-            methods: [GET]
-
-      - name: discovery-health-svc
-        host: discovery-service
-        port: 8000
-        protocol: http
-        path: /healthz/ready
-        routes:
-          - name: discovery-health-route
-            paths:
-              - /healthz/discovery-service
-            strip_path: true
-            methods: [GET]
-
-      - name: agent-health-svc
-        host: agent-service
-        port: 8000
-        protocol: http
-        path: /healthz/ready
-        routes:
-          - name: agent-health-route
-            paths:
-              - /healthz/agent-service
-            strip_path: true
-            methods: [GET]
-
-      - name: notification-health-svc
-        host: notification-service
-        port: 8000
-        protocol: http
-        path: /healthz/ready
-        routes:
-          - name: notification-health-route
-            paths:
-              - /healthz/notification-service
-            strip_path: true
-            methods: [GET]
 ---
+# ClusterRole covers cluster-scoped resources (Ingress, IngressClass, nodes).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kong-ingress-clusterrole
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: jobcopilot
+rules:
+  - apiGroups: [""]
+    resources: [endpoints, nodes, pods, secrets, services, namespaces]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [create, patch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses, ingressclasses]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses/status]
+    verbs: [update, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kong-ingress-clusterrole-binding
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: jobcopilot
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kong-ingress-clusterrole
+subjects:
+  - kind: ServiceAccount
+    name: kong-serviceaccount
+    namespace: jobcopilot
+---
+# Role covers namespace-scoped resources (leases for KIC leader election).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kong-ingress-role
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: jobcopilot
+rules:
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, list, watch, create, update, patch]
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [get, list, watch, create, update, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kong-ingress-role-binding
+  namespace: jobcopilot
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: jobcopilot
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kong-ingress-role
+subjects:
+  - kind: ServiceAccount
+    name: kong-serviceaccount
+    namespace: jobcopilot
+---
+# IngressClass: Ingress resources with ingressClassName: kong are handled by this controller.
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: kong
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: jobcopilot
+spec:
+  controller: ingress-controllers.konghq.com/kong
+---
+# Public-facing LoadBalancer for API traffic.
+# KIC reads this service's external IP and writes it to each Ingress .status.loadBalancer.
 apiVersion: v1
 kind: Service
 metadata:
-  name: kong
+  name: kong-proxy
   namespace: jobcopilot
   labels:
     app.kubernetes.io/name: kong
@@ -169,23 +128,6 @@ spec:
     - name: https
       port: 443
       targetPort: 8443
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: kong-admin
-  namespace: jobcopilot
-  labels:
-    app.kubernetes.io/name: kong
-    app.kubernetes.io/component: admin
-    app.kubernetes.io/part-of: jobcopilot
-spec:
-  selector:
-    app.kubernetes.io/name: kong
-  ports:
-    - name: admin
-      port: 8001
-      targetPort: 8001
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -206,21 +148,36 @@ spec:
         app.kubernetes.io/name: kong
         app.kubernetes.io/part-of: jobcopilot
     spec:
+      serviceAccountName: kong-serviceaccount
+      securityContext:
+        runAsNonRoot: true
       containers:
-        - name: kong
+        # ── Kong data plane ────────────────────────────────────────────────────
+        - name: proxy
           image: kong:3.9
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
           ports:
             - name: proxy
               containerPort: 8000
             - name: proxy-ssl
               containerPort: 8443
-            - name: admin
-              containerPort: 8001
+            - name: status
+              containerPort: 8100
           env:
             - name: KONG_DATABASE
               value: "off"
-            - name: KONG_DECLARATIVE_CONFIG
-              value: /etc/kong/kong.yml
+            # KIC v3 generates route config in expressions format — must match.
+            - name: KONG_ROUTER_FLAVOR
+              value: "expressions"
+            - name: KONG_PROXY_LISTEN
+              value: "0.0.0.0:8000, 0.0.0.0:8443 ssl http2"
+            # Admin API restricted to localhost; the KIC sidecar reaches it via pod-local network.
+            - name: KONG_ADMIN_LISTEN
+              value: "127.0.0.1:8001"
+            - name: KONG_STATUS_LISTEN
+              value: "0.0.0.0:8100"
             - name: KONG_PROXY_ACCESS_LOG
               value: /dev/stdout
             - name: KONG_ADMIN_ACCESS_LOG
@@ -229,24 +186,19 @@ spec:
               value: /dev/stderr
             - name: KONG_ADMIN_ERROR_LOG
               value: /dev/stderr
-            - name: KONG_ADMIN_LISTEN
-              value: "0.0.0.0:8001"
             - name: KONG_LOG_LEVEL
               value: warn
-          volumeMounts:
-            - name: kong-config
-              mountPath: /etc/kong
           readinessProbe:
             httpGet:
-              path: /status
-              port: 8001
+              path: /status/ready
+              port: 8100
             initialDelaySeconds: 10
             periodSeconds: 10
             failureThreshold: 5
           livenessProbe:
             httpGet:
               path: /status
-              port: 8001
+              port: 8100
             initialDelaySeconds: 20
             periodSeconds: 15
             failureThreshold: 3
@@ -257,7 +209,50 @@ spec:
             limits:
               cpu: "1"
               memory: 512Mi
-      volumes:
-        - name: kong-config
-          configMap:
-            name: kong-config
+
+        # ── KIC control plane ─────────────────────────────────────────────────
+        - name: ingress-controller
+          image: kong/kubernetes-ingress-controller:3.4
+          securityContext:
+            runAsUser: 65534
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          env:
+            - name: CONTROLLER_KONG_ADMIN_URL
+              value: "http://localhost:8001"
+            - name: CONTROLLER_PUBLISH_SERVICE
+              value: "jobcopilot/kong-proxy"
+            - name: CONTROLLER_INGRESS_CLASS_NAME
+              value: "kong"
+            - name: CONTROLLER_LOG_LEVEL
+              value: "warn"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 10254
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 10254
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
