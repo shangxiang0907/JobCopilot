@@ -1,0 +1,147 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Production overlay — Hetzner single-node deployment.
+#
+# Usage (on the server, from infra/):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# What it adds on top of the local base file:
+#   • Caddy edge proxy with automatic Let's Encrypt TLS (the ONLY public ingress)
+#   • Every internal service rebound to 127.0.0.1 (defense-in-depth behind the
+#     hcloud firewall; also sidesteps Docker's iptables bypass of host firewalls)
+#   • Keycloak switched to production `start` mode behind the TLS-terminating proxy
+#   • A pg_dumpall backup sidecar (nightly, 7-day retention)
+#
+# Requires infra/.env with (see .env.example "Cloud Deployment" section):
+#   SERVER_HOST, KEYCLOAK_PUBLIC_URL, FRONTEND_PUBLIC_URL, ENCRYPTION_KEY,
+#   POSTGRES_PASSWORD, RABBITMQ_PASSWORD, KEYCLOAK_ADMIN_PASSWORD
+#
+# NOTE: the `!override` tag REPLACES the base `ports:` list instead of merging it
+# (Compose merges sequences by default, which would otherwise keep the public
+# 0.0.0.0 bindings). Requires Docker Compose >= 2.24.4.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: jobcopilot
+
+services:
+
+  # ── Edge proxy: terminates TLS, the only service bound to public 80/443 ──────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - keycloak
+    environment:
+      # Apex domain; the Caddyfile derives auth.<SERVER_HOST> from it.
+      SERVER_HOST: ${SERVER_HOST:?set SERVER_HOST in infra/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"      # HTTP/3 (QUIC)
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data    # persisted ACME certs/account — MUST survive restarts
+      - caddy_config:/config
+
+  # ── Rebind every internal service to loopback only ──────────────────────────
+  postgres:
+    ports: !override
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    ports: !override
+      - "127.0.0.1:6379:6379"
+
+  rabbitmq:
+    ports: !override
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+
+  qdrant:
+    ports: !override
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+
+  temporal:
+    ports: !override
+      - "127.0.0.1:7233:7233"
+
+  temporal-ui:
+    # Internal ops tool — reach it via SSH tunnel: ssh -L 8233:localhost:8233 <server>
+    ports: !override
+      - "127.0.0.1:8233:8080"
+
+  kong:
+    # Kong is internal-only; the frontend proxies /v1/* to it over the Docker network.
+    ports: !override
+      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8001:8001"
+
+  # ── Keycloak: production mode behind the TLS-terminating Caddy proxy ─────────
+  keycloak:
+    command: ["start", "--import-realm"]
+    environment:
+      KC_PROXY_HEADERS: xforwarded     # trust X-Forwarded-* from Caddy
+      KC_HOSTNAME_STRICT: "true"       # override base's dev "false"
+    ports: !override
+      - "127.0.0.1:8080:8080"
+
+  frontend:
+    ports: !override
+      - "127.0.0.1:3000:3000"
+
+  profile-service:
+    ports: !override
+      - "127.0.0.1:8010:8000"
+
+  job-service:
+    ports: !override
+      - "127.0.0.1:8011:8000"
+
+  discovery-service:
+    ports: !override
+      - "127.0.0.1:8012:8000"
+
+  agent-service:
+    ports: !override
+      - "127.0.0.1:8013:8000"
+
+  notification-service:
+    ports: !override
+      - "127.0.0.1:8014:8000"
+
+  # ── Logical backup sidecar: nightly pg_dumpall (captures jobcopilot + keycloak
+  #    + temporal databases and roles), keep 7 days. Restore with:
+  #      gunzip -c all-YYYYMMDD-HHMMSS.sql.gz | docker compose exec -T postgres psql -U postgres
+  pg-backup:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - pg_backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "[pg-backup] sidecar started -> /backups (daily, 7-day retention)"
+        while true; do
+          ts=$$(date +%Y%m%d-%H%M%S)
+          if pg_dumpall --clean | gzip > /backups/all-$$ts.sql.gz; then
+            echo "[pg-backup] wrote all-$$ts.sql.gz"
+          else
+            echo "[pg-backup] dump FAILED at $$ts"
+            rm -f /backups/all-$$ts.sql.gz
+          fi
+          find /backups -name '*.sql.gz' -mtime +7 -delete
+          sleep 86400
+        done
+
+volumes:
+  caddy_data:
+  caddy_config:
+  pg_backups:

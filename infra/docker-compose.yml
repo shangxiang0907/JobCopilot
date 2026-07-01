@@ -29,7 +29,7 @@ services:
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: jobcopilot
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -61,7 +61,7 @@ services:
     image: rabbitmq:3.13-management-alpine
     environment:
       RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     ports:
@@ -97,7 +97,7 @@ services:
       DB: postgres12
       DB_PORT: 5432
       POSTGRES_USER: postgres
-      POSTGRES_PWD: postgres
+      POSTGRES_PWD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_SEEDS: postgres
       LOG_LEVEL: warn
     ports:
@@ -143,15 +143,15 @@ services:
         condition: service_healthy
     environment:
       KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: postgres
-      KC_DB_PASSWORD: postgres
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
-      KC_HOSTNAME_URL: "http://localhost:8080"
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
     volumes:
       - ./keycloak/jobcopilot-realm.json:/opt/keycloak/data/import/jobcopilot-realm.json:ro
     ports:
@@ -204,6 +204,7 @@ services:
   # are always up-to-date on container boot.
 
   profile-service:
+    image: ghcr.io/shangxiang0907/jobcopilot-profile:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: services/profile/Dockerfile
@@ -217,11 +218,11 @@ services:
     environment:
       SERVICE_NAME: profile-service
       ENVIRONMENT: development
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobcopilot
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/jobcopilot
       REDIS_URL: redis://redis:6379
       QDRANT_URL: http://qdrant:6333
       KEYCLOAK_URL: http://keycloak:8080
-      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_ISSUER_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: api
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
@@ -247,6 +248,7 @@ services:
     restart: unless-stopped
 
   job-service:
+    image: ghcr.io/shangxiang0907/jobcopilot-job:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: services/job/Dockerfile
@@ -258,10 +260,10 @@ services:
     environment:
       SERVICE_NAME: job-service
       ENVIRONMENT: development
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobcopilot
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/jobcopilot
       REDIS_URL: redis://redis:6379
       KEYCLOAK_URL: http://keycloak:8080
-      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_ISSUER_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: api
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
@@ -280,6 +282,7 @@ services:
     restart: unless-stopped
 
   discovery-service:
+    image: ghcr.io/shangxiang0907/jobcopilot-discovery:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: services/discovery/Dockerfile
@@ -295,15 +298,15 @@ services:
     environment:
       SERVICE_NAME: discovery-service
       ENVIRONMENT: development
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobcopilot
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/jobcopilot
       REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      RABBITMQ_URL: amqp://guest:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
       TEMPORAL_HOST: temporal:7233
       TEMPORAL_NAMESPACE: jobcopilot
       PROFILE_SERVICE_URL: http://profile-service:8000
       PLAYWRIGHT_HEADLESS: "true"
       KEYCLOAK_URL: http://keycloak:8080
-      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_ISSUER_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: api
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
@@ -321,6 +324,7 @@ services:
     restart: unless-stopped
 
   agent-service:
+    image: ghcr.io/shangxiang0907/jobcopilot-agent:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: services/agent/Dockerfile
@@ -334,9 +338,9 @@ services:
     environment:
       SERVICE_NAME: agent-service
       ENVIRONMENT: development
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobcopilot
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/jobcopilot
       REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      RABBITMQ_URL: amqp://guest:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       LLM_MODEL: ${LLM_MODEL:-qwen-max}
@@ -345,7 +349,7 @@ services:
       PROFILE_SERVICE_URL: http://profile-service:8000
       JOB_SERVICE_URL: http://job-service:8000
       KEYCLOAK_URL: http://keycloak:8080
-      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_ISSUER_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: api
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
@@ -363,6 +367,7 @@ services:
     restart: unless-stopped
 
   notification-service:
+    image: ghcr.io/shangxiang0907/jobcopilot-notification:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: services/notification/Dockerfile
@@ -374,11 +379,11 @@ services:
     environment:
       SERVICE_NAME: notification-service
       ENVIRONMENT: development
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobcopilot
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/jobcopilot
       REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      RABBITMQ_URL: amqp://guest:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
       KEYCLOAK_URL: http://keycloak:8080
-      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_ISSUER_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: api
       SMTP_HOST: ${SMTP_HOST:-}
@@ -402,6 +407,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: ghcr.io/shangxiang0907/jobcopilot-frontend:${IMAGE_TAG:-latest}
     build:
       context: ../frontend
       dockerfile: Dockerfile
@@ -413,7 +419,7 @@ services:
     environment:
       # Runtime env vars — injected into window.__ENV__ by layout.tsx at request time.
       # The browser reaches Keycloak via the host-exposed port, not the internal Docker hostname.
-      KEYCLOAK_PUBLIC_URL: http://localhost:8080
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: frontend
     ports:
@@ -432,7 +438,8 @@ services:
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      FRONTEND_URL: ${FRONTEND_PUBLIC_URL:-http://localhost:3000}
     restart: "no"
 
 # ── Volumes ─────────────────────────────────────────────────────────────────

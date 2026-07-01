@@ -35,3 +35,4 @@ Thumbs.db
 
 # Docker
 infra/.env
+infra/.env.production

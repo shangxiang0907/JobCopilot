@@ -1,0 +1,31 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Caddyfile — JobCopilot production edge proxy (Hetzner single-node).
+#
+# Automatic HTTPS via Let's Encrypt. Caddy obtains and auto-renews certs for the
+# apex domain and the `auth.` subdomain, then reverse-proxies over the internal
+# Docker network. HTTP is auto-redirected to HTTPS.
+#
+# Prerequisites:
+#   • SERVER_HOST env set to the apex domain (e.g. arnoldshang.com)
+#   • DNS A records for both `<SERVER_HOST>` and `auth.<SERVER_HOST>` -> server IP
+#   • Cloudflare proxy DISABLED (grey cloud / DNS only) so the ACME HTTP-01
+#     challenge reaches Caddy directly on port 80
+#   • caddy_data volume mounted so issued certs persist across restarts
+# ─────────────────────────────────────────────────────────────────────────────
+
+{
+	email admin@{$SERVER_HOST}
+}
+
+# Apex domain: Next.js frontend.
+# The frontend rewrites /v1/* to Kong internally, so Kong is never exposed here.
+{$SERVER_HOST} {
+	encode zstd gzip
+	reverse_proxy frontend:3000
+}
+
+# Keycloak (OIDC) on the auth subdomain.
+auth.{$SERVER_HOST} {
+	encode zstd gzip
+	reverse_proxy keycloak:8080
+}
