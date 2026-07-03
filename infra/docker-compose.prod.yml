@@ -1,8 +1,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Production overlay — Hetzner single-node deployment.
 #
-# Usage (on the server, from infra/):
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Usage: deploy via infra/scripts/deploy.sh (it resolves image digests, ships the
+# env, and runs `docker compose ... pull && up -d --no-build`). This overlay is
+# NOT meant to be run by hand — the *_IMAGE_DIGEST vars below are mandatory.
 #
 # What it adds on top of the local base file:
 #   • Caddy edge proxy with automatic Let's Encrypt TLS (the ONLY public ingress)
@@ -10,10 +11,15 @@
 #     hcloud firewall; also sidesteps Docker's iptables bypass of host firewalls)
 #   • Keycloak switched to production `start` mode behind the TLS-terminating proxy
 #   • A pg_dumpall backup sidecar (nightly, 7-day retention)
+#   • The 6 app images pinned by IMMUTABLE DIGEST (not a mutable tag). Production
+#     must NEVER resolve to :latest, so each ref uses a mandatory `${..:?}` digest
+#     var — a missing digest hard-fails compose instead of silently pulling latest.
 #
 # Requires infra/.env with (see .env.example "Cloud Deployment" section):
 #   SERVER_HOST, KEYCLOAK_PUBLIC_URL, FRONTEND_PUBLIC_URL, ENCRYPTION_KEY,
 #   POSTGRES_PASSWORD, RABBITMQ_PASSWORD, KEYCLOAK_ADMIN_PASSWORD
+# plus the per-service *_IMAGE_DIGEST vars, which deploy.sh resolves from the
+# git-SHA image tags and injects automatically — do NOT set them by hand.
 #
 # NOTE: the `!override` tag REPLACES the base `ports:` list instead of merging it
 # (Compose merges sequences by default, which would otherwise keep the public
@@ -87,26 +93,32 @@ services:
       - "127.0.0.1:8080:8080"
 
   frontend:
+    image: ghcr.io/shangxiang0907/jobcopilot-frontend@${FRONTEND_IMAGE_DIGEST:?FRONTEND_IMAGE_DIGEST unset — deploy via infra/scripts/deploy.sh}
     ports: !override
       - "127.0.0.1:3000:3000"
 
   profile-service:
+    image: ghcr.io/shangxiang0907/jobcopilot-profile@${PROFILE_IMAGE_DIGEST:?PROFILE_IMAGE_DIGEST unset — deploy via infra/scripts/deploy.sh}
     ports: !override
       - "127.0.0.1:8010:8000"
 
   job-service:
+    image: ghcr.io/shangxiang0907/jobcopilot-job@${JOB_IMAGE_DIGEST:?JOB_IMAGE_DIGEST unset — deploy via infra/scripts/deploy.sh}
     ports: !override
       - "127.0.0.1:8011:8000"
 
   discovery-service:
+    image: ghcr.io/shangxiang0907/jobcopilot-discovery@${DISCOVERY_IMAGE_DIGEST:?DISCOVERY_IMAGE_DIGEST unset — deploy via infra/scripts/deploy.sh}
     ports: !override
       - "127.0.0.1:8012:8000"
 
   agent-service:
+    image: ghcr.io/shangxiang0907/jobcopilot-agent@${AGENT_IMAGE_DIGEST:?AGENT_IMAGE_DIGEST unset — deploy via infra/scripts/deploy.sh}
     ports: !override
       - "127.0.0.1:8013:8000"
 
   notification-service:
+    image: ghcr.io/shangxiang0907/jobcopilot-notification@${NOTIFICATION_IMAGE_DIGEST:?NOTIFICATION_IMAGE_DIGEST unset — deploy via infra/scripts/deploy.sh}
     ports: !override
       - "127.0.0.1:8014:8000"
 
