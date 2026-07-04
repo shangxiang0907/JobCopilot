@@ -310,8 +310,9 @@ Always prefer the proper, maintainable solution over a quick workaround. Before 
 Concretely:
 - When an infrastructure/config error occurs, fix the root cause — do not patch the symptom.
 - If two options exist (quick hack vs. proper fix), present both with trade-offs and default to the proper one.
+- **When choosing among multiple _legitimate_ options, the recommendation MUST be driven by architectural correctness — NEVER by "smallest change / least effort / least risk / smallest diff." Never list minimal change as a pro of the recommended option. If unsure which option is the best practice, research it before recommending.**
 - Only proceed with a workaround if the user explicitly accepts it after understanding the trade-offs.
-- This applies to: Dockerfiles, Docker Compose, Alembic config, K8s manifests, CI pipelines, and all architectural decisions.
+- This applies to: Dockerfiles, Docker Compose, Alembic config, K8s manifests, CI pipelines, framework rendering models, and all architectural decisions.
 
 **中文：**  
 任何情况下优先选择正确、可维护的方案，而非临时变通。在实现任何修复之前，先验证其是否符合行业最佳实践。如果临时方案很诱人，明确说明并提出正确做法。临时方案会积累成长期维护债务，并阻碍后续扩展。
@@ -319,8 +320,9 @@ Concretely:
 具体要求：
 - 遇到基础设施/配置错误，修复根本原因，不要仅打补丁。
 - 如果存在两个选项（临时方案 vs. 正确方案），列出各自权衡，默认选正确方案。
+- **在多个_合法_方案中选择时，推荐必须以架构正确性为准——绝不以「改动最小 / 最省事 / 风险最低 / diff 最小」作为依据，也不得把「改动小」列为推荐方案的优点。若不确定哪个是最佳实践，先研究再推荐。**
 - 只有在用户明确理解权衡后主动接受时，才可以采用临时方案。
-- 适用范围：Dockerfile、Docker Compose、Alembic 配置、K8s manifest、CI 流水线及所有架构决策。
+- 适用范围：Dockerfile、Docker Compose、Alembic 配置、K8s manifest、CI 流水线、框架渲染模型及所有架构决策。
 
 ---
 
