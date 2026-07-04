@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import Script from "next/script"
 import "./globals.css"
 import { Providers } from "@/lib/providers"
 import { AppShell } from "@/components/layout/AppShell"
@@ -12,24 +13,14 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // Read at request time (server-side) so the same image works in every environment.
-  // The browser reads these values from window.__ENV__ — no NEXT_PUBLIC_ bake-in needed.
-  const clientEnv = {
-    KEYCLOAK_URL: process.env.KEYCLOAK_PUBLIC_URL ?? "http://localhost:8080",
-    KEYCLOAK_REALM: process.env.KEYCLOAK_REALM ?? "jobcopilot",
-    KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID ?? "frontend",
-  }
-
+  // window.__ENV__ is served by the always-dynamic /env.js route handler and loaded
+  // beforeInteractive (before any app code/hydration), so runtime config is read
+  // per-request from the container env — never baked in at build time. This layout
+  // touches no process.env, keeping all pages statically optimizable.
   return (
     <html lang="en">
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `window.__ENV__=${JSON.stringify(clientEnv)}`,
-          }}
-        />
-      </head>
       <body className={inter.className}>
+        <Script src="/env.js" strategy="beforeInteractive" />
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>

@@ -3,6 +3,9 @@
 *.env.local
 infra/k8s/config/secrets.yaml
 
+# Playwright MCP output (screenshots / page snapshots)
+.playwright-mcp/
+
 # Python
 __pycache__/
 *.py[cod]
