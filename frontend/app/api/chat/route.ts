@@ -4,7 +4,6 @@ const KONG_URL = process.env.KONG_URL ?? "http://kong:8000"
 
 export async function POST(req: NextRequest) {
   const { messages } = await req.json()
-  const lastMessage = messages[messages.length - 1]
 
   const backendRes = await fetch(`${KONG_URL}/v1/agent/chat/stream`, {
     method: "POST",
@@ -14,9 +13,10 @@ export async function POST(req: NextRequest) {
       "X-Tenant-ID": req.headers.get("X-Tenant-ID") ?? "",
       "X-User-ID": req.headers.get("X-User-ID") ?? "",
     },
+    // Backend contract is ChatRequest { messages: [{ role, content }] } — forward
+    // the full conversation as-is rather than splitting into message/history.
     body: JSON.stringify({
-      message: lastMessage.content,
-      history: messages.slice(0, -1).map((m: { role: string; content: string }) => ({
+      messages: messages.map((m: { role: string; content: string }) => ({
         role: m.role,
         content: m.content,
       })),
