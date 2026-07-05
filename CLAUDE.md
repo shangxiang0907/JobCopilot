@@ -311,6 +311,7 @@ Concretely:
 - When an infrastructure/config error occurs, fix the root cause — do not patch the symptom.
 - If two options exist (quick hack vs. proper fix), present both with trade-offs and default to the proper one.
 - **When choosing among multiple _legitimate_ options, the recommendation MUST be driven by architectural correctness — NEVER by "smallest change / least effort / least risk / smallest diff." Never list minimal change as a pro of the recommended option. If unsure which option is the best practice, research it before recommending.**
+- **Never use production as a debug loop.** Reproduce and verify every fix locally (via `docker compose up`) or in staging BEFORE deploying. Deploy only changes already verified elsewhere — production must not be the test bed. When debugging a frontend↔backend integration, audit BOTH sides of the contract together (schemas + both endpoints) in one pass so all mismatches are caught at once; read-only code tracing alone is insufficient — run it end-to-end. Batch related fixes into a single deploy instead of one-commit-per-bug round-trips.
 - Only proceed with a workaround if the user explicitly accepts it after understanding the trade-offs.
 - This applies to: Dockerfiles, Docker Compose, Alembic config, K8s manifests, CI pipelines, framework rendering models, and all architectural decisions.
 
@@ -321,6 +322,7 @@ Concretely:
 - 遇到基础设施/配置错误，修复根本原因，不要仅打补丁。
 - 如果存在两个选项（临时方案 vs. 正确方案），列出各自权衡，默认选正确方案。
 - **在多个_合法_方案中选择时，推荐必须以架构正确性为准——绝不以「改动最小 / 最省事 / 风险最低 / diff 最小」作为依据，也不得把「改动小」列为推荐方案的优点。若不确定哪个是最佳实践，先研究再推荐。**
+- **绝不把生产环境当调试循环。** 每个修复都必须先在本地（`docker compose up`）或 staging 端到端复现并验证，再部署；生产只接收已在别处验证过的变更，不得拿生产试错。调试前后端集成时，一次把契约两侧（schema + 两端端点）审全，一并抓出所有不一致；只靠只读追踪代码不够，必须端到端跑通。相关修复合并成一次部署，不要一个 bug 一次生产往返。
 - 只有在用户明确理解权衡后主动接受时，才可以采用临时方案。
 - 适用范围：Dockerfile、Docker Compose、Alembic 配置、K8s manifest、CI 流水线、框架渲染模型及所有架构决策。
 
