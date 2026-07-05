@@ -21,6 +21,8 @@
 # Requires:
 #   • A clean git tree; GIT_REF must resolve to a commit whose images exist in GHCR
 #     (i.e. a commit CD built after it was pushed to main)
+#   • gh CLI authenticated (verifies the commit's CD run — incl. the blocking
+#     Trivy image scan — concluded green before anything is deployed)
 #   • infra/.env.production filled in (template: .env.example "Cloud Deployment")
 #   • GHCR packages public (no registry login needed on the server)
 #   • docker buildx (used locally to resolve tag -> digest; no image is pulled)
@@ -69,6 +71,36 @@ if ! git -C "$REPO_ROOT" merge-base --is-ancestor "$TAG" origin/main 2>/dev/null
   echo "         (Ctrl-C to abort) ..." >&2
   sleep 5
 fi
+
+# 1b. Supply-chain gate: the commit's CD run (image build + blocking Trivy scan)
+#     must have concluded green. Resolving a digest (step 2b) only proves an image
+#     EXISTS in GHCR — CD pushes images BEFORE scanning them, so a commit whose
+#     image-scan job failed still has pullable images. Never deploy those.
+command -v gh >/dev/null 2>&1 || {
+  echo "ERROR: gh CLI not found — required to verify the CD run (incl. Trivy" >&2
+  echo "       image scan) passed for ${TAG:0:12}. Install: https://cli.github.com" >&2
+  exit 1
+}
+cd_state="$(gh run list --workflow CD --commit "$TAG" --limit 1 \
+              --json status,conclusion --jq '.[0] | "\(.status)/\(.conclusion)"' \
+              2>/dev/null || true)"
+case "$cd_state" in
+  completed/success)
+    echo "==> CD run for ${TAG:0:12} is green (build + image scan passed)." ;;
+  ""|null/null)
+    echo "ERROR: no CD run found for commit ${TAG:0:12}. Push it to main and wait" >&2
+    echo "       for CD to finish:  gh run watch" >&2
+    exit 1 ;;
+  in_progress/*|queued/*|pending/*|waiting/*)
+    echo "ERROR: CD run for ${TAG:0:12} has not finished (${cd_state%%/*})." >&2
+    echo "       Wait for it:  gh run watch" >&2
+    exit 1 ;;
+  *)
+    echo "ERROR: CD run for ${TAG:0:12} did not succeed (state: ${cd_state})." >&2
+    echo "       Its Trivy image scan may have found Critical CVEs. Inspect with:" >&2
+    echo "       gh run list --workflow CD --commit ${TAG}" >&2
+    exit 1 ;;
+esac
 
 # 2. Cloud env must exist and be real.
 [ -f "$ENV_FILE" ] || {
