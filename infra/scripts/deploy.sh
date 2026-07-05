@@ -128,7 +128,16 @@ PIN_ENV="IMAGE_TAG=${TAG}"
 declare -a DIGEST_ENVS=()
 for svc in "${SERVICES[@]}"; do
   ref="ghcr.io/${GHCR_OWNER}/jobcopilot-${svc}:${TAG}"
-  digest="$(docker buildx imagetools inspect "$ref" 2>/dev/null | awk '/^Digest:/{print $2; exit}')"
+  # `|| true`: under set -e -o pipefail a failed inspect would kill the script
+  # inside the substitution, silently skipping the diagnostic below. Retry a
+  # few times — right after CD finishes, GHCR may not have propagated the
+  # manifest yet.
+  digest=""
+  for attempt in 1 2 3; do
+    digest="$(docker buildx imagetools inspect "$ref" 2>/dev/null | awk '/^Digest:/{print $2; exit}' || true)"
+    [ -n "$digest" ] && break
+    [ "$attempt" -lt 3 ] && { echo "    ${ref##*/}: not resolvable yet, retrying in 10s ..." >&2; sleep 10; }
+  done
   if [ -z "$digest" ]; then
     echo "ERROR: could not resolve a digest for ${ref}." >&2
     echo "       Has CD finished building & pushing commit ${TAG:0:12} to GHCR?" >&2
