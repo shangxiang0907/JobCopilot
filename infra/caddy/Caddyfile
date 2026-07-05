@@ -12,7 +12,6 @@
 #     challenge reaches Caddy directly on port 80
 #   • caddy_data volume mounted so issued certs persist across restarts
 # ─────────────────────────────────────────────────────────────────────────────
-
 {
 	email admin@{$SERVER_HOST}
 }

@@ -176,6 +176,13 @@ printf '%s\n' "$PIN_ENV" | ssh_ "cd ${REMOTE_DIR}/infra \
 echo "==> Pulling images + starting stack ..."
 ssh_ "cd ${REMOTE_DIR}/infra && docker compose ${COMPOSE[*]} pull && docker compose ${COMPOSE[*]} up -d --no-build --remove-orphans"
 
+# 5b. Apply Caddyfile changes. `up -d` only recreates containers whose compose
+#     definition changed — edits to the bind-mounted Caddyfile are invisible to
+#     it. `caddy reload` is Caddy's graceful zero-downtime reload (a no-op when
+#     the config is unchanged), so running it every deploy is safe.
+echo "==> Reloading Caddy config ..."
+ssh_ "cd ${REMOTE_DIR}/infra && docker compose ${COMPOSE[*]} exec -T -w /etc/caddy caddy caddy reload --config /etc/caddy/Caddyfile"
+
 SERVER_HOST="$(grep -E '^SERVER_HOST=' "$ENV_FILE" | cut -d= -f2-)"
 echo ""
 echo "==> Deploy complete (commit ${TAG:0:12})."

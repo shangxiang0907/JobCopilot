@@ -45,7 +45,10 @@ services:
       - "443:443"
       - "443:443/udp"      # HTTP/3 (QUIC)
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Mount the DIRECTORY, not the file: rsync (and most editors) replace a
+      # file via tmp-file + rename, which orphans a single-file bind mount — the
+      # container keeps the old inode and `caddy reload` re-reads stale config.
+      - ./caddy:/etc/caddy:ro
       - caddy_data:/data    # persisted ACME certs/account — MUST survive restarts
       - caddy_config:/config
 
