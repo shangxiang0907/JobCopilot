@@ -50,7 +50,16 @@ services:
       - caddy_config:/config
 
   # ── Rebind every internal service to loopback only ──────────────────────────
+  #
+  # NOTE on the ${..:?} overrides below: the base file falls back to dev defaults
+  # (postgres / guest / admin) so plain `docker compose up` works locally. In
+  # production those fallbacks must be fatal. A single failing interpolation
+  # aborts the ENTIRE compose file, so overriding each variable once — at its
+  # canonical consumer — is sufficient to hard-fail any prod invocation that is
+  # missing a real credential (deploy.sh checks too; this covers manual runs).
   postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a strong POSTGRES_PASSWORD in infra/.env — dev fallback forbidden in prod}
     ports: !override
       - "127.0.0.1:5432:5432"
 
@@ -59,6 +68,8 @@ services:
       - "127.0.0.1:6379:6379"
 
   rabbitmq:
+    environment:
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set a strong RABBITMQ_PASSWORD in infra/.env — dev fallback forbidden in prod}
     ports: !override
       - "127.0.0.1:5672:5672"
       - "127.0.0.1:15672:15672"
@@ -87,6 +98,7 @@ services:
   keycloak:
     command: ["start", "--import-realm"]
     environment:
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set a strong KEYCLOAK_ADMIN_PASSWORD in infra/.env — dev fallback forbidden in prod}
       KC_PROXY_HEADERS: xforwarded     # trust X-Forwarded-* from Caddy
       KC_HOSTNAME_STRICT: "true"       # override base's dev "false"
     ports: !override
@@ -99,6 +111,8 @@ services:
 
   profile-service:
     image: ghcr.io/shangxiang0907/jobcopilot-profile@${PROFILE_IMAGE_DIGEST:?PROFILE_IMAGE_DIGEST unset — deploy via infra/scripts/deploy.sh}
+    environment:
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in infra/.env — it encrypts stored LinkedIn cookies}
     ports: !override
       - "127.0.0.1:8010:8000"
 
@@ -134,7 +148,7 @@ services:
     environment:
       PGHOST: postgres
       PGUSER: postgres
-      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
     volumes:
       - pg_backups:/backups
     entrypoint: ["/bin/sh", "-c"]
