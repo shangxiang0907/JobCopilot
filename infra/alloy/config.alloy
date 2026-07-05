@@ -1,0 +1,39 @@
+// Grafana Alloy — ships container logs to Loki.
+// (Alloy replaces Promtail, which Grafana has deprecated.)
+// Discovers containers belonging to this compose project via the Docker socket
+// and labels each stream with the compose service name.
+
+discovery.docker "jobcopilot" {
+  host = "unix:///var/run/docker.sock"
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=jobcopilot"]
+  }
+}
+
+discovery.relabel "jobcopilot" {
+  targets = discovery.docker.jobcopilot.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "jobcopilot" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.jobcopilot.output
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

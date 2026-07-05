@@ -104,6 +104,10 @@ services:
     ports: !override
       - "127.0.0.1:8080:8080"
 
+  grafana:
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set a strong GRAFANA_ADMIN_PASSWORD in infra/.env — dev fallback forbidden in prod}
+
   frontend:
     image: ghcr.io/shangxiang0907/jobcopilot-frontend@${FRONTEND_IMAGE_DIGEST:?FRONTEND_IMAGE_DIGEST unset — deploy via infra/scripts/deploy.sh}
     ports: !override

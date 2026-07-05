@@ -116,13 +116,13 @@ Full design in `docs/SAD.md`. Key design constraints (violating any one blocks l
 | CI/CD | GitHub Actions |
 
 ### Observability / 可观测性
-| Component | Choice |
-|---|---|
-| Metrics | Prometheus (metric prefix: `jobcopilot_`) |
-| Logs | Loki + Promtail (structured JSON) |
-| Traces | Tempo + OpenTelemetry SDK |
-| Dashboards | Grafana |
-| LLM Traces | LangSmith |
+| Component | Choice | Status |
+|---|---|---|
+| Metrics | Prometheus — every service exposes `/metrics` via shared `jobcopilot_shared.metrics` (prefix `jobcopilot_`, identical names across services, distinguished by the scrape `job` label; multi-worker services use `PROMETHEUS_MULTIPROC_DIR`) | ✅ implemented |
+| Logs | Loki + Grafana Alloy (Docker discovery; Promtail is deprecated by Grafana) | ✅ implemented |
+| Dashboards | Grafana — datasources & dashboards provisioned as code in `infra/grafana/` | ✅ implemented |
+| Traces | Tempo + OpenTelemetry SDK | ⬜ roadmap |
+| LLM Traces | LangSmith (enabled via `LANGCHAIN_TRACING_V2` + API key) | ✅ implemented |
 
 ### Dev Tools / 开发工具
 | Tool | Purpose |

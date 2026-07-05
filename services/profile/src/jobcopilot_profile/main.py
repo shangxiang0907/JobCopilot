@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from jobcopilot_shared.handlers import add_exception_handlers
 from jobcopilot_shared.health import build_health_router
 from jobcopilot_shared.logging import configure_logging
+from jobcopilot_shared.metrics import instrument_app
 from jobcopilot_shared.middleware.tenant import RequestContextMiddleware
 
 from jobcopilot_profile.config import settings
@@ -20,6 +21,7 @@ app = FastAPI(
 )
 
 app.add_middleware(RequestContextMiddleware)
+instrument_app(app)
 add_exception_handlers(app)
 
 app.include_router(build_health_router(settings.service_name, settings.version))

@@ -17,6 +17,13 @@ plugins:
       policy: local
       limit_by: ip
       fault_tolerant: true
+  # Gateway metrics, scraped by Prometheus from the status API (:8100/metrics).
+  - name: prometheus
+    config:
+      status_code_metrics: true
+      latency_metrics: true
+      bandwidth_metrics: true
+      upstream_health_metrics: true
 
 services:
   - name: profile-svc

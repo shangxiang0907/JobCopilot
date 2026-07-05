@@ -18,6 +18,8 @@ dependencies = [
     "python-jose[cryptography]>=3.3.0",
     "structlog>=24.1.0",
     "starlette>=0.37.0",
+    "prometheus-client>=0.25.0",
+    "prometheus-fastapi-instrumentator>=8.0.0",
 ]
 
 [project.optional-dependencies]

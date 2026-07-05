@@ -1,0 +1,12 @@
+# Dashboards-as-code: everything in /etc/grafana/dashboards is auto-loaded.
+apiVersion: 1
+
+providers:
+  - name: jobcopilot
+    folder: JobCopilot
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false

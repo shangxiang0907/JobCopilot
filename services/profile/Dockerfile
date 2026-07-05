@@ -22,6 +22,9 @@ COPY services/profile .
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV VIRTUAL_ENV="/app/.venv"
+# Required for correct metrics with --workers 2: each uvicorn worker is a
+# separate process, so /metrics must aggregate via the multiprocess registry.
+ENV PROMETHEUS_MULTIPROC_DIR="/tmp/prometheus-metrics"
 
 USER appuser
 EXPOSE 8000
