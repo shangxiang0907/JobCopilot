@@ -5,6 +5,19 @@ _transform: true
 # JWT validation is handled at the FastAPI service layer via jobcopilot_shared.auth.
 # Kong is responsible only for routing and rate-limiting; no JWT plugin needed here.
 
+# Global safety net: coarse per-IP limit across every route. NOTE: in production
+# Kong sits behind the Next.js server-side rewrite, so the "IP" it sees is the
+# frontend container — this bucket is effectively a whole-site request cap, sized
+# accordingly. `policy: local` is correct for single-node; switch to `redis` if
+# Kong ever scales horizontally.
+plugins:
+  - name: rate-limiting
+    config:
+      minute: 600
+      policy: local
+      limit_by: ip
+      fault_tolerant: true
+
 services:
   - name: profile-svc
     host: profile-service
@@ -64,6 +77,18 @@ services:
           - /v1/agent
         strip_path: false
         preserve_host: false
+    plugins:
+      # Every agent request fans out to LLM calls (real money). Limit per user by
+      # bucketing on the Authorization header (per-JWT ≈ per-user; tokens rotate
+      # every 5 min which only resets the bucket). Client IP is useless here —
+      # in prod Kong only ever sees the frontend container's IP.
+      - name: rate-limiting
+        config:
+          minute: 20
+          policy: local
+          limit_by: header
+          header_name: authorization
+          fault_tolerant: true
 
   - name: notification-svc
     host: notification-service
