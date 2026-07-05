@@ -1,0 +1,49 @@
+# Automated dependency updates. Grouped per ecosystem to keep PR volume low;
+# every PR still runs the full CI (lint / typecheck / tests / build).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      frontend:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directories:
+      - /frontend
+      - /services/profile
+      - /services/job
+      - /services/discovery
+      - /services/agent
+      - /services/notification
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
+        patterns: ["*"]
+
+  - package-ecosystem: docker-compose
+    directory: /infra
+    schedule:
+      interval: weekly
+    groups:
+      compose-images:
+        patterns: ["*"]
