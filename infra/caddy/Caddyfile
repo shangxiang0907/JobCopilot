@@ -21,6 +21,16 @@
 # The frontend rewrites /v1/* to Kong internally, so Kong is never exposed here.
 {$SERVER_HOST} {
 	encode zstd gzip
+
+	header {
+		# 1 year HSTS; no includeSubDomains — auth.<host> is served separately.
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
 	reverse_proxy frontend:3000
 }
 
@@ -31,6 +41,13 @@
 # administer via SSH tunnel instead:  ssh -L 8080:localhost:8080 <server>
 auth.{$SERVER_HOST} {
 	encode zstd gzip
+
+	header {
+		# Keycloak manages its own CSP/frame headers (login pages may be framed
+		# by its own flows) — only add what it does not set itself.
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
 
 	@admin path /admin /admin/* /realms/master /realms/master/*
 	respond @admin 403
