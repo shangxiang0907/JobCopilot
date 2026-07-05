@@ -13,6 +13,7 @@ from typing import Any, TypedDict
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 
+from jobcopilot_agent.graphs._content import response_text
 from jobcopilot_agent.prompts.interview import (
     BEHAVIORAL_SYSTEM,
     BEHAVIORAL_USER,
@@ -61,8 +62,7 @@ async def _gen_behavioral_node(state: InterviewState) -> dict[str, Any]:
     ]
     try:
         response = await llm.ainvoke(messages)
-        assert isinstance(response.content, str)
-        result = json.loads(response.content)
+        result = json.loads(response_text(response))
         return {"behavioral_questions": result.get("questions", [])}
     except Exception as exc:
         log.warning("gen_behavioral_failed", extra={"error": str(exc)})
@@ -89,8 +89,7 @@ async def _gen_technical_node(state: InterviewState) -> dict[str, Any]:
     ]
     try:
         response = await llm.ainvoke(messages)
-        assert isinstance(response.content, str)
-        result = json.loads(response.content)
+        result = json.loads(response_text(response))
         return {"technical_questions": result.get("questions", [])}
     except Exception as exc:
         log.warning("gen_technical_failed", extra={"error": str(exc)})

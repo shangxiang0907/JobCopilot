@@ -7,13 +7,12 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "ASYNC", "S", "B"]
-ignore = [
-    "S101",  # allow assert in tests
-    "S105",  # allow hardcoded passwords in tests
-]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S", "N"]
+# Tests may use assert, fixed credentials, etc. (S) and long fixture names (N).
+# Must be "**/tests/**": tests live in services/*/tests/ and packages/*/tests/,
+# which a bare "tests/**" (repo-root only) never matched.
+"**/tests/**" = ["S", "N"]
 # Infrastructure init scripts use urllib stdlib for HTTP calls to admin-controlled
 # internal URLs; S310 (urlopen scheme audit) and S110 (except-pass) are intentional.
 "infra/keycloak/init-realm.py" = ["S310", "S110"]

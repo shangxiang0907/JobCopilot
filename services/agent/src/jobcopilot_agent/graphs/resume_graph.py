@@ -12,6 +12,7 @@ from typing import Any, TypedDict
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 
+from jobcopilot_agent.graphs._content import response_text
 from jobcopilot_agent.prompts.resume import GAP_ANALYSIS_SYSTEM, GAP_ANALYSIS_USER
 from jobcopilot_agent.services.llm import get_llm
 
@@ -48,8 +49,7 @@ async def _gap_analysis_node(state: ResumeState) -> dict[str, Any]:
     ]
     try:
         response = await llm.ainvoke(messages)
-        assert isinstance(response.content, str)
-        result = json.loads(response.content)
+        result = json.loads(response_text(response))
         return {
             "match_score": float(result.get("match_score", 0)),
             "gap_analysis": {
