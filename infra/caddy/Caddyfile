@@ -25,7 +25,15 @@
 }
 
 # Keycloak (OIDC) on the auth subdomain.
+# Only the user-facing OIDC surface of the jobcopilot realm is public. The admin
+# console/REST API (/admin/*) and the master realm (which admins authenticate
+# against) are blocked at the edge, per Keycloak's production hardening guidance —
+# administer via SSH tunnel instead:  ssh -L 8080:localhost:8080 <server>
 auth.{$SERVER_HOST} {
 	encode zstd gzip
+
+	@admin path /admin /admin/* /realms/master /realms/master/*
+	respond @admin 403
+
 	reverse_proxy keycloak:8080
 }
