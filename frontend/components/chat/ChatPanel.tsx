@@ -19,9 +19,9 @@ async function fetchWithAuth(url: URL | RequestInfo, options?: RequestInit): Pro
     ...options,
     headers: {
       ...options?.headers,
+      // Identity travels only inside the verified JWT; backends derive
+      // sub/tenant_id from it and never trust client-declared headers.
       Authorization: `Bearer ${kc.token ?? ""}`,
-      "X-Tenant-ID": (kc.tokenParsed?.tenant_id as string | undefined) ?? "",
-      "X-User-ID": kc.tokenParsed?.sub ?? "",
     },
   })
 }

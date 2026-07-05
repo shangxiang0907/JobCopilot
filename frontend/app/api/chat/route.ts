@@ -10,8 +10,6 @@ export async function POST(req: NextRequest) {
     headers: {
       "Content-Type": "application/json",
       Authorization: req.headers.get("Authorization") ?? "",
-      "X-Tenant-ID": req.headers.get("X-Tenant-ID") ?? "",
-      "X-User-ID": req.headers.get("X-User-ID") ?? "",
     },
     // Backend contract is ChatRequest { messages: [{ role, content }] } — forward
     // the full conversation as-is rather than splitting into message/history.

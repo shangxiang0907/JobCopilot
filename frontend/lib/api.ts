@@ -11,10 +11,9 @@ api.interceptors.request.use(async (config) => {
     const kc = getKeycloak()
     if (kc.authenticated) {
       await kc.updateToken(30).catch(() => kc.login())
+      // Identity (sub / tenant_id) travels ONLY inside the verified JWT — backends
+      // must never trust client-declared identity headers.
       if (kc.token) config.headers.Authorization = `Bearer ${kc.token}`
-      const parsed = kc.tokenParsed
-      if (parsed?.tenant_id) config.headers["X-Tenant-ID"] = parsed.tenant_id as string
-      if (parsed?.sub) config.headers["X-User-ID"] = parsed.sub
     }
   }
   return config
