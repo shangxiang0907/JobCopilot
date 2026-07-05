@@ -72,7 +72,7 @@ Full design in `docs/SAD.md`. Key design constraints (violating any one blocks l
 | **Discovery Service** | Python 3.11 + FastAPI + Playwright + Temporal Worker | `Deployment` | `discovery_schema` |
 | **Agent Service** | Python 3.11 + FastAPI + LangGraph | `Deployment` (KEDA) | `agent_schema` |
 | **Notification Service** | Python 3.11 + FastAPI | `Deployment` | `notification_schema` |
-| **Frontend** | Next.js 14 + TypeScript | `Deployment` | — |
+| **Frontend** | Next.js 15 + TypeScript | `Deployment` | — |
 
 ---
 
@@ -148,7 +148,7 @@ JobCopilot/
 │   │   ├── tools/        # ReAct tool definitions
 │   │   └── prompts/      # All LLM prompt templates
 │   └── notification/     # Notification Service (FastAPI)
-├── frontend/             # Next.js 14 application
+├── frontend/             # Next.js 15 application
 │   ├── app/              # App Router pages
 │   ├── components/       # shadcn/ui + custom components
 │   └── lib/              # API clients, store, utils
@@ -161,7 +161,6 @@ JobCopilot/
 ├── docs/
 │   ├── PRD.md            # Product Requirements Document (bilingual)
 │   ├── SAD.md            # Software Architecture Design (bilingual, with Mermaid diagrams)
-│   └── agents/           # Per-agent design docs
 ├── data/                 # Seed / test data
 ├── .github/
 │   └── workflows/        # CI/CD pipelines

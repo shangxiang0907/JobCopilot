@@ -1,8 +1,10 @@
 name: CI
 
+# push:[main] + pull_request covers everything once — "branches: [\"**\"]" made
+# every PR branch run CI twice (push event + pull_request event).
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -98,7 +100,8 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen
-      - run: uv run pytest packages/ services/ -v -x -m "not integration"
+      # No -x: report every failure in one run instead of one per round-trip.
+      - run: uv run pytest packages/ services/ -v -m "not integration"
 
   # ── 6. Integration Tests (real PostgreSQL + Redis + RabbitMQ) ────────────────
   integration-test:
@@ -158,4 +161,4 @@ jobs:
           (cd services/profile      && uv run alembic upgrade head)
           (cd services/job          && uv run alembic upgrade head)
           (cd services/notification && uv run alembic upgrade head)
-      - run: uv run pytest packages/ services/ -v -x -m integration
+      - run: uv run pytest packages/ services/ -v -m integration

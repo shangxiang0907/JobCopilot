@@ -9,10 +9,10 @@ Last Updated / 最后更新：2026-06-10
 ## 1. System Overview / 系统概述
 
 **EN:**  
-JobCopilot is built on a microservices architecture with five application services behind a Kong API Gateway, a Keycloak-backed authentication layer, and a multi-agent AI pipeline powered by LangGraph and orchestrated by Temporal. The frontend is a Next.js 14 application. All services are designed for horizontal scaling on Kubernetes.
+JobCopilot is built on a microservices architecture with five application services behind a Kong API Gateway, a Keycloak-backed authentication layer, and a multi-agent AI pipeline powered by LangGraph and orchestrated by Temporal. The frontend is a Next.js 15 application. All services are designed for horizontal scaling on Kubernetes.
 
 **中文：**  
-JobCopilot 采用微服务架构，Kong API Gateway 后方部署五个应用服务，通过 Keycloak 实现身份认证，AI 流水线基于 LangGraph 多 Agent 图并由 Temporal 负责工作流编排。前端为 Next.js 14 应用。所有服务均以水平扩展为目标，运行于 Kubernetes 之上。
+JobCopilot 采用微服务架构，Kong API Gateway 后方部署五个应用服务，通过 Keycloak 实现身份认证，AI 流水线基于 LangGraph 多 Agent 图并由 Temporal 负责工作流编排。前端为 Next.js 15 应用。所有服务均以水平扩展为目标，运行于 Kubernetes 之上。
 
 ---
 
@@ -48,7 +48,7 @@ graph TB
 
 ```mermaid
 graph TB
-    Browser["🌐 Next.js 14 Frontend\nTypeScript + Tailwind CSS\nVercel AI SDK + assistant-ui"]
+    Browser["🌐 Next.js 15 Frontend\nTypeScript + Tailwind CSS\nVercel AI SDK + assistant-ui"]
 
     subgraph Gateway["Gateway Layer / 网关层"]
         Kong["Kong API Gateway 3.x\nRouting · Rate Limiting · Auth Plugin\n路由 · 限流 · 认证插件"]
