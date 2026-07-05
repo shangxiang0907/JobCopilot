@@ -27,8 +27,23 @@ export async function POST(req: NextRequest) {
     return new Response("Backend error", { status: backendRes.status })
   }
 
-  // Adapt LangGraph astream_events v2 → Vercel AI SDK text stream (protocol v1)
+  // Adapt the agent's SSE contract → Vercel AI SDK text stream (protocol v1).
+  // The agent already flattens LangGraph events into:
+  //   data: {"type":"token","content":"..."}   (assistant text chunk)
+  //   data: {"type":"tool_call"|"tool_result"|"done"|"error", ...}
   const encoder = new TextEncoder()
+  const emitText = (
+    controller: ReadableStreamDefaultController<Uint8Array>,
+    content: unknown,
+  ) => {
+    const text =
+      typeof content === "string"
+        ? content
+        : Array.isArray(content)
+          ? content.map((c: { text?: string }) => c.text ?? "").join("")
+          : ""
+    if (text) controller.enqueue(encoder.encode(`0:${JSON.stringify(text)}\n`))
+  }
   const stream = new ReadableStream({
     async start(controller) {
       const reader = backendRes.body!.getReader()
@@ -47,24 +62,12 @@ export async function POST(req: NextRequest) {
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue
             const payload = line.slice(6).trim()
-            if (payload === "[DONE]") continue
+            if (!payload) continue
 
             try {
               const event = JSON.parse(payload)
-              if (event.event === "on_chat_model_stream") {
-                const chunk = event.data?.chunk
-                const content = chunk?.content
-                if (!content) continue
-                const text =
-                  typeof content === "string"
-                    ? content
-                    : Array.isArray(content)
-                      ? content.map((c: { text?: string }) => c.text ?? "").join("")
-                      : ""
-                if (text) {
-                  controller.enqueue(encoder.encode(`0:${JSON.stringify(text)}\n`))
-                }
-              }
+              if (event.type === "token") emitText(controller, event.content)
+              else if (event.type === "error") emitText(controller, event.content)
             } catch {
               // skip malformed events
             }
