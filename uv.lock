@@ -2001,7 +2001,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "jobcopilot-shared", editable = "packages/shared" },
     { name = "openai", specifier = ">=1.30.0" },
-    { name = "pydantic", extras = ["email"], specifier = ">=2.7.0" },
+    { name = "pydantic", extras = ["email"], specifier = ">=2.13.4" },
     { name = "pydantic-settings", specifier = ">=2.3.0" },
     { name = "pypdf", specifier = ">=4.0.0" },
     { name = "python-docx", specifier = ">=1.1.0" },
