@@ -114,6 +114,10 @@ for v in SERVER_HOST KEYCLOAK_PUBLIC_URL FRONTEND_PUBLIC_URL ENCRYPTION_KEY \
 done
 grep -qE "^ENCRYPTION_KEY=0{64}$" "$ENV_FILE" && {
   echo "ERROR: ENCRYPTION_KEY is still the all-zero dev placeholder." >&2; exit 1; }
+grep -qE '^COMPOSE_PROFILES=.*offsite-backup' "$ENV_FILE" || {
+  echo "WARNING: offsite backup sync is NOT enabled — DB backups exist only on the" >&2
+  echo "         server's own disk. Set COMPOSE_PROFILES=offsite-backup plus the" >&2
+  echo "         BACKUP_S3_* vars in .env.production (see .env.example)." >&2; }
 
 # 2b. Resolve each service's git-SHA tag to its immutable digest (locally, no
 #     pull). Fails hard if CD hasn't built this commit yet. Also builds the

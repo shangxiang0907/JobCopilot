@@ -167,6 +167,48 @@ services:
           sleep 86400
         done
 
+  # ── Offsite backup sync: mirrors /backups to an S3-compatible bucket ─────────
+  #    (Cloudflare R2 / Backblaze B2 free tiers are plenty; MinIO/AWS also work.)
+  #    Opt-in via COMPOSE_PROFILES=offsite-backup in infra/.env plus the
+  #    BACKUP_S3_* vars (see .env.example). `rclone copy` never propagates local
+  #    deletions, so remote retention (30d) is independent of the local 7d prune —
+  #    a compromised/dead server cannot take the offsite copies with it. Enable
+  #    object versioning on the bucket for extra protection against overwrites.
+  pg-backup-sync:
+    image: rclone/rclone:1
+    restart: unless-stopped
+    profiles: ["offsite-backup"]
+    depends_on:
+      - pg-backup
+    environment:
+      RCLONE_CONFIG_OFFSITE_TYPE: s3
+      RCLONE_CONFIG_OFFSITE_PROVIDER: ${BACKUP_S3_PROVIDER:-Other}
+      RCLONE_CONFIG_OFFSITE_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
+      RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
+      RCLONE_CONFIG_OFFSITE_REGION: ${BACKUP_S3_REGION:-auto}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+    volumes:
+      - pg_backups:/backups:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$$RCLONE_CONFIG_OFFSITE_ENDPOINT" ] || [ -z "$$RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID" ] \
+           || [ -z "$$RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY" ] || [ -z "$$BACKUP_S3_BUCKET" ]; then
+          echo "[pg-backup-sync] BACKUP_S3_* configuration incomplete — see infra/.env.example"
+          exit 1
+        fi
+        echo "[pg-backup-sync] mirroring /backups -> offsite:$$BACKUP_S3_BUCKET/pg every 6h (remote retention 30d)"
+        while true; do
+          if rclone copy /backups "offsite:$$BACKUP_S3_BUCKET/pg" --s3-no-check-bucket; then
+            rclone delete "offsite:$$BACKUP_S3_BUCKET/pg" --min-age 30d --s3-no-check-bucket || true
+            echo "[pg-backup-sync] copy OK at $$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          else
+            echo "[pg-backup-sync] copy FAILED at $$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          fi
+          sleep 21600
+        done
+
 volumes:
   caddy_data:
   caddy_config:
