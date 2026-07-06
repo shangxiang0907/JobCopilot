@@ -11,30 +11,30 @@ All documentation in this repo is **bilingual (English / Chinese)** in a single-
 ## Project Status / 项目状态
 
 **EN:**  
-All application code is implemented and running locally. The full stack — 5 backend microservices, shared library, Next.js 15 frontend, and Docker Compose infrastructure (PostgreSQL, Redis, RabbitMQ, Qdrant, Temporal, Kong, Keycloak) — is committed, pushed, and healthy. Implementation follows `docs/SAD.md` for architecture decisions and `docs/PRD.md` for product requirements.
+All application code is implemented, verified end-to-end, and **live in production** at `https://arnoldshang.com` (single-node Docker Compose on Hetzner, deployed via `infra/scripts/deploy.sh` — CI builds → GHCR → digest-pinned pull; production is never a build/debug environment). The full stack — 5 backend microservices, shared library, Next.js 15 frontend, and infrastructure (PostgreSQL, Redis, RabbitMQ, Qdrant, Temporal, Kong, Keycloak, Caddy edge with TLS + observability) — is committed, pushed, and healthy. Implementation follows `docs/SAD.md` for architecture decisions and `docs/PRD.md` for product requirements.
 
-**Current task (2026-06-20): End-to-end manual feature verification** — The auth chain is fully validated (JWT + tenant_id, `/v1/profiles/me` HTTP 200). The next step is to manually walk through all core user flows in the browser before advancing to Kubernetes. After verification passes, a new skill is planned that may require architectural changes and new features.
+**Milestone status (updated 2026-07-06):**
+1. ✅ Auth chain (Keycloak OIDC, JWT RS256, tenant_id claim)
+2. ✅ E2E manual verification (login → profile → jobs list/detail/tracking → AI assistant streaming chat → discovery) — completed 2026-07-06, incl. the `/jobs` list page and a full frontend↔backend contract reconciliation
+3. ✅ Kubernetes manifests (`infra/k8s/`) — written; future scaling path (current deployment is Compose)
+4. ✅ Hetzner production deployment (Caddy TLS edge, security hardening, Prometheus/Loki/Grafana observability)
 
-**Milestone order:**
-1. ✅ Auth chain (Keycloak OIDC, JWT RS256, tenant_id claim) — done
-2. 🔄 **E2E manual verification** (login → profile → jobs → AI assistant → discovery) — in progress
-3. ⬜ New skill / feature (TBD — may touch multiple services)
-4. ⬜ Kubernetes manifests (`infra/k8s/`)
+**Next milestone: not yet defined** — decide with the user before starting new feature work. Known open items: Tempo + OpenTelemetry tracing (roadmap), offsite backup enablement (awaiting S3 credentials), production test-account cleanup before public launch.
 
-**Test account:** `testuser@example.com` / `Test1234!` (Keycloak realm: `jobcopilot`)
+**Local test account:** `testuser@example.com` / `Test1234!` (Keycloak realm: `jobcopilot`; production uses a separate strong-password account — see session memory, never commit it here)
 
 **中文：**  
-所有应用代码已实现并在本地正常运行。完整技术栈——5 个后端微服务、共享库、Next.js 15 前端、Docker Compose 基础设施（PostgreSQL、Redis、RabbitMQ、Qdrant、Temporal、Kong、Keycloak）——均已提交推送并处于健康状态。实现以 `docs/SAD.md` 架构决策和 `docs/PRD.md` 产品需求为准。
+所有应用代码已实现、完成端到端验证并已**上线生产** `https://arnoldshang.com`（Hetzner 单节点 Docker Compose，经 `infra/scripts/deploy.sh` 部署——CI 构建 → GHCR → digest 钉死拉取；生产环境绝不用于构建或调试）。完整技术栈——5 个后端微服务、共享库、Next.js 15 前端、基础设施（PostgreSQL、Redis、RabbitMQ、Qdrant、Temporal、Kong、Keycloak、Caddy TLS 边缘 + 可观测性）——均已提交推送并处于健康状态。实现以 `docs/SAD.md` 架构决策和 `docs/PRD.md` 产品需求为准。
 
-**当前任务（2026-06-20）：端到端手动功能验证** —— 认证链路已全部验证（JWT + tenant_id，`/v1/profiles/me` HTTP 200）。下一步是在浏览器中手动走完所有核心用户流程，再推进 Kubernetes。验证通过后，计划测试一个新 skill，可能涉及架构调整和新功能开发。
+**里程碑状态（2026-07-06 更新）：**
+1. ✅ 认证链路（Keycloak OIDC、JWT RS256、tenant_id claim）
+2. ✅ 端到端手动验证（登录 → 简历 → 职位列表/详情/跟踪 → AI 助手流式对话 → 职位发现）——2026-07-06 收官，含 `/jobs` 列表页与前后端契约全面对齐
+3. ✅ Kubernetes 清单文件（`infra/k8s/`）——已编写，作为未来扩容路径（当前部署为 Compose）
+4. ✅ Hetzner 生产部署（Caddy TLS 边缘、安全加固、Prometheus/Loki/Grafana 可观测性）
 
-**里程碑顺序：**
-1. ✅ 认证链路（Keycloak OIDC、JWT RS256、tenant_id claim）——已完成
-2. 🔄 **端到端手动验证**（登录 → 简历 → 职位 → AI 助手 → 职位发现）——进行中
-3. ⬜ 新 skill / 功能（待定，可能涉及多个服务）
-4. ⬜ Kubernetes 清单文件（`infra/k8s/`）
+**下一个里程碑：尚未确定**——开始新功能开发前先与用户确认。已知待办：Tempo + OpenTelemetry 链路追踪（roadmap）、异地备份启用（等 S3 凭据）、正式对外前清理生产测试账号。
 
-**测试账号：** `testuser@example.com` / `Test1234!`（Keycloak realm: `jobcopilot`）
+**本地测试账号：** `testuser@example.com` / `Test1234!`（Keycloak realm: `jobcopilot`；生产使用独立强口令账号——见会话记忆，切勿写入本文件）
 
 ---
 
