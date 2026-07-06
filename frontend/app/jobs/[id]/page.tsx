@@ -3,7 +3,13 @@
 import { useParams, useRouter } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, ExternalLink, Star, Building2, MapPin, Briefcase } from "lucide-react"
-import api, { type Job, type Application, type JobAnalysis, type ApplicationStatus } from "@/lib/api"
+import api, {
+  type Job,
+  type Application,
+  type JobAnalysis,
+  type ApplicationStatus,
+  type Paginated,
+} from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,13 +25,22 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
   withdrawn: "Withdrawn",
 }
 
+// Mirrors VALID_TRANSITIONS in services/job models/application.py
 const STATUS_TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
   discovered: ["applied", "withdrawn"],
   applied: ["interviewing", "rejected", "withdrawn"],
   interviewing: ["offer", "rejected", "withdrawn"],
-  offer: ["withdrawn"],
+  offer: [],
   rejected: [],
   withdrawn: [],
+}
+
+const JOB_TYPE_LABELS: Record<string, string> = {
+  full_time: "Full-time",
+  part_time: "Part-time",
+  contract: "Contract",
+  internship: "Internship",
+  remote: "Remote",
 }
 
 export default function JobDetailPage() {
@@ -39,26 +54,39 @@ export default function JobDetailPage() {
     queryFn: () => api.get(`/v1/jobs/${id}`).then((r) => r.data),
   })
 
-  const { data: application } = useQuery<Application>({
+  const { data: application } = useQuery<Application | undefined>({
     queryKey: ["application-for-job", id],
     queryFn: () =>
-      api.get("/v1/applications", { params: { job_id: id } }).then((r) => r.data.items?.[0]),
+      api
+        .get<Paginated<Application>>("/v1/applications", { params: { job_id: id } })
+        .then((r) => r.data.items[0]),
     enabled: !!id,
   })
 
-  const { data: analysis } = useQuery<JobAnalysis>({
+  const { data: analysis } = useQuery<JobAnalysis | null>({
     queryKey: ["analysis", id],
-    queryFn: () => api.get(`/v1/agent/analyses/${id}`).then((r) => r.data),
+    queryFn: () =>
+      api
+        .get(`/v1/agent/analyses/${id}`)
+        .then((r) => r.data)
+        .catch(() => null),
     enabled: !!id,
+  })
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["applications"] })
+    queryClient.invalidateQueries({ queryKey: ["application-for-job", id] })
+  }
+
+  const trackJob = useMutation({
+    mutationFn: () => api.post("/v1/applications", { job_id: id }),
+    onSuccess: invalidate,
   })
 
   const updateStatus = useMutation({
     mutationFn: (status: ApplicationStatus) =>
-      api.patch(`/v1/applications/${application!.id}`, { status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["applications"] })
-      queryClient.invalidateQueries({ queryKey: ["application-for-job", id] })
-    },
+      api.patch(`/v1/applications/${application!.application_id}/status`, { status }),
+    onSuccess: invalidate,
   })
 
   if (jobLoading) {
@@ -88,10 +116,10 @@ export default function JobDetailPage() {
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-semibold truncate">{job.title}</h1>
-          <p className="text-sm text-muted-foreground">{job.company.name}</p>
+          <p className="text-sm text-muted-foreground">{job.company_name}</p>
         </div>
         <Button variant="outline" size="sm" asChild>
-          <a href={job.job_url} target="_blank" rel="noopener noreferrer">
+          <a href={job.url} target="_blank" rel="noopener noreferrer">
             <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
             View Posting
           </a>
@@ -109,7 +137,7 @@ export default function JobDetailPage() {
               <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <Building2 className="h-3.5 w-3.5" />
-                  {job.company.name}
+                  {job.company_name}
                 </span>
                 {job.location && (
                   <span className="flex items-center gap-1.5">
@@ -117,19 +145,19 @@ export default function JobDetailPage() {
                     {job.location}
                   </span>
                 )}
-                {job.employment_type && (
+                {job.job_type && (
                   <span className="flex items-center gap-1.5">
                     <Briefcase className="h-3.5 w-3.5" />
-                    {job.employment_type}
+                    {JOB_TYPE_LABELS[job.job_type] ?? job.job_type}
                   </span>
                 )}
-                {job.remote_type && <Badge variant="secondary">{job.remote_type}</Badge>}
+                <Badge variant="secondary">{job.source}</Badge>
               </div>
-              {job.description_raw && (
+              {job.raw_jd && (
                 <>
                   <Separator />
                   <div className="text-sm whitespace-pre-wrap text-foreground/80 max-h-96 overflow-y-auto">
-                    {job.description_raw}
+                    {job.raw_jd}
                   </div>
                 </>
               )}
@@ -142,7 +170,7 @@ export default function JobDetailPage() {
                 <CardTitle className="text-base">AI Analysis</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {analysis.match_score !== undefined && (
+                {analysis.match_score != null && (
                   <div className="flex items-center gap-2">
                     <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                     <span className="font-semibold">{analysis.match_score}% match</span>
@@ -201,7 +229,19 @@ export default function JobDetailPage() {
                   )}
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">No application yet.</p>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Not tracked yet. Add it to your kanban board.
+                  </p>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    disabled={trackJob.isPending}
+                    onClick={() => trackJob.mutate()}
+                  >
+                    Track this job
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>

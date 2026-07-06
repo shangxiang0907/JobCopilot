@@ -28,10 +28,10 @@ export function JobCard({ application }: Props) {
 
           {/* Company + location */}
           <div className="space-y-1">
-            {job?.company && (
+            {job?.company_name && (
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Building2 className="h-3 w-3 shrink-0" />
-                <span className="truncate">{job.company.name}</span>
+                <span className="truncate">{job.company_name}</span>
               </div>
             )}
             {job?.location && (
@@ -44,7 +44,7 @@ export function JobCard({ application }: Props) {
 
           {/* Footer: match score + date */}
           <div className="flex items-center justify-between pt-0.5">
-            {application.match_score !== undefined ? (
+            {application.match_score != null ? (
               <span className="flex items-center gap-1 text-xs font-medium text-yellow-600">
                 <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                 {application.match_score}%
@@ -53,9 +53,9 @@ export function JobCard({ application }: Props) {
               <span />
             )}
             <div className="flex items-center gap-2">
-              {job?.remote_type && (
+              {job?.job_type && (
                 <Badge variant="outline" className="text-[10px] h-4 px-1.5">
-                  {job.remote_type}
+                  {job.job_type}
                 </Badge>
               )}
               <span className="text-[10px] text-muted-foreground">

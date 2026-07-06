@@ -25,7 +25,7 @@ export function KanbanColumn({ label, color, applications }: Props) {
         {applications.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-6">No applications here</p>
         ) : (
-          applications.map((app) => <JobCard key={app.id} application={app} />)
+          applications.map((app) => <JobCard key={app.application_id} application={app} />)
         )}
       </div>
     </div>

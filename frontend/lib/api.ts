@@ -29,42 +29,58 @@ export type ApplicationStatus =
   | "rejected"
   | "withdrawn"
 
-export interface Company {
-  id: string
-  name: string
-  website?: string
-  industry?: string
-  size?: string
+// Mirrors jobcopilot_shared.schemas.common.PaginatedResponse
+export interface Paginated<T> {
+  items: T[]
+  total: number
+  page: number
+  size: number
+  has_next: boolean
 }
 
+// Mirrors services/job JobResponse
 export interface Job {
-  id: string
-  tenant_id: string
-  title: string
-  company: Company
-  location?: string
-  job_url: string
-  description_raw?: string
-  remote_type?: string
-  employment_type?: string
-  salary_range?: Record<string, unknown>
-  source: string
-  posted_at?: string
-  discovered_at: string
-}
-
-export interface Application {
-  id: string
-  tenant_id: string
-  user_id: string
   job_id: string
-  job?: Job
-  status: ApplicationStatus
-  match_score?: number
-  applied_at?: string
-  notes?: string
+  tenant_id: string
+  company_id?: string | null
+  title: string
+  company_name: string
+  url: string
+  source: string
+  raw_jd?: string | null
+  analysis?: Record<string, unknown> | null
+  salary_min?: number | null
+  salary_max?: number | null
+  location?: string | null
+  job_type?: string | null
+  discovered_at?: string | null
   created_at: string
   updated_at: string
+}
+
+// Mirrors services/job ApplicationJobSummary (embedded by GET /v1/applications)
+export interface ApplicationJobSummary {
+  job_id: string
+  title: string
+  company_name: string
+  location?: string | null
+  job_type?: string | null
+  url: string
+}
+
+// Mirrors services/job ApplicationResponse
+export interface Application {
+  application_id: string
+  user_id: string
+  job_id: string
+  status: ApplicationStatus
+  match_score?: number | null
+  resume_suggestions?: Record<string, unknown> | null
+  notes?: string | null
+  applied_at?: string | null
+  created_at: string
+  updated_at: string
+  job?: ApplicationJobSummary | null
 }
 
 export interface Profile {
@@ -90,13 +106,17 @@ export interface Resume {
   created_at: string
 }
 
+// Mirrors services/agent AnalysisResponse
 export interface JobAnalysis {
-  id: string
+  analysis_id: string
   job_id: string
   user_id: string
-  match_score?: number
-  jd_structured?: Record<string, unknown>
-  resume_suggestions?: Record<string, unknown>
-  interview_questions?: Record<string, unknown>
+  jd_structured?: Record<string, unknown> | null
+  skills_required?: unknown[] | null
+  match_score?: number | null
+  resume_suggestions?: Record<string, unknown> | null
+  interview_questions?: Record<string, unknown> | null
+  status: string
   created_at: string
+  updated_at: string
 }

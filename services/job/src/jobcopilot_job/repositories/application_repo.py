@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from jobcopilot_job.models.application import VALID_TRANSITIONS, Application
 from jobcopilot_job.models.application_event import ApplicationEvent
+from jobcopilot_job.models.job import Job
 from jobcopilot_job.schemas.application import (
     ApplicationCreate,
     ApplicationStatusUpdate,
@@ -53,15 +54,19 @@ class ApplicationRepository:
     async def get_all(
         self,
         user_id: uuid.UUID,
+        tenant_id: uuid.UUID,
         page: int = 1,
         size: int = 20,
         status: str | None = None,
-    ) -> tuple[list[Application], int]:
+        job_id: uuid.UUID | None = None,
+    ) -> tuple[list[tuple[Application, Job | None]], int]:
         from sqlalchemy import func as sqlfunc
 
         filters = [Application.user_id == user_id]
         if status:
             filters.append(Application.status == status)
+        if job_id:
+            filters.append(Application.job_id == job_id)
 
         total_stmt = select(sqlfunc.count()).select_from(
             select(Application.application_id).where(*filters).subquery()
@@ -69,13 +74,14 @@ class ApplicationRepository:
         total = (await self._session.execute(total_stmt)).scalar_one()
 
         rows_stmt = (
-            select(Application)
+            select(Application, Job)
+            .outerjoin(Job, (Job.job_id == Application.job_id) & (Job.tenant_id == tenant_id))
             .where(*filters)
             .order_by(Application.updated_at.desc())
             .offset((page - 1) * size)
             .limit(size)
         )
-        rows = list((await self._session.execute(rows_stmt)).scalars().all())
+        rows = [(app, job) for app, job in (await self._session.execute(rows_stmt)).all()]
         return rows, total
 
     async def transition_status(

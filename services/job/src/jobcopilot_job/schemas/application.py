@@ -27,6 +27,19 @@ class ApplicationUpdate(BaseModel):
     notes: str | None = None
 
 
+class ApplicationJobSummary(BaseModel):
+    """Job fields a list view needs alongside an application (kanban cards etc.)."""
+
+    job_id: uuid.UUID
+    title: str
+    company_name: str
+    location: str | None
+    job_type: str | None
+    url: str
+
+    model_config = {"from_attributes": True}
+
+
 class ApplicationResponse(BaseModel):
     application_id: uuid.UUID
     user_id: uuid.UUID
@@ -38,6 +51,8 @@ class ApplicationResponse(BaseModel):
     applied_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    # Populated by the list endpoint (joined in one query); None elsewhere.
+    job: ApplicationJobSummary | None = None
 
     model_config = {"from_attributes": True}
 

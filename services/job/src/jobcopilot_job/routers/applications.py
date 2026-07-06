@@ -1,4 +1,5 @@
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 from jobcopilot_shared.schemas.common import PaginatedResponse
@@ -8,6 +9,7 @@ from jobcopilot_job.repositories.application_repo import ApplicationRepository
 from jobcopilot_job.schemas.application import (
     ApplicationCreate,
     ApplicationEventResponse,
+    ApplicationJobSummary,
     ApplicationResponse,
     ApplicationStatusUpdate,
     ApplicationUpdate,
@@ -24,10 +26,18 @@ async def list_applications(
     page: int = 1,
     size: int = 20,
     status_filter: str | None = Query(default=None, alias="status"),
+    job_id: Annotated[uuid.UUID | None, Query()] = None,
 ) -> PaginatedResponse[ApplicationResponse]:
     repo = ApplicationRepository(session)
-    apps, total = await repo.get_all(user_id, page=page, size=size, status=status_filter)
-    items = [ApplicationResponse.model_validate(a) for a in apps]
+    rows, total = await repo.get_all(
+        user_id, tenant_id, page=page, size=size, status=status_filter, job_id=job_id
+    )
+    items = []
+    for app, job in rows:
+        item = ApplicationResponse.model_validate(app)
+        if job is not None:
+            item.job = ApplicationJobSummary.model_validate(job)
+        items.append(item)
     return PaginatedResponse(
         items=items, total=total, page=page, size=size, has_next=(page * size < total)
     )
