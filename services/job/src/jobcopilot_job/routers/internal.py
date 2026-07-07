@@ -75,11 +75,14 @@ async def internal_transition_application_by_job(
     return ApplicationResponse.model_validate(app)
 
 
-@router.post("/jobs", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/jobs", response_model=JobResponse, status_code=status.HTTP_200_OK)
 async def internal_create_job(
     body: InternalJobCreate,
     session: SessionDep,
 ) -> JobResponse:
+    """Idempotent upsert by URL: returns the existing job (refreshed with any new
+    raw_jd/analysis) instead of 409 — discovery re-runs re-publish the same URLs.
+    Callers rely on job_id in the response to key their own records."""
     repo = JobRepository(session)
     job = await repo.create_internal(body)
     return JobResponse.model_validate(job)

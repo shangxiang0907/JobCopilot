@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, status
+from jobcopilot_shared.schemas.common import PaginatedResponse
 from temporalio.client import Client
 
 from jobcopilot_discovery.config import settings
@@ -55,11 +56,17 @@ async def trigger_run(
     return DiscoveryRunResponse.model_validate(run)
 
 
-@router.get("", response_model=list[DiscoveryRunResponse])
-async def list_runs(session: SessionDep, user_id: UserIdDep) -> list[DiscoveryRunResponse]:
+@router.get("", response_model=PaginatedResponse[DiscoveryRunResponse])
+async def list_runs(
+    session: SessionDep, user_id: UserIdDep
+) -> PaginatedResponse[DiscoveryRunResponse]:
+    """All /v1 collection endpoints return PaginatedResponse — see CLAUDE.md."""
     repo = RunRepository(session)
     runs = await repo.list(user_id)
-    return [DiscoveryRunResponse.model_validate(r) for r in runs]
+    items = [DiscoveryRunResponse.model_validate(r) for r in runs]
+    return PaginatedResponse(
+        items=items, total=len(items), page=1, size=max(len(items), 1), has_next=False
+    )
 
 
 @router.get("/{run_id}", response_model=DiscoveryRunResponse)

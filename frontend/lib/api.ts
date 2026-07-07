@@ -83,26 +83,27 @@ export interface Application {
   job?: ApplicationJobSummary | null
 }
 
+// Mirrors services/profile ProfileResponse
 export interface Profile {
-  id: string
-  tenant_id: string
+  profile_id: string
   user_id: string
-  display_name?: string
-  personal_info?: Record<string, unknown>
-  job_preferences?: Record<string, unknown>
+  personal_info?: Record<string, unknown> | null
+  preferences?: Record<string, unknown> | null
   has_linkedin_cookie: boolean
   has_llm_api_key: boolean
+  created_at: string
+  updated_at: string
 }
 
+// Mirrors services/profile ResumeResponse
 export interface Resume {
-  id: string
-  tenant_id: string
+  resume_id: string
   user_id: string
-  filename: string
-  file_size: number
-  mime_type: string
-  is_active: boolean
+  file_name: string
+  file_url: string
+  parsed_data?: Record<string, unknown> | null
   version: number
+  is_active: boolean
   created_at: string
 }
 

@@ -11,12 +11,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1048576).toFixed(1)} MB`
-}
-
 export default function ProfilePage() {
   const queryClient = useQueryClient()
   const [linkedinCookie, setLinkedinCookie] = useState("")
@@ -26,6 +20,7 @@ export default function ProfilePage() {
     queryKey: ["profile"],
     queryFn: () => api.get("/v1/profiles/me").then((r) => r.data),
   })
+  const personalName = (profile?.personal_info as { name?: string } | null | undefined)?.name
 
   const { data: resumes = [] } = useQuery<Resume[]>({
     queryKey: ["resumes"],
@@ -54,7 +49,7 @@ export default function ProfilePage() {
   })
 
   const activateResume = useMutation({
-    mutationFn: (id: string) => api.post(`/v1/resumes/${id}/activate`),
+    mutationFn: (id: string) => api.patch(`/v1/resumes/${id}/activate`, { is_active: true }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resumes"] }),
   })
 
@@ -98,10 +93,10 @@ export default function ProfilePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {profile?.display_name && (
+            {personalName && (
               <p>
                 <span className="text-muted-foreground">Name: </span>
-                {profile.display_name}
+                {personalName}
               </p>
             )}
             <div className="flex gap-3">
@@ -197,7 +192,7 @@ export default function ProfilePage() {
               <div className="space-y-2">
                 {resumes.map((r) => (
                   <div
-                    key={r.id}
+                    key={r.resume_id}
                     className="flex items-center justify-between p-3 rounded-md border"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -205,9 +200,9 @@ export default function ProfilePage() {
                         <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                       )}
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{r.filename}</p>
+                        <p className="text-sm font-medium truncate">{r.file_name}</p>
                         <p className="text-xs text-muted-foreground">
-                          v{r.version} · {formatBytes(r.file_size)}
+                          v{r.version} · {new Date(r.created_at).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -216,7 +211,7 @@ export default function ProfilePage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => activateResume.mutate(r.id)}
+                          onClick={() => activateResume.mutate(r.resume_id)}
                         >
                           Set Active
                         </Button>
@@ -224,7 +219,7 @@ export default function ProfilePage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => deleteResume.mutate(r.id)}
+                        onClick={() => deleteResume.mutate(r.resume_id)}
                       >
                         <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                       </Button>

@@ -36,6 +36,9 @@ async def internal_get_profile(
     active_resume_data = (
         ResumeResponse.model_validate(active_resume).model_dump() if active_resume else None
     )
+    active_resume_text = ""
+    if active_resume is not None and active_resume.parsed_data:
+        active_resume_text = str(active_resume.parsed_data.get("raw_text") or "")
 
     return InternalProfileResponse(
         profile_id=profile.profile_id,
@@ -45,6 +48,7 @@ async def internal_get_profile(
         linkedin_cookie=_safe_decrypt(profile.linkedin_cookie_enc),
         llm_api_key=_safe_decrypt(profile.llm_api_key_enc),
         active_resume=active_resume_data,
+        active_resume_text=active_resume_text,
     )
 
 

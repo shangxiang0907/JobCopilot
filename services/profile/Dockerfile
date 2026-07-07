@@ -15,6 +15,10 @@ RUN uv sync --frozen --package profile-service --no-dev --no-editable --compile-
 FROM python:3.11-slim
 
 RUN useradd -u 1000 -m appuser
+# Resume storage mount point — must exist appuser-owned BEFORE the named volume
+# is first mounted: Docker copies this ownership into a fresh volume, and the
+# container runs non-root so it cannot chown at runtime.
+RUN mkdir -p /data/resumes && chown -R appuser:appuser /data
 WORKDIR /app
 
 COPY --from=build /app/.venv /app/.venv

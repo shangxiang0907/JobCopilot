@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 
 import httpx
 import structlog
-from jobcopilot_shared.crypto import decrypt
 from jobcopilot_shared.db import build_engine, build_session_factory
 from jobcopilot_shared.redis_client import build_redis
 from temporalio import activity
@@ -97,6 +96,7 @@ class UpdateRunStatusInput:
 @dataclass
 class PublishCookieExpiredInput:
     user_id: str
+    tenant_id: str
     run_id: str
 
 
@@ -106,7 +106,8 @@ class PublishCookieExpiredInput:
 @activity.defn
 async def validate_cookie_activity(inp: ValidateCookieInput) -> ValidateCookieResult:
     """Fetch the user's LinkedIn cookie from Profile Service, then validate it against LinkedIn."""
-    url = f"{settings.profile_service_url}/internal/profiles/{inp.user_id}"
+    # Purpose-built minimal endpoint; Profile Service owns decryption.
+    url = f"{settings.profile_service_url}/internal/profiles/{inp.user_id}/cookie"
     async with httpx.AsyncClient(timeout=8.0) as client:
         resp = await client.get(url)
 
@@ -114,12 +115,10 @@ async def validate_cookie_activity(inp: ValidateCookieInput) -> ValidateCookieRe
         log.warning("profile_fetch_failed", user_id=inp.user_id, status=resp.status_code)
         return ValidateCookieResult(is_valid=False, cookie="")
 
-    profile_data = resp.json()
-    cookie_enc = profile_data.get("linkedin_cookie_enc") or ""
-    if not cookie_enc:
+    cookie = resp.json().get("linkedin_cookie") or ""
+    if not cookie:
         return ValidateCookieResult(is_valid=False, cookie="")
 
-    cookie = decrypt(cookie_enc, settings.encryption_key)
     is_valid = await linkedin_scraper.validate_cookie(cookie)
 
     log.info("cookie_validated", user_id=inp.user_id, is_valid=is_valid)
@@ -216,7 +215,7 @@ async def publish_jobs_activity(inp: PublishJobsInput) -> PublishJobsResult:
 @activity.defn
 async def publish_cookie_expired_activity(inp: PublishCookieExpiredInput) -> None:
     """Notify Notification Service that the user's LinkedIn cookie has expired."""
-    await publish_cookie_expired(user_id=inp.user_id, run_id=inp.run_id)
+    await publish_cookie_expired(user_id=inp.user_id, tenant_id=inp.tenant_id, run_id=inp.run_id)
     log.warning("cookie_expired_published", user_id=inp.user_id, run_id=inp.run_id)
 
 

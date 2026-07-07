@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, status
+from jobcopilot_shared.schemas.common import PaginatedResponse
 
 from jobcopilot_discovery.deps import SessionDep, UserIdDep
 from jobcopilot_discovery.repositories.config_repo import ConfigRepository
@@ -13,11 +14,17 @@ from jobcopilot_discovery.schemas.discovery import (
 router = APIRouter(prefix="/v1/discovery/configs", tags=["discovery-configs"])
 
 
-@router.get("", response_model=list[DiscoveryConfigResponse])
-async def list_configs(session: SessionDep, user_id: UserIdDep) -> list[DiscoveryConfigResponse]:
+@router.get("", response_model=PaginatedResponse[DiscoveryConfigResponse])
+async def list_configs(
+    session: SessionDep, user_id: UserIdDep
+) -> PaginatedResponse[DiscoveryConfigResponse]:
+    """All /v1 collection endpoints return PaginatedResponse — see CLAUDE.md."""
     repo = ConfigRepository(session)
     configs = await repo.list(user_id)
-    return [DiscoveryConfigResponse.model_validate(c) for c in configs]
+    items = [DiscoveryConfigResponse.model_validate(c) for c in configs]
+    return PaginatedResponse(
+        items=items, total=len(items), page=1, size=max(len(items), 1), has_next=False
+    )
 
 
 @router.post("", response_model=DiscoveryConfigResponse, status_code=status.HTTP_201_CREATED)

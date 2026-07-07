@@ -65,7 +65,9 @@ class DiscoveryWorkflow:
             if not validate_result.is_valid:
                 await workflow.execute_activity(
                     publish_cookie_expired_activity,
-                    PublishCookieExpiredInput(user_id=inp.user_id, run_id=inp.run_id),
+                    PublishCookieExpiredInput(
+                        user_id=inp.user_id, tenant_id=inp.tenant_id, run_id=inp.run_id
+                    ),
                     start_to_close_timeout=timedelta(seconds=10),
                 )
                 await workflow.execute_activity(

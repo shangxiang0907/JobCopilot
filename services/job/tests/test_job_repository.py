@@ -135,3 +135,42 @@ async def test_job_search_filter(db_engine: AsyncEngine) -> None:
             none_found, total_none = await repo.get_all(tenant_id, search="golang")
             assert total_none == 0
             assert none_found == []
+
+
+@pytest.mark.integration
+async def test_internal_create_is_idempotent_upsert_by_url(db_engine: AsyncEngine) -> None:
+    """Discovery re-runs re-publish the same URL — the second create must return
+    the SAME job (refreshed), not raise ConflictError."""
+    factory = build_session_factory(db_engine)
+    tenant_id = uuid.uuid4()
+    url = f"https://linkedin.com/jobs/view/{uuid.uuid4()}"
+
+    async with factory() as session:
+        async with session.begin():
+            first = await JobRepository(session).create_internal(
+                InternalJobCreate(
+                    tenant_id=tenant_id,
+                    title="Backend Engineer",
+                    company_name="Acme",
+                    url=url,
+                    source="discovery",
+                )
+            )
+            first_id = first.job_id
+
+    async with factory() as session:
+        async with session.begin():
+            second = await JobRepository(session).create_internal(
+                InternalJobCreate(
+                    tenant_id=tenant_id,
+                    title="Backend Engineer",
+                    company_name="Acme",
+                    url=url,
+                    source="discovery",
+                    raw_jd="fresh description",
+                    analysis={"skills_required": ["Python"]},
+                )
+            )
+            assert second.job_id == first_id
+            assert second.raw_jd == "fresh description"
+            assert second.analysis == {"skills_required": ["Python"]}

@@ -58,8 +58,11 @@ async def publish_jobs_discovered(
     return count
 
 
-async def publish_cookie_expired(user_id: str, run_id: str) -> None:
-    """Publish a cookie.expired event so Notification Service can alert the user."""
+async def publish_cookie_expired(user_id: str, tenant_id: str, run_id: str) -> None:
+    """Publish a cookie.expired event so Notification Service can alert the user.
+
+    Contract: Notification Service's cookie.expired handler requires user_id AND tenant_id.
+    """
     connection = await _get_connection()
     async with connection:
         channel = await connection.channel()
@@ -68,6 +71,7 @@ async def publish_cookie_expired(user_id: str, run_id: str) -> None:
         )
         payload = {
             "user_id": user_id,
+            "tenant_id": tenant_id,
             "run_id": run_id,
             "occurred_at": datetime.now(tz=UTC).isoformat(),
         }

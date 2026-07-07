@@ -254,6 +254,9 @@ docker compose build profile-service job-service discovery-service agent-service
 ### API Conventions / API 规范
 - All external endpoints versioned: `/v1/`
 - Internal service-to-service endpoints: `/internal/` (Kong blocks external access)
+- **Every `/v1` collection endpoint returns `PaginatedResponse` (`{items, total, page, size, has_next}`)** — never a bare JSON array; the frontend reads `.items` everywhere. / **所有 `/v1` 集合端点统一返回 `PaginatedResponse`**，不得返回裸数组。
+- `POST /internal/jobs` is an **idempotent upsert by URL** (returns the existing job refreshed, never 409) — discovery re-runs re-publish the same URLs; callers key their records by the returned `job_id`. / `POST /internal/jobs` 为**按 URL 幂等 upsert**，调用方以响应中的 `job_id` 为准。
+- MQ event contracts: `job.discovered` carries NO job_id (consumer must upsert the job first to obtain one); `cookie.expired` MUST carry `user_id` + `tenant_id` + `run_id`. / MQ 事件契约：`job.discovered` 不含 job_id（消费者先 upsert 职位换取真实 id）；`cookie.expired` 必须携带 `user_id`、`tenant_id`、`run_id`。
 - Error response shape: `{ "error": { "code": "...", "message": "..." } }` — no internal stack traces
 - Health probes: `GET /healthz/live` (liveness) and `GET /healthz/ready` (readiness)
 - Streaming (AI chat): Server-Sent Events (`text/event-stream`)

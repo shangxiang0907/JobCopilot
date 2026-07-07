@@ -9,8 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
+// Mirrors services/discovery DiscoveryConfigResponse
 interface DiscoveryConfig {
-  id: string
+  config_id: string
   user_id: string
   keywords: string[]
   locations: string[]
@@ -18,13 +19,14 @@ interface DiscoveryConfig {
   created_at: string
 }
 
+// Mirrors services/discovery DiscoveryRunResponse
 interface DiscoveryRun {
-  id: string
+  run_id: string
   config_id: string
-  status: "pending" | "running" | "completed" | "failed"
-  jobs_found: number
-  started_at?: string
-  completed_at?: string
+  status: string // pending | running | completed | failed | cookie_expired
+  jobs_discovered: number
+  started_at: string
+  finished_at?: string | null
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -32,7 +34,9 @@ const STATUS_COLOR: Record<string, string> = {
   running: "bg-blue-100 text-blue-800",
   completed: "bg-green-100 text-green-800",
   failed: "bg-red-100 text-red-800",
+  cookie_expired: "bg-orange-100 text-orange-800",
 }
+const STATUS_COLOR_FALLBACK = "bg-gray-100 text-gray-800"
 
 export default function DiscoveryPage() {
   const queryClient = useQueryClient()
@@ -146,10 +150,10 @@ export default function DiscoveryPage() {
             </h2>
             {configs.map((cfg) => {
               const activeRun = runs.find(
-                (r) => r.config_id === cfg.id && r.status === "running"
+                (r) => r.config_id === cfg.config_id && r.status === "running"
               )
               return (
-                <Card key={cfg.id}>
+                <Card key={cfg.config_id}>
                   <CardContent className="flex items-center justify-between p-4">
                     <div className="space-y-1">
                       <p className="text-sm font-medium">
@@ -165,7 +169,7 @@ export default function DiscoveryPage() {
                       size="sm"
                       variant="outline"
                       disabled={!!activeRun || triggerRun.isPending}
-                      onClick={() => triggerRun.mutate(cfg.id)}
+                      onClick={() => triggerRun.mutate(cfg.config_id)}
                     >
                       {activeRun ? (
                         <>
@@ -193,17 +197,17 @@ export default function DiscoveryPage() {
             </h2>
             {runs.slice(0, 10).map((run) => (
               <div
-                key={run.id}
+                key={run.run_id}
                 className="flex items-center justify-between py-2 px-3 rounded-md border text-sm"
               >
                 <span className="text-muted-foreground font-mono text-xs truncate max-w-[8rem]">
-                  {run.id.slice(0, 8)}…
+                  {run.run_id.slice(0, 8)}…
                 </span>
                 <span>
-                  {run.jobs_found ?? 0} jobs found
+                  {run.jobs_discovered ?? 0} jobs found
                 </span>
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[run.status]}`}
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[run.status] ?? STATUS_COLOR_FALLBACK}`}
                 >
                   {run.status}
                 </span>

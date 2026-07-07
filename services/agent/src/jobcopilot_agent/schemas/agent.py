@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, Field
 
 # ── Request schemas ──────────────────────────────────────────────────────────
 
@@ -86,7 +86,9 @@ class PrepareInterviewResponse(BaseModel):
 
 
 class AnalysisResponse(BaseModel):
-    analysis_id: uuid.UUID
+    # The ORM attribute is `id` (shared UUIDPrimaryKeyMixin); accept both so
+    # model_validate(orm_obj) works while the wire field stays `analysis_id`.
+    analysis_id: uuid.UUID = Field(validation_alias=AliasChoices("analysis_id", "id"))
     job_id: uuid.UUID
     user_id: uuid.UUID
     jd_structured: dict[str, Any] | None

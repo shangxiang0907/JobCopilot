@@ -102,3 +102,23 @@ async def test_graph_error_marks_analysis_as_error() -> None:
     assert kwargs["status"] == "error"
     assert kwargs["error_message"] == "LLM timeout"
     session.commit.assert_awaited_once()
+
+
+def test_analysis_response_validates_orm_object_with_id_attribute() -> None:
+    """Regression: the ORM attr is `id` (UUIDPrimaryKeyMixin) but the wire field
+    is `analysis_id` — model_validate used to raise, 500ing GET /analyses."""
+    from datetime import UTC, datetime
+
+    from jobcopilot_agent.models.analysis import JobAnalysis
+    from jobcopilot_agent.schemas.agent import AnalysisResponse
+
+    analysis = JobAnalysis(
+        job_id=uuid.uuid4(), user_id=uuid.uuid4(), tenant_id=uuid.uuid4(), status="done"
+    )
+    analysis.id = uuid.uuid4()
+    analysis.created_at = datetime.now(UTC)
+    analysis.updated_at = datetime.now(UTC)
+
+    resp = AnalysisResponse.model_validate(analysis)
+    assert resp.analysis_id == analysis.id
+    assert resp.model_dump()["analysis_id"] == analysis.id

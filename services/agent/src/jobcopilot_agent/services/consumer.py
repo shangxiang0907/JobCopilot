@@ -1,7 +1,10 @@
 """
 RabbitMQ consumer for job.discovered events.
 
-Each message triggers AnalyzerGraph → saves JobAnalysis → notifies Job Service.
+Order matters: the job is upserted in Job Service FIRST so the analysis is
+keyed by the real job_id (the MQ payload carries no job_id — see the
+Discovery publisher contract). Then AnalyzerGraph runs and the structured
+analysis is pushed back onto the job record.
 """
 
 import asyncio
@@ -13,11 +16,10 @@ from typing import Any
 
 import aio_pika
 import httpx
-from jobcopilot_shared.db import build_engine, build_session_factory
 
 from jobcopilot_agent.config import settings
-from jobcopilot_agent.graphs.analyzer_graph import AnalyzerState, analyzer_graph
-from jobcopilot_agent.repositories.analysis_repo import AnalysisRepository
+from jobcopilot_agent.deps import open_db_session
+from jobcopilot_agent.services.analysis import run_job_analysis
 
 log = logging.getLogger(__name__)
 
@@ -27,78 +29,71 @@ _ROUTING_KEY = "job.discovered"
 
 
 async def _process_job_message(body: dict[str, Any]) -> None:
-    """Run AnalyzerGraph for a single discovered job and persist results."""
+    """Upsert the job, run AnalyzerGraph keyed by the real job_id, persist results."""
     user_id = body.get("user_id", "")
     tenant_id = body.get("tenant_id", "")
-    job_id_str = body.get("job_id") or str(uuid.uuid4())
+    url = body.get("url", "")
+    if not user_id or not tenant_id or not url:
+        log.error(
+            "job_message_missing_fields",
+            extra={"user_id": user_id, "tenant_id": tenant_id, "url": url},
+        )
+        return
 
-    state: AnalyzerState = {
-        "job_id": job_id_str,
-        "user_id": user_id,
-        "tenant_id": tenant_id,
-        "url": body.get("url", ""),
-        "title": body.get("title", ""),
-        "company_name": body.get("company_name", ""),
-        "location": body.get("location", ""),
-        "raw_text": body.get("raw_text", ""),
-        "resume_text": "",
-        "jd_structured": {},
-        "skills_required": [],
-        "match_score": 0.0,
-        "error": None,
-    }
+    # 1. Idempotent upsert in Job Service → authoritative job_id
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            f"{settings.job_service_url}/internal/jobs",
+            json={
+                "tenant_id": tenant_id,
+                "url": url,
+                "title": body.get("title", ""),
+                "company_name": body.get("company_name", ""),
+                "location": body.get("location", ""),
+                "raw_jd": body.get("raw_text", ""),
+                "source": "discovery",
+                "discovered_at": body.get("discovered_at") or datetime.now(tz=UTC).isoformat(),
+            },
+        )
+    if resp.status_code not in (200, 201):
+        log.error(
+            "job_upsert_failed",
+            extra={"status": resp.status_code, "url": url},
+        )
+        return
+    job_id = resp.json()["job_id"]
 
-    result = await analyzer_graph.ainvoke(state)
+    # 2. Analyze and persist, keyed by the real job_id
+    async with open_db_session() as session:
+        outcome = await run_job_analysis(
+            session,
+            job_id=uuid.UUID(job_id),
+            user_id=uuid.UUID(user_id),
+            tenant_id=uuid.UUID(tenant_id),
+            url=url,
+            title=body.get("title", ""),
+            company_name=body.get("company_name", ""),
+            location=body.get("location", ""),
+            raw_text=body.get("raw_text", ""),
+        )
 
-    # Persist analysis to DB
-    engine = build_engine(settings.database_url)
-    session_factory = build_session_factory(engine)
-    try:
-        async with session_factory() as session:
-            async with session.begin():
-                repo = AnalysisRepository(session)
-                analysis = await repo.get_or_create(
-                    job_id=uuid.UUID(job_id_str),
-                    user_id=uuid.UUID(user_id),
-                    tenant_id=uuid.UUID(tenant_id),
+    # 3. Push the structured analysis back onto the job record
+    if outcome.jd_structured:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.patch(
+                    f"{settings.job_service_url}/internal/jobs/{job_id}",
+                    json={"analysis": outcome.jd_structured},
                 )
-                await repo.update_analysis(
-                    analysis,
-                    jd_structured=result.get("jd_structured"),
-                    skills_required=result.get("skills_required"),
-                    match_score=result.get("match_score"),
-                    status="done" if not result.get("error") else "error",
-                    error_message=result.get("error"),
-                )
-    finally:
-        await engine.dispose()
-
-    # Notify Job Service to store the job record
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            await client.post(
-                f"{settings.job_service_url}/internal/jobs",
-                json={
-                    "tenant_id": tenant_id,
-                    "url": body.get("url", ""),
-                    "title": body.get("title", ""),
-                    "company_name": body.get("company_name", ""),
-                    "location": body.get("location", ""),
-                    "raw_jd": body.get("raw_text", ""),
-                    "analysis": result.get("jd_structured"),
-                    "source": "discovery",
-                    "discovered_at": body.get("discovered_at") or datetime.now(tz=UTC).isoformat(),
-                },
-            )
-    except Exception as exc:
-        log.warning("job_service_notify_failed", extra={"error": str(exc), "url": body.get("url")})
+        except Exception as exc:
+            log.warning("job_analysis_patch_failed", extra={"error": str(exc), "job_id": job_id})
 
     log.info(
         "job_analyzed",
         extra={
-            "job_id": job_id_str,
+            "job_id": job_id,
             "user_id": user_id,
-            "match_score": result.get("match_score"),
+            "match_score": outcome.match_score,
         },
     )
 

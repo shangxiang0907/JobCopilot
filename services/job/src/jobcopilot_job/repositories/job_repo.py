@@ -38,9 +38,20 @@ class JobRepository:
         return job
 
     async def create_internal(self, data: InternalJobCreate) -> Job:
+        """Idempotent upsert by URL — discovery re-runs re-publish the same URLs.
+
+        An existing job (same URL) is refreshed with any newly provided
+        raw_jd/analysis and returned instead of raising ConflictError.
+        """
         existing = await self._find_by_url(data.url)
         if existing is not None:
-            raise ConflictError(f"Job with URL already exists: {data.url}")
+            if data.raw_jd:
+                existing.raw_jd = data.raw_jd
+            if data.analysis is not None:
+                existing.analysis = data.analysis
+            await self._session.flush()
+            await self._session.refresh(existing)
+            return existing
         job = Job(
             tenant_id=data.tenant_id,
             company_id=data.company_id,

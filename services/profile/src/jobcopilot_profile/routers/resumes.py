@@ -3,6 +3,7 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, UploadFile, status
 from jobcopilot_shared.logging import get_logger
+from jobcopilot_shared.schemas.common import PaginatedResponse
 
 from jobcopilot_profile.deps import SessionDep, TenantIdDep, UserIdDep
 from jobcopilot_profile.repositories.resume_repo import ResumeRepository
@@ -13,15 +14,19 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/v1/resumes", tags=["resumes"])
 
 
-@router.get("", response_model=list[ResumeResponse])
+@router.get("", response_model=PaginatedResponse[ResumeResponse])
 async def list_resumes(
     session: SessionDep,
     tenant_id: TenantIdDep,
     user_id: UserIdDep,
-) -> list[ResumeResponse]:
+) -> PaginatedResponse[ResumeResponse]:
+    """All /v1 collection endpoints return PaginatedResponse — see CLAUDE.md."""
     repo = ResumeRepository(session)
     resumes = await repo.list(user_id)
-    return [ResumeResponse.model_validate(r) for r in resumes]
+    items = [ResumeResponse.model_validate(r) for r in resumes]
+    return PaginatedResponse(
+        items=items, total=len(items), page=1, size=max(len(items), 1), has_next=False
+    )
 
 
 @router.post("", response_model=ResumeResponse, status_code=status.HTTP_201_CREATED)
