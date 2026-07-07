@@ -86,8 +86,10 @@ class JobRepository:
         source: str | None = None,
         location: str | None = None,
         job_type: str | None = None,
+        search: str | None = None,
     ) -> tuple[list[Job], int]:
         from sqlalchemy import func as sqlfunc
+        from sqlalchemy import or_
 
         filters = [Job.tenant_id == tenant_id]
         if source:
@@ -96,6 +98,15 @@ class JobRepository:
             filters.append(Job.location.ilike(f"%{location}%"))
         if job_type:
             filters.append(Job.job_type == job_type)
+        if search:
+            pattern = f"%{search}%"
+            filters.append(
+                or_(
+                    Job.title.ilike(pattern),
+                    Job.company_name.ilike(pattern),
+                    Job.location.ilike(pattern),
+                )
+            )
 
         total_stmt = select(sqlfunc.count()).select_from(
             select(Job.job_id).where(*filters).subquery()

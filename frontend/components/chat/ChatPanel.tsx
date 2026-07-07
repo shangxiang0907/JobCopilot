@@ -2,7 +2,7 @@
 
 import { useRef, useEffect } from "react"
 import { useChat } from "ai/react"
-import { X, Send, Bot, User } from "lucide-react"
+import { Check, Loader2, X, Send, Bot, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,6 +24,14 @@ async function fetchWithAuth(url: URL | RequestInfo, options?: RequestInit): Pro
       Authorization: `Bearer ${kc.token ?? ""}`,
     },
   })
+}
+
+const TOOL_LABELS: Record<string, string> = {
+  analyze_job: "Analyzing job posting",
+  update_kanban: "Updating kanban board",
+  search_jobs: "Searching jobs",
+  get_applications: "Fetching applications",
+  prepare_interview: "Preparing interview questions",
 }
 
 export function ChatPanel() {
@@ -93,6 +101,23 @@ export function ChatPanel() {
                       : "bg-muted text-foreground rounded-tl-sm"
                   )}
                 >
+                  {m.toolInvocations && m.toolInvocations.length > 0 && (
+                    <div className={cn("space-y-1", m.content && "mb-1.5")}>
+                      {m.toolInvocations.map((t) => (
+                        <div
+                          key={t.toolCallId}
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                          {t.state === "result" ? (
+                            <Check className="h-3 w-3 shrink-0" />
+                          ) : (
+                            <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+                          )}
+                          <span>{TOOL_LABELS[t.toolName] ?? t.toolName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {m.content}
                 </div>
               </div>

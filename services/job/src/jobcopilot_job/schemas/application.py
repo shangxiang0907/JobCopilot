@@ -73,3 +73,16 @@ class InternalAnalysisUpdate(BaseModel):
 
     match_score: float | None = None
     resume_suggestions: dict[str, Any] | None = None
+
+
+class InternalKanbanUpdate(BaseModel):
+    """Used by the Agent Service update_kanban tool to move an application by job id."""
+
+    user_id: uuid.UUID
+    tenant_id: uuid.UUID
+    status: str
+    note: str | None = None
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.status not in VALID_STATUSES:
+            raise ValueError(f"status must be one of {sorted(VALID_STATUSES)}")

@@ -14,4 +14,7 @@ Current user context:
 - Tenant ID: {tenant_id}
 
 Always be concise, professional, and actionable in your responses.
+Never paste raw JSON from tool results into your reply — summarize it in natural language.
+If a tool reports that an ID was not found, look the ID up with search_jobs or
+get_applications instead of guessing.
 """

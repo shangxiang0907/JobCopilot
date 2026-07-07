@@ -2,12 +2,16 @@
 
 import json
 import logging
+import uuid
 
 import httpx
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
 from jobcopilot_agent.config import settings
+from jobcopilot_agent.deps import open_db_session
+from jobcopilot_agent.services.analysis import run_job_analysis
+from jobcopilot_agent.services.interview import prepare_interview_questions
 
 log = logging.getLogger(__name__)
 
@@ -18,25 +22,69 @@ def _ctx(config: RunnableConfig) -> tuple[str, str]:
     return cfg.get("user_id", ""), cfg.get("tenant_id", "")
 
 
+def _service_error(resp: httpx.Response) -> str:
+    """Extract a human-readable message from an error response."""
+    try:
+        data = resp.json()
+    except Exception:
+        return f"Service returned {resp.status_code}"
+    error = data.get("error") or {}
+    message = error.get("message") or data.get("detail")
+    return str(message) if message else f"Service returned {resp.status_code}"
+
+
 @tool
-async def analyze_job(url: str, config: RunnableConfig) -> str:
-    """Analyze a job posting from its URL. Fetches the job and runs the full AI analysis pipeline.
+async def analyze_job(job_id: str, config: RunnableConfig) -> str:
+    """Run AI analysis on a tracked job: extract structured requirements from its
+    description and compute a match score against the user's resume.
 
     Args:
-        url: The full URL of the job posting to analyze.
+        job_id: The UUID of the job to analyze (find it with search_jobs).
     """
     user_id, tenant_id = _ctx(config)
-    payload = {"url": url, "user_id": user_id, "tenant_id": tenant_id}
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                f"{settings.job_service_url}/internal/jobs/analyze",
-                json=payload,
+        job_uuid = uuid.UUID(job_id)
+        user_uuid = uuid.UUID(user_id)
+        tenant_uuid = uuid.UUID(tenant_id)
+    except ValueError:
+        return json.dumps({"status": "error", "message": f"Invalid job_id '{job_id}'"})
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{settings.job_service_url}/internal/jobs/{job_id}")
+        # A job in another tenant must look identical to a missing one.
+        if resp.status_code != 200:
+            return json.dumps({"status": "error", "message": _service_error(resp)})
+        job = resp.json()
+        if job.get("tenant_id") != tenant_id:
+            return json.dumps({"status": "error", "message": f"Job {job_id} not found"})
+
+        raw_text = job.get("raw_jd") or ""
+        if not raw_text:
+            return json.dumps(
+                {"status": "error", "message": "This job has no description text to analyze."}
             )
-        if resp.status_code in (200, 202):
-            data = resp.json()
-            return json.dumps({"status": "queued", "job_id": data.get("job_id"), "url": url})
-        return json.dumps({"status": "error", "message": f"Service returned {resp.status_code}"})
+
+        async with open_db_session() as session:
+            outcome = await run_job_analysis(
+                session,
+                job_id=job_uuid,
+                user_id=user_uuid,
+                tenant_id=tenant_uuid,
+                url=job.get("url", ""),
+                title=job.get("title", ""),
+                company_name=job.get("company_name", ""),
+                location=job.get("location") or "",
+                raw_text=raw_text,
+            )
+        return json.dumps(
+            {
+                "status": outcome.status,
+                "job_id": job_id,
+                "match_score": outcome.match_score,
+                "skills_required": outcome.skills_required[:10],
+            }
+        )
     except Exception as exc:
         log.warning("analyze_job_tool_failed", extra={"error": str(exc)})
         return json.dumps({"status": "error", "message": str(exc)})
@@ -68,7 +116,7 @@ async def update_kanban(job_id: str, status: str, config: RunnableConfig) -> str
             )
         if resp.status_code == 200:
             return json.dumps({"status": "updated", "job_id": job_id, "new_status": status})
-        return json.dumps({"status": "error", "message": f"Service returned {resp.status_code}"})
+        return json.dumps({"status": "error", "message": _service_error(resp)})
     except Exception as exc:
         log.warning("update_kanban_tool_failed", extra={"error": str(exc)})
         return json.dumps({"status": "error", "message": str(exc)})
@@ -81,12 +129,12 @@ async def search_jobs(query: str, config: RunnableConfig) -> str:
     Args:
         query: Search terms, e.g. 'Python backend engineer remote'.
     """
-    user_id, tenant_id = _ctx(config)
+    _user_id, tenant_id = _ctx(config)
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
                 f"{settings.job_service_url}/internal/jobs",
-                params={"q": query, "user_id": user_id, "tenant_id": tenant_id, "limit": 5},
+                params={"q": query, "tenant_id": tenant_id, "limit": 5},
             )
         if resp.status_code == 200:
             jobs = resp.json().get("items", [])
@@ -100,7 +148,7 @@ async def search_jobs(query: str, config: RunnableConfig) -> str:
                 for j in jobs
             ]
             return json.dumps({"jobs": summary, "total": len(summary)})
-        return json.dumps({"jobs": [], "total": 0})
+        return json.dumps({"status": "error", "message": _service_error(resp)})
     except Exception as exc:
         log.warning("search_jobs_tool_failed", extra={"error": str(exc)})
         return json.dumps({"status": "error", "message": str(exc)})
@@ -129,15 +177,16 @@ async def get_applications(config: RunnableConfig, status: str = "") -> str:
             summary = [
                 {
                     "application_id": a.get("application_id"),
-                    "job_title": a.get("job_title"),
-                    "company": a.get("company_name"),
+                    "job_id": a.get("job_id"),
+                    "job_title": (a.get("job") or {}).get("title"),
+                    "company": (a.get("job") or {}).get("company_name"),
                     "status": a.get("status"),
                     "match_score": a.get("match_score"),
                 }
                 for a in apps
             ]
             return json.dumps({"applications": summary, "total": len(summary)})
-        return json.dumps({"applications": [], "total": 0})
+        return json.dumps({"status": "error", "message": _service_error(resp)})
     except Exception as exc:
         log.warning("get_applications_tool_failed", extra={"error": str(exc)})
         return json.dumps({"status": "error", "message": str(exc)})
@@ -152,24 +201,31 @@ async def prepare_interview(job_id: str, config: RunnableConfig) -> str:
     """
     user_id, tenant_id = _ctx(config)
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                "http://localhost:8000/v1/agent/interview",
-                json={"job_id": job_id},
-                headers={"X-User-Id": user_id, "X-Tenant-Id": tenant_id},
-            )
-        if resp.status_code == 200:
-            data = resp.json()
-            questions = data.get("questions", [])
+        job_uuid = uuid.UUID(job_id)
+        user_uuid = uuid.UUID(user_id)
+        tenant_uuid = uuid.UUID(tenant_id)
+    except ValueError:
+        return json.dumps({"status": "error", "message": f"Invalid job_id '{job_id}'"})
+
+    try:
+        async with open_db_session() as session:
+            prep = await prepare_interview_questions(session, job_uuid, user_uuid, tenant_uuid)
+        if prep is None:
             return json.dumps(
                 {
-                    "status": "ready",
-                    "job_id": job_id,
-                    "question_count": len(questions),
-                    "preview": questions[:2] if questions else [],
+                    "status": "error",
+                    "message": "No analysis found for this job. Run analyze_job first.",
                 }
             )
-        return json.dumps({"status": "error", "message": f"Service returned {resp.status_code}"})
+        questions = prep.behavioral_questions + prep.technical_questions
+        return json.dumps(
+            {
+                "status": "ready",
+                "job_id": job_id,
+                "question_count": len(questions),
+                "preview": questions[:2],
+            }
+        )
     except Exception as exc:
         log.warning("prepare_interview_tool_failed", extra={"error": str(exc)})
         return json.dumps({"status": "error", "message": str(exc)})

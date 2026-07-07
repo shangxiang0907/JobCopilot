@@ -98,3 +98,40 @@ async def test_job_delete(db_engine: AsyncEngine) -> None:
         async with session.begin():
             with pytest.raises(NotFoundError):
                 await JobRepository(session).get(tenant_id, job_id)
+
+
+@pytest.mark.integration
+async def test_job_search_filter(db_engine: AsyncEngine) -> None:
+    factory = build_session_factory(db_engine)
+    tenant_id = uuid.uuid4()
+    async with factory() as session:
+        async with session.begin():
+            repo = JobRepository(session)
+            for title, company in [
+                ("Senior Python Engineer", "Acme Corp"),
+                ("Data Scientist", "Beta Labs"),
+            ]:
+                await repo.create_internal(
+                    InternalJobCreate(
+                        tenant_id=tenant_id,
+                        title=title,
+                        company_name=company,
+                        url=f"https://linkedin.com/jobs/view/{uuid.uuid4()}",
+                        source="linkedin",
+                    )
+                )
+
+    async with factory() as session:
+        async with session.begin():
+            repo = JobRepository(session)
+            by_title, total_title = await repo.get_all(tenant_id, search="python")
+            assert total_title == 1
+            assert by_title[0].title == "Senior Python Engineer"
+
+            by_company, total_company = await repo.get_all(tenant_id, search="beta")
+            assert total_company == 1
+            assert by_company[0].company_name == "Beta Labs"
+
+            none_found, total_none = await repo.get_all(tenant_id, search="golang")
+            assert total_none == 0
+            assert none_found == []

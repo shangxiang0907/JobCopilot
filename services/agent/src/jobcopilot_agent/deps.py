@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 from fastapi import Depends
@@ -13,6 +14,13 @@ _session_factory = build_session_factory(_engine)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with _session_factory() as session:
+        yield session
+
+
+@asynccontextmanager
+async def open_db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Session for non-request contexts (ReAct tools) sharing the app engine."""
     async with _session_factory() as session:
         yield session
 

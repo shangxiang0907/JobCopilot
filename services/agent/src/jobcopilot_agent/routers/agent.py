@@ -10,14 +10,9 @@ GET  /v1/agent/analyses/{job_id} → fetch stored analysis
 import logging
 import uuid
 
-import httpx
 from fastapi import APIRouter, HTTPException, status
 
-from jobcopilot_agent.config import settings
 from jobcopilot_agent.deps import CurrentUser, DbDep
-from jobcopilot_agent.graphs.analyzer_graph import AnalyzerState, analyzer_graph
-from jobcopilot_agent.graphs.interview_graph import InterviewState, interview_graph
-from jobcopilot_agent.graphs.resume_graph import ResumeState, resume_graph
 from jobcopilot_agent.repositories.analysis_repo import AnalysisRepository
 from jobcopilot_agent.schemas.agent import (
     AnalysisResponse,
@@ -31,6 +26,9 @@ from jobcopilot_agent.schemas.agent import (
     PrepareInterviewResponse,
     ResumeSuggestions,
 )
+from jobcopilot_agent.services.analysis import run_job_analysis
+from jobcopilot_agent.services.interview import prepare_interview_questions
+from jobcopilot_agent.services.matching import run_resume_match
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/agent", tags=["agent"])
@@ -43,42 +41,25 @@ async def analyze_job(
     db: DbDep,
 ) -> AnalyzeJobResponse:
     """Run AnalyzerGraph on a job posting and persist the structured analysis."""
-    state: AnalyzerState = {
-        "job_id": str(req.job_id),
-        "user_id": str(user["user_id"]),
-        "tenant_id": str(user["tenant_id"]),
-        "url": req.url,
-        "title": req.title,
-        "company_name": req.company_name,
-        "location": req.location,
-        "raw_text": req.raw_text,
-        "resume_text": "",
-        "jd_structured": {},
-        "skills_required": [],
-        "match_score": 0.0,
-        "error": None,
-    }
-    result = await analyzer_graph.ainvoke(state)
-
-    repo = AnalysisRepository(db)
-    async with db.begin():
-        analysis = await repo.get_or_create(req.job_id, user["user_id"], user["tenant_id"])
-        await repo.update_analysis(
-            analysis,
-            jd_structured=result.get("jd_structured"),
-            skills_required=result.get("skills_required"),
-            match_score=result.get("match_score"),
-            status="done" if not result.get("error") else "error",
-            error_message=result.get("error"),
-        )
+    outcome = await run_job_analysis(
+        db,
+        job_id=req.job_id,
+        user_id=uuid.UUID(str(user["user_id"])),
+        tenant_id=uuid.UUID(str(user["tenant_id"])),
+        url=req.url,
+        title=req.title,
+        company_name=req.company_name,
+        location=req.location,
+        raw_text=req.raw_text,
+    )
 
     return AnalyzeJobResponse(
-        analysis_id=analysis.id,
+        analysis_id=outcome.analysis_id,
         job_id=req.job_id,
-        jd_structured=JdStructured(**result.get("jd_structured", {})),
-        skills_required=result.get("skills_required", []),
-        match_score=result.get("match_score", 0.0),
-        status=analysis.status,
+        jd_structured=JdStructured(**outcome.jd_structured),
+        skills_required=outcome.skills_required,
+        match_score=outcome.match_score,
+        status=outcome.status,
     )
 
 
@@ -89,60 +70,27 @@ async def match_resume(
     db: DbDep,
 ) -> MatchResumeResponse:
     """Run ResumeGraph for detailed gap analysis and tailored suggestions."""
-    # Fetch stored JD structure
-    repo = AnalysisRepository(db)
-    analysis = await repo.get_by_job_user(req.job_id, user["user_id"], user["tenant_id"])
-    if not analysis or not analysis.jd_structured:
+    outcome = await run_resume_match(
+        db,
+        job_id=req.job_id,
+        user_id=uuid.UUID(str(user["user_id"])),
+        tenant_id=uuid.UUID(str(user["tenant_id"])),
+    )
+    if outcome is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No analysis found for this job. Run /analyze first.",
         )
 
-    # Fetch resume text from Profile Service
-    resume_text = ""
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(
-                f"{settings.profile_service_url}/internal/profiles/{user['user_id']}"
-            )
-        if resp.status_code == 200:
-            resume_text = resp.json().get("active_resume_text") or ""
-    except Exception as exc:
-        log.warning("profile_fetch_failed", extra={"error": str(exc)})
-
-    state: ResumeState = {
-        "job_id": str(req.job_id),
-        "user_id": str(user["user_id"]),
-        "tenant_id": str(user["tenant_id"]),
-        "jd_structured": analysis.jd_structured,
-        "resume_text": resume_text,
-        "match_score": 0.0,
-        "gap_analysis": {},
-        "suggestions": [],
-        "error": None,
-    }
-    result = await resume_graph.ainvoke(state)
-
-    async with db.begin():
-        await repo.update_analysis(
-            analysis,
-            match_score=result.get("match_score"),
-            resume_suggestions={
-                "gap_analysis": result.get("gap_analysis"),
-                "suggestions": result.get("suggestions"),
-            },
-            status="done",
-        )
-
     suggestions = ResumeSuggestions(
-        match_score=result.get("match_score", 0.0),
-        gap_analysis=result.get("gap_analysis", {}),
-        suggestions=[s.get("action", "") for s in result.get("suggestions", [])],
+        match_score=outcome.match_score,
+        gap_analysis=outcome.gap_analysis,
+        suggestions=[s.get("action", "") for s in outcome.suggestions],
     )
     return MatchResumeResponse(
-        analysis_id=analysis.id,
+        analysis_id=outcome.analysis_id,
         job_id=req.job_id,
-        match_score=result.get("match_score", 0.0),
+        match_score=outcome.match_score,
         resume_suggestions=suggestions,
         status="done",
     )
@@ -155,41 +103,24 @@ async def prepare_interview(
     db: DbDep,
 ) -> PrepareInterviewResponse:
     """Run InterviewGraph to generate behavioral + technical questions."""
-    repo = AnalysisRepository(db)
-    analysis = await repo.get_by_job_user(req.job_id, user["user_id"], user["tenant_id"])
-    if not analysis or not analysis.jd_structured:
+    prep = await prepare_interview_questions(
+        db,
+        job_id=req.job_id,
+        user_id=uuid.UUID(str(user["user_id"])),
+        tenant_id=uuid.UUID(str(user["tenant_id"])),
+    )
+    if prep is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No analysis found for this job. Run /analyze first.",
         )
 
-    state: InterviewState = {
-        "job_id": str(req.job_id),
-        "user_id": str(user["user_id"]),
-        "tenant_id": str(user["tenant_id"]),
-        "jd_structured": analysis.jd_structured,
-        "behavioral_questions": [],
-        "technical_questions": [],
-        "error": None,
-    }
-    result = await interview_graph.ainvoke(state)
-
     all_questions = [
-        InterviewQuestion(category="behavioral", **q)
-        for q in result.get("behavioral_questions", [])
-    ] + [
-        InterviewQuestion(category="technical", **q) for q in result.get("technical_questions", [])
-    ]
-
-    interview_data = {
-        "behavioral": result.get("behavioral_questions", []),
-        "technical": result.get("technical_questions", []),
-    }
-    async with db.begin():
-        await repo.update_analysis(analysis, interview_questions=interview_data, status="done")
+        InterviewQuestion(category="behavioral", **q) for q in prep.behavioral_questions
+    ] + [InterviewQuestion(category="technical", **q) for q in prep.technical_questions]
 
     return PrepareInterviewResponse(
-        analysis_id=analysis.id,
+        analysis_id=prep.analysis_id,
         job_id=req.job_id,
         questions=all_questions,
         status="done",
