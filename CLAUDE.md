@@ -13,11 +13,12 @@ All documentation in this repo is **bilingual (English / Chinese)** in a single-
 **EN:**  
 All application code is implemented, verified end-to-end, and **live in production** at `https://arnoldshang.com` (single-node Docker Compose on Hetzner, deployed via `infra/scripts/deploy.sh` — CI builds → GHCR → digest-pinned pull; production is never a build/debug environment). The full stack — 5 backend microservices, shared library, Next.js 15 frontend, and infrastructure (PostgreSQL, Redis, RabbitMQ, Qdrant, Temporal, Kong, Keycloak, Caddy edge with TLS + observability) — is committed, pushed, and healthy. Implementation follows `docs/SAD.md` for architecture decisions and `docs/PRD.md` for product requirements.
 
-**Milestone status (updated 2026-07-06):**
+**Milestone status (updated 2026-07-08):**
 1. ✅ Auth chain (Keycloak OIDC, JWT RS256, tenant_id claim)
 2. ✅ E2E manual verification (login → profile → jobs list/detail/tracking → AI assistant streaming chat → discovery) — completed 2026-07-06, incl. the `/jobs` list page and a full frontend↔backend contract reconciliation
 3. ✅ Kubernetes manifests (`infra/k8s/`) — written; future scaling path (current deployment is Compose)
 4. ✅ Hetzner production deployment (Caddy TLS edge, security hardening, Prometheus/Loki/Grafana observability)
+5. ✅ AI assistant tool-chain repair (2026-07-08, prod @ `e801133`) — all 5 ReAct tools wired to real Job Service internal endpoints (4 previously called endpoints that never existed and failed silently); HTTP self-calls replaced with in-process shared services; shared structlog config fixed (it crashed on every log call, turning all services' handled errors into bare 500s); tool activity now streamed to the chat UI. See "AI Assistant Tool Contract" below.
 
 **Next milestone: not yet defined** — decide with the user before starting new feature work. Known open items: Tempo + OpenTelemetry tracing (roadmap), offsite backup enablement (awaiting S3 credentials), production test-account cleanup before public launch.
 
@@ -26,11 +27,12 @@ All application code is implemented, verified end-to-end, and **live in producti
 **中文：**  
 所有应用代码已实现、完成端到端验证并已**上线生产** `https://arnoldshang.com`（Hetzner 单节点 Docker Compose，经 `infra/scripts/deploy.sh` 部署——CI 构建 → GHCR → digest 钉死拉取；生产环境绝不用于构建或调试）。完整技术栈——5 个后端微服务、共享库、Next.js 15 前端、基础设施（PostgreSQL、Redis、RabbitMQ、Qdrant、Temporal、Kong、Keycloak、Caddy TLS 边缘 + 可观测性）——均已提交推送并处于健康状态。实现以 `docs/SAD.md` 架构决策和 `docs/PRD.md` 产品需求为准。
 
-**里程碑状态（2026-07-06 更新）：**
+**里程碑状态（2026-07-08 更新）：**
 1. ✅ 认证链路（Keycloak OIDC、JWT RS256、tenant_id claim）
 2. ✅ 端到端手动验证（登录 → 简历 → 职位列表/详情/跟踪 → AI 助手流式对话 → 职位发现）——2026-07-06 收官，含 `/jobs` 列表页与前后端契约全面对齐
 3. ✅ Kubernetes 清单文件（`infra/k8s/`）——已编写，作为未来扩容路径（当前部署为 Compose）
 4. ✅ Hetzner 生产部署（Caddy TLS 边缘、安全加固、Prometheus/Loki/Grafana 可观测性）
+5. ✅ AI 助手工具链修复（2026-07-08，生产 @ `e801133`）——5 个 ReAct 工具全部接通真实的 Job Service 内部端点（此前 4 个调用的端点从不存在、静默失败）；HTTP 自调用改为进程内共享服务；修复共享 structlog 配置（原先每次日志调用都崩溃，全部服务的业务异常退化为裸 500）；工具调用过程实时透出到聊天 UI。详见下文「AI 助手工具契约」。
 
 **下一个里程碑：尚未确定**——开始新功能开发前先与用户确认。已知待办：Tempo + OpenTelemetry 链路追踪（roadmap）、异地备份启用（等 S3 凭据）、正式对外前清理生产测试账号。
 
@@ -246,6 +248,7 @@ docker compose build profile-service job-service discovery-service agent-service
 - mypy for type checking (strict mode per service)
 - No inline SQL strings — use SQLAlchemy ORM or text() with bound parameters
 - Structured JSON logging via shared `packages/shared/logging.py`; every log entry includes `trace_id`, `tenant_id`, `service`
+- `packages/shared/logging.py` is a **pure native structlog** pipeline (PrintLogger → JSON on stdout). Never add stdlib-only processors (e.g. `structlog.stdlib.add_logger_name`) — they crash every log call in every service, including the exception handlers (regression test: `packages/shared/tests/test_logging.py`). / 共享日志是**纯原生 structlog** 管线，禁止混入 stdlib 专用处理器（如 `add_logger_name`）——会使全部服务的每次日志调用崩溃，连异常处理器一起（回归测试见 `packages/shared/tests/test_logging.py`）。
 - All API responses include `X-Request-Id` header
 
 ### API Conventions / API 规范
@@ -260,12 +263,31 @@ docker compose build profile-service job-service discovery-service agent-service
 - Every query against a tenant-scoped table must include `WHERE tenant_id = :tenant_id`
 - `SELECT *` is forbidden; always list columns explicitly
 - Parameterized queries only; no string-interpolated SQL
+- SQLAlchemy async sessions **autobegin** on the first statement — never call `session.begin()` after a query on the same session (raises `InvalidRequestError`; this 500'd `/v1/agent/match` + `/interview` in prod). Service-layer functions own their unit of work: query → mutate → `commit()`. / SQLAlchemy 异步会话在第一条语句时**自动开启事务**——同一会话查询后不得再调 `session.begin()`（必抛 `InvalidRequestError`，曾导致两个生产端点必然 500）。服务层函数自持工作单元：查询 → 变更 → `commit()`。
 
 ### LLM / AI
 - Default model: `qwen-max` via DashScope; switchable via `LLM_MODEL` env var
 - LangGraph dev mode: `langgraph dev` (development only, never deployed to cluster)
 - All LangGraph graphs must define explicit input/output state schemas (TypedDict)
 - Prompts live in `services/agent/prompts/`; never inline prompts in graph code
+
+### AI Assistant Tool Contract / AI 助手工具契约
+
+**EN:**  
+The 5 ReAct tools (`services/agent/.../tools/job_tools.py`) bind to real, tested endpoints — never invent one. Capabilities living in the Agent Service itself run **in-process** through the shared service layer (`services/analysis.py` / `interview.py` / `matching.py`), which the `/v1/agent/*` endpoints call too. Never HTTP-self-call your own service. Tools calling tenant-unscoped internal getters (e.g. `GET /internal/jobs/{job_id}`) must verify `tenant_id` on the response and treat a mismatch as "not found".
+
+| Tool | Binding |
+|---|---|
+| `analyze_job(job_id)` | `GET /internal/jobs/{job_id}` (tenant-checked) → in-process AnalyzerGraph via `run_job_analysis` |
+| `search_jobs(query)` | `GET /internal/jobs?tenant_id&q&limit` |
+| `get_applications(status?)` | `GET /internal/applications?user_id&tenant_id&status&limit` |
+| `update_kanban(job_id, status)` | `PATCH /internal/applications/by-job/{job_id}` (status state machine enforced server-side) |
+| `prepare_interview(job_id)` | in-process InterviewGraph via `prepare_interview_questions` |
+
+Chat SSE streams tool activity: `{"type":"tool_call","id","name","args"}` and `{"type":"tool_result","id","name","result"}`. The Next.js `/api/chat` proxy maps them to Vercel AI SDK data-stream parts `9:`/`a:`; `ChatPanel` renders them from `message.toolInvocations`. The contract spans three layers (agent SSE → proxy → UI) — change them together.
+
+**中文：**  
+5 个 ReAct 工具必须绑定真实存在、有测试覆盖的端点——不得杜撰。能力在 Agent Service 自身的，必须**进程内**走共享服务层（analysis / interview / matching），与 `/v1/agent/*` 端点共用同一代码路径——严禁 HTTP 自调用。调用无租户过滤的内部端点时必须校验响应中的 `tenant_id`，不匹配按"不存在"处理。聊天 SSE 的 tool_call / tool_result 事件（含 id、result）由前端代理映射为 AI SDK 数据流 `9:`/`a:` 部分，`ChatPanel` 据 `toolInvocations` 渲染；该契约横跨三层（agent SSE → 代理 → UI），修改时必须三层同步。
 
 ### Security / 安全
 - LinkedIn cookies and API keys: AES-256-GCM encrypted before any persistence
@@ -311,6 +333,7 @@ Concretely:
 - If two options exist (quick hack vs. proper fix), present both with trade-offs and default to the proper one.
 - **When choosing among multiple _legitimate_ options, the recommendation MUST be driven by architectural correctness — NEVER by "smallest change / least effort / least risk / smallest diff." Never list minimal change as a pro of the recommended option. If unsure which option is the best practice, research it before recommending.**
 - **Never use production as a debug loop.** Reproduce and verify every fix locally (via `docker compose up`) or in staging BEFORE deploying. Deploy only changes already verified elsewhere — production must not be the test bed. When debugging a frontend↔backend integration, audit BOTH sides of the contract together (schemas + both endpoints) in one pass so all mismatches are caught at once; read-only code tracing alone is insufficient — run it end-to-end. Batch related fixes into a single deploy instead of one-commit-per-bug round-trips.
+- **Exercise error paths and service-to-service contracts end-to-end, not just happy paths.** "Contract" includes agent-tool ↔ internal-endpoint bindings and exception-handler paths, not only frontend↔backend. A tool that "fails gracefully" (returns error JSON) hides a missing endpoint — the LLM confabulates a fluent answer on top of it, so nothing looks broken (2026-07-08: 4 of 5 ReAct tools had called nonexistent endpoints since launch, and the shared logging bug turning handled errors into bare 500s was only caught by E2E-running an error path).
 - Only proceed with a workaround if the user explicitly accepts it after understanding the trade-offs.
 - This applies to: Dockerfiles, Docker Compose, Alembic config, K8s manifests, CI pipelines, framework rendering models, and all architectural decisions.
 
@@ -322,6 +345,7 @@ Concretely:
 - 如果存在两个选项（临时方案 vs. 正确方案），列出各自权衡，默认选正确方案。
 - **在多个_合法_方案中选择时，推荐必须以架构正确性为准——绝不以「改动最小 / 最省事 / 风险最低 / diff 最小」作为依据，也不得把「改动小」列为推荐方案的优点。若不确定哪个是最佳实践，先研究再推荐。**
 - **绝不把生产环境当调试循环。** 每个修复都必须先在本地（`docker compose up`）或 staging 端到端复现并验证，再部署；生产只接收已在别处验证过的变更，不得拿生产试错。调试前后端集成时，一次把契约两侧（schema + 两端端点）审全，一并抓出所有不一致；只靠只读追踪代码不够，必须端到端跑通。相关修复合并成一次部署，不要一个 bug 一次生产往返。
+- **错误路径与服务间契约也必须端到端跑通，不能只测正常路径。** 「契约」不止前端↔后端，还包括 Agent 工具↔内部端点的绑定和异常处理器路径。「优雅失败」的工具（返回错误 JSON）会掩盖端点缺失——LLM 会在其上编出流畅的回答，表面看一切正常（2026-07-08 教训：5 个 ReAct 工具中 4 个自上线起调用的端点根本不存在；共享日志缺陷把所有业务异常变成裸 500，也是靠端到端跑一条出错路径才暴露）。
 - 只有在用户明确理解权衡后主动接受时，才可以采用临时方案。
 - 适用范围：Dockerfile、Docker Compose、Alembic 配置、K8s manifest、CI 流水线、框架渲染模型及所有架构决策。
 
