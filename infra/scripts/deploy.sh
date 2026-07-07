@@ -129,14 +129,14 @@ declare -a DIGEST_ENVS=()
 for svc in "${SERVICES[@]}"; do
   ref="ghcr.io/${GHCR_OWNER}/jobcopilot-${svc}:${TAG}"
   # `|| true`: under set -e -o pipefail a failed inspect would kill the script
-  # inside the substitution, silently skipping the diagnostic below. Retry a
-  # few times — right after CD finishes, GHCR may not have propagated the
-  # manifest yet.
+  # inside the substitution, silently skipping the diagnostic below. Retry —
+  # right after CD finishes, GHCR manifest propagation has been observed to
+  # exceed 20s, so allow ~100s total before giving up.
   digest=""
-  for attempt in 1 2 3; do
+  for attempt in 1 2 3 4 5 6; do
     digest="$(docker buildx imagetools inspect "$ref" 2>/dev/null | awk '/^Digest:/{print $2; exit}' || true)"
     [ -n "$digest" ] && break
-    [ "$attempt" -lt 3 ] && { echo "    ${ref##*/}: not resolvable yet, retrying in 10s ..." >&2; sleep 10; }
+    [ "$attempt" -lt 6 ] && { echo "    ${ref##*/}: not resolvable yet, retrying in 20s ..." >&2; sleep 20; }
   done
   if [ -z "$digest" ]; then
     echo "ERROR: could not resolve a digest for ${ref}." >&2
