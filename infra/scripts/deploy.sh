@@ -192,6 +192,13 @@ ssh_ "cd ${REMOTE_DIR}/infra && docker compose ${COMPOSE[*]} pull && docker comp
 echo "==> Reloading Caddy config ..."
 ssh_ "cd ${REMOTE_DIR}/infra && docker compose ${COMPOSE[*]} exec -T -w /etc/caddy caddy caddy reload --config /etc/caddy/Caddyfile"
 
+# 6. Prune superseded images. Each digest-pinned deploy strands the previous
+#    generation (~3.7GB across the 6 app images) and nothing else ever deletes
+#    it — unbounded growth until the disk fills. Keep the last 72h of unused
+#    images for instant local rollback; older rollbacks re-pull from GHCR.
+echo "==> Pruning images unused for >72h ..."
+ssh_ "docker image prune -af --filter 'until=72h' | tail -1"
+
 SERVER_HOST="$(grep -E '^SERVER_HOST=' "$ENV_FILE" | cut -d= -f2-)"
 echo ""
 echo "==> Deploy complete (commit ${TAG:0:12})."
