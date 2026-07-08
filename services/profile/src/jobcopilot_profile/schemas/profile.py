@@ -64,6 +64,12 @@ class ProfileResponse(BaseModel):
         )
 
 
+class InternalCookieResponse(BaseModel):
+    """Minimal decrypted-cookie payload for the Discovery Service."""
+
+    linkedin_cookie: str | None
+
+
 class InternalProfileResponse(BaseModel):
     """Full profile data for internal service calls — includes decrypted credentials."""
 

@@ -16,6 +16,8 @@ from typing import Any
 
 import aio_pika
 import httpx
+from jobcopilot_shared.events import JOB_DISCOVERED_KEY, JobDiscoveredEvent
+from pydantic import ValidationError
 
 from jobcopilot_agent.config import settings
 from jobcopilot_agent.deps import open_db_session
@@ -25,18 +27,21 @@ log = logging.getLogger(__name__)
 
 _EXCHANGE = settings.rabbitmq_exchange
 _QUEUE = "agent.job.discovered"
-_ROUTING_KEY = "job.discovered"
+_ROUTING_KEY = JOB_DISCOVERED_KEY
 
 
 async def _process_job_message(body: dict[str, Any]) -> None:
     """Upsert the job, run AnalyzerGraph keyed by the real job_id, persist results."""
-    user_id = body.get("user_id", "")
-    tenant_id = body.get("tenant_id", "")
-    url = body.get("url", "")
-    if not user_id or not tenant_id or not url:
+    try:
+        event = JobDiscoveredEvent.model_validate(body)
+    except ValidationError as exc:
+        # Poison message — drop it (redelivery would fail identically).
+        log.error("job_message_invalid", extra={"error": str(exc)})
+        return
+    if not event.user_id or not event.tenant_id or not event.url:
         log.error(
             "job_message_missing_fields",
-            extra={"user_id": user_id, "tenant_id": tenant_id, "url": url},
+            extra={"user_id": event.user_id, "tenant_id": event.tenant_id, "url": event.url},
         )
         return
 
@@ -45,20 +50,20 @@ async def _process_job_message(body: dict[str, Any]) -> None:
         resp = await client.post(
             f"{settings.job_service_url}/internal/jobs",
             json={
-                "tenant_id": tenant_id,
-                "url": url,
-                "title": body.get("title", ""),
-                "company_name": body.get("company_name", ""),
-                "location": body.get("location", ""),
-                "raw_jd": body.get("raw_text", ""),
+                "tenant_id": event.tenant_id,
+                "url": event.url,
+                "title": event.title,
+                "company_name": event.company_name,
+                "location": event.location,
+                "raw_jd": event.raw_text,
                 "source": "discovery",
-                "discovered_at": body.get("discovered_at") or datetime.now(tz=UTC).isoformat(),
+                "discovered_at": event.discovered_at or datetime.now(tz=UTC).isoformat(),
             },
         )
     if resp.status_code not in (200, 201):
         log.error(
             "job_upsert_failed",
-            extra={"status": resp.status_code, "url": url},
+            extra={"status": resp.status_code, "url": event.url},
         )
         return
     job_id = resp.json()["job_id"]
@@ -68,13 +73,13 @@ async def _process_job_message(body: dict[str, Any]) -> None:
         outcome = await run_job_analysis(
             session,
             job_id=uuid.UUID(job_id),
-            user_id=uuid.UUID(user_id),
-            tenant_id=uuid.UUID(tenant_id),
-            url=url,
-            title=body.get("title", ""),
-            company_name=body.get("company_name", ""),
-            location=body.get("location", ""),
-            raw_text=body.get("raw_text", ""),
+            user_id=uuid.UUID(event.user_id),
+            tenant_id=uuid.UUID(event.tenant_id),
+            url=event.url,
+            title=event.title,
+            company_name=event.company_name,
+            location=event.location,
+            raw_text=event.raw_text,
         )
 
     # 3. Push the structured analysis back onto the job record
@@ -92,7 +97,7 @@ async def _process_job_message(body: dict[str, Any]) -> None:
         "job_analyzed",
         extra={
             "job_id": job_id,
-            "user_id": user_id,
+            "user_id": event.user_id,
             "match_score": outcome.match_score,
         },
     )

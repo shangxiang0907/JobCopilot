@@ -1,12 +1,15 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel
 
-VALID_STATUSES = frozenset(
-    {"discovered", "applied", "interviewing", "offer", "rejected", "withdrawn"}
-)
+# Single source of truth for application statuses — a Literal so the OpenAPI
+# schema carries the enum and the generated frontend types get the union.
+ApplicationStatusName = Literal[
+    "discovered", "applied", "interviewing", "offer", "rejected", "withdrawn"
+]
+VALID_STATUSES = frozenset(get_args(ApplicationStatusName))
 
 
 class ApplicationCreate(BaseModel):
@@ -15,12 +18,8 @@ class ApplicationCreate(BaseModel):
 
 
 class ApplicationStatusUpdate(BaseModel):
-    status: str
+    status: ApplicationStatusName
     note: str | None = None
-
-    def model_post_init(self, __context: Any) -> None:
-        if self.status not in VALID_STATUSES:
-            raise ValueError(f"status must be one of {sorted(VALID_STATUSES)}")
 
 
 class ApplicationUpdate(BaseModel):
@@ -44,7 +43,7 @@ class ApplicationResponse(BaseModel):
     application_id: uuid.UUID
     user_id: uuid.UUID
     job_id: uuid.UUID
-    status: str
+    status: ApplicationStatusName
     match_score: float | None
     resume_suggestions: dict[str, Any] | None
     notes: str | None
@@ -80,9 +79,5 @@ class InternalKanbanUpdate(BaseModel):
 
     user_id: uuid.UUID
     tenant_id: uuid.UUID
-    status: str
+    status: ApplicationStatusName
     note: str | None = None
-
-    def model_post_init(self, __context: Any) -> None:
-        if self.status not in VALID_STATUSES:
-            raise ValueError(f"status must be one of {sorted(VALID_STATUSES)}")

@@ -20,6 +20,7 @@ _JOB_ID = str(uuid.uuid4())
 _BODY = {
     "user_id": _USER_ID,
     "tenant_id": _TENANT_ID,
+    "run_id": "run-1",
     "url": "https://linkedin.com/jobs/view/123",
     "title": "Backend Engineer",
     "company_name": "Acme",
@@ -95,7 +96,8 @@ async def test_no_analysis_when_job_upsert_fails() -> None:
 
 
 @pytest.mark.asyncio
-async def test_message_without_identity_is_dropped() -> None:
+async def test_malformed_message_is_dropped() -> None:
+    """Payloads violating the shared JobDiscoveredEvent contract are poison messages."""
     client = _mock_http_client()
     with (
         patch("jobcopilot_agent.services.consumer.httpx.AsyncClient", return_value=client),
@@ -104,7 +106,19 @@ async def test_message_without_identity_is_dropped() -> None:
             new_callable=AsyncMock,
         ) as mock_run,
     ):
-        await _process_job_message({"url": "https://example.com", "user_id": "", "tenant_id": ""})
+        # missing required fields entirely → ValidationError path
+        await _process_job_message({"url": "https://example.com"})
+        # present but empty identity → guard path
+        await _process_job_message(
+            {
+                "url": "https://example.com",
+                "user_id": "",
+                "tenant_id": "",
+                "run_id": "r",
+                "title": "t",
+                "company_name": "c",
+            }
+        )
 
     client.post.assert_not_awaited()
     mock_run.assert_not_awaited()

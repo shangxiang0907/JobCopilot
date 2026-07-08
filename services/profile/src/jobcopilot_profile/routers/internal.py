@@ -11,7 +11,7 @@ from jobcopilot_profile.config import settings
 from jobcopilot_profile.deps import SessionDep
 from jobcopilot_profile.repositories.profile_repo import ProfileRepository
 from jobcopilot_profile.repositories.resume_repo import ResumeRepository
-from jobcopilot_profile.schemas.profile import InternalProfileResponse
+from jobcopilot_profile.schemas.profile import InternalCookieResponse, InternalProfileResponse
 from jobcopilot_profile.schemas.resume import ResumeResponse
 
 logger = get_logger(__name__)
@@ -52,15 +52,15 @@ async def internal_get_profile(
     )
 
 
-@router.get("/profiles/{user_id}/cookie")
+@router.get("/profiles/{user_id}/cookie", response_model=InternalCookieResponse)
 async def internal_get_cookie(
     user_id: uuid.UUID,
     session: SessionDep,
-) -> dict[str, str | None]:
+) -> InternalCookieResponse:
     """Minimal endpoint for Discovery Service to fetch the LinkedIn cookie only."""
     profile_repo = ProfileRepository(session)
     profile = await profile_repo.get_by_user(user_id)
-    return {"linkedin_cookie": _safe_decrypt(profile.linkedin_cookie_enc)}
+    return InternalCookieResponse(linkedin_cookie=_safe_decrypt(profile.linkedin_cookie_enc))
 
 
 def _safe_decrypt(encrypted: str | None) -> str | None:

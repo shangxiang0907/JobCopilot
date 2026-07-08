@@ -21,103 +21,33 @@ api.interceptors.request.use(async (config) => {
 
 export default api
 
-export type ApplicationStatus =
-  | "discovered"
-  | "applied"
-  | "interviewing"
-  | "offer"
-  | "rejected"
-  | "withdrawn"
+// ── Wire types ────────────────────────────────────────────────────────────────
+// All entity types are GENERATED from the backend OpenAPI schemas — never
+// hand-write them. Regenerate with `npm run gen:api-types` after running
+// `uv run python scripts/export_openapi.py`; CI fails when either is stale.
+import type { components as AgentComponents } from "./gen/agent"
+import type { components as DiscoveryComponents } from "./gen/discovery"
+import type { components as JobComponents } from "./gen/job"
+import type { components as ProfileComponents } from "./gen/profile"
 
-// Mirrors jobcopilot_shared.schemas.common.PaginatedResponse
+export type Job = JobComponents["schemas"]["JobResponse"]
+export type Application = JobComponents["schemas"]["ApplicationResponse"]
+export type ApplicationJobSummary = JobComponents["schemas"]["ApplicationJobSummary"]
+export type ApplicationStatus = Application["status"]
+
+export type Profile = ProfileComponents["schemas"]["ProfileResponse"]
+export type Resume = ProfileComponents["schemas"]["ResumeResponse"]
+
+export type DiscoveryConfig = DiscoveryComponents["schemas"]["DiscoveryConfigResponse"]
+export type DiscoveryRun = DiscoveryComponents["schemas"]["DiscoveryRunResponse"]
+
+export type JobAnalysis = AgentComponents["schemas"]["AnalysisResponse"]
+
+// Mirrors jobcopilot_shared.schemas.common.PaginatedResponse (generic on items)
 export interface Paginated<T> {
   items: T[]
   total: number
   page: number
   size: number
   has_next: boolean
-}
-
-// Mirrors services/job JobResponse
-export interface Job {
-  job_id: string
-  tenant_id: string
-  company_id?: string | null
-  title: string
-  company_name: string
-  url: string
-  source: string
-  raw_jd?: string | null
-  analysis?: Record<string, unknown> | null
-  salary_min?: number | null
-  salary_max?: number | null
-  location?: string | null
-  job_type?: string | null
-  discovered_at?: string | null
-  created_at: string
-  updated_at: string
-}
-
-// Mirrors services/job ApplicationJobSummary (embedded by GET /v1/applications)
-export interface ApplicationJobSummary {
-  job_id: string
-  title: string
-  company_name: string
-  location?: string | null
-  job_type?: string | null
-  url: string
-}
-
-// Mirrors services/job ApplicationResponse
-export interface Application {
-  application_id: string
-  user_id: string
-  job_id: string
-  status: ApplicationStatus
-  match_score?: number | null
-  resume_suggestions?: Record<string, unknown> | null
-  notes?: string | null
-  applied_at?: string | null
-  created_at: string
-  updated_at: string
-  job?: ApplicationJobSummary | null
-}
-
-// Mirrors services/profile ProfileResponse
-export interface Profile {
-  profile_id: string
-  user_id: string
-  personal_info?: Record<string, unknown> | null
-  preferences?: Record<string, unknown> | null
-  has_linkedin_cookie: boolean
-  has_llm_api_key: boolean
-  created_at: string
-  updated_at: string
-}
-
-// Mirrors services/profile ResumeResponse
-export interface Resume {
-  resume_id: string
-  user_id: string
-  file_name: string
-  file_url: string
-  parsed_data?: Record<string, unknown> | null
-  version: number
-  is_active: boolean
-  created_at: string
-}
-
-// Mirrors services/agent AnalysisResponse
-export interface JobAnalysis {
-  analysis_id: string
-  job_id: string
-  user_id: string
-  jd_structured?: Record<string, unknown> | null
-  skills_required?: unknown[] | null
-  match_score?: number | null
-  resume_suggestions?: Record<string, unknown> | null
-  interview_questions?: Record<string, unknown> | null
-  status: string
-  created_at: string
-  updated_at: string
 }

@@ -1,10 +1,15 @@
 """RabbitMQ publisher using aio-pika."""
 
-import json
 from datetime import UTC, datetime
 from typing import Any
 
 import aio_pika
+from jobcopilot_shared.events import (
+    COOKIE_EXPIRED_KEY,
+    JOB_DISCOVERED_KEY,
+    CookieExpiredEvent,
+    JobDiscoveredEvent,
+)
 
 from jobcopilot_discovery.config import settings
 
@@ -34,24 +39,24 @@ async def publish_jobs_discovered(
 
         count = 0
         for job in jobs:
-            payload = {
-                "user_id": user_id,
-                "tenant_id": tenant_id,
-                "run_id": run_id,
-                "url": job["url"],
-                "title": job["title"],
-                "company_name": job["company_name"],
-                "location": job["location"],
-                "raw_text": job.get("raw_text", ""),
-                "discovered_at": datetime.now(tz=UTC).isoformat(),
-            }
+            event = JobDiscoveredEvent(
+                user_id=user_id,
+                tenant_id=tenant_id,
+                run_id=run_id,
+                url=job["url"],
+                title=job["title"],
+                company_name=job["company_name"],
+                location=job["location"],
+                raw_text=job.get("raw_text", ""),
+                discovered_at=datetime.now(tz=UTC).isoformat(),
+            )
             await exchange.publish(
                 aio_pika.Message(
-                    body=json.dumps(payload).encode(),
+                    body=event.model_dump_json().encode(),
                     content_type="application/json",
                     delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
                 ),
-                routing_key="job.discovered",
+                routing_key=JOB_DISCOVERED_KEY,
             )
             count += 1
 
@@ -69,17 +74,17 @@ async def publish_cookie_expired(user_id: str, tenant_id: str, run_id: str) -> N
         exchange = await channel.declare_exchange(
             _EXCHANGE, aio_pika.ExchangeType.TOPIC, durable=True
         )
-        payload = {
-            "user_id": user_id,
-            "tenant_id": tenant_id,
-            "run_id": run_id,
-            "occurred_at": datetime.now(tz=UTC).isoformat(),
-        }
+        event = CookieExpiredEvent(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            run_id=run_id,
+            occurred_at=datetime.now(tz=UTC).isoformat(),
+        )
         await exchange.publish(
             aio_pika.Message(
-                body=json.dumps(payload).encode(),
+                body=event.model_dump_json().encode(),
                 content_type="application/json",
                 delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             ),
-            routing_key="cookie.expired",
+            routing_key=COOKIE_EXPIRED_KEY,
         )

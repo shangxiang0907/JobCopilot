@@ -16,6 +16,9 @@ select = ["E", "F", "I", "N", "UP", "ASYNC", "S", "B"]
 # Infrastructure init scripts use urllib stdlib for HTTP calls to admin-controlled
 # internal URLs; S310 (urlopen scheme audit) and S110 (except-pass) are intentional.
 "infra/keycloak/init-realm.py" = ["S310", "S110"]
+# The OpenAPI export script re-invokes its own interpreter with literal service
+# names (no untrusted input); S603 subprocess auditing is intentional here.
+"scripts/export_openapi.py" = ["S603"]
 
 [tool.mypy]
 python_version = "3.11"

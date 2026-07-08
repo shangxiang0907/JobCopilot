@@ -13,6 +13,12 @@ import uuid
 from typing import Any
 
 import aio_pika
+from jobcopilot_shared.events import (
+    COOKIE_EXPIRED_KEY,
+    NOTIFICATION_TRIGGER_KEY,
+    CookieExpiredEvent,
+    NotificationTriggerEvent,
+)
 
 from jobcopilot_notification.config import settings
 from jobcopilot_notification.services.dispatcher import dispatch_standalone
@@ -21,15 +27,14 @@ log = logging.getLogger(__name__)
 
 _EXCHANGE = settings.rabbitmq_exchange
 _QUEUE = "notification.events"
-_ROUTING_KEYS = ["cookie.expired", "notification.trigger"]
+_ROUTING_KEYS = [COOKIE_EXPIRED_KEY, NOTIFICATION_TRIGGER_KEY]
 
 
 async def _handle_cookie_expired(body: dict[str, Any]) -> None:
-    tenant_id = uuid.UUID(body["tenant_id"])
-    user_id = uuid.UUID(body["user_id"])
+    event = CookieExpiredEvent.model_validate(body)
     await dispatch_standalone(
-        tenant_id=tenant_id,
-        user_id=user_id,
+        tenant_id=uuid.UUID(event.tenant_id),
+        user_id=uuid.UUID(event.user_id),
         type="cookie_expired",
         title="LinkedIn Cookie Expired",
         body=(
@@ -37,27 +42,26 @@ async def _handle_cookie_expired(body: dict[str, Any]) -> None:
             "Please update it in your profile settings to resume job discovery."
         ),
         channels=["in_app", "email", "wechat", "dingtalk"],
-        metadata={"run_id": body.get("run_id")},
+        metadata={"run_id": event.run_id},
     )
 
 
 async def _handle_notification_trigger(body: dict[str, Any]) -> None:
-    tenant_id = uuid.UUID(body["tenant_id"])
-    user_id = uuid.UUID(body["user_id"])
+    event = NotificationTriggerEvent.model_validate(body)
     await dispatch_standalone(
-        tenant_id=tenant_id,
-        user_id=user_id,
-        type=body.get("type", "custom"),
-        title=body.get("title", "JobCopilot Notification"),
-        body=body.get("body", ""),
-        channels=body.get("channels", ["in_app"]),
-        metadata=body.get("metadata"),
+        tenant_id=uuid.UUID(event.tenant_id),
+        user_id=uuid.UUID(event.user_id),
+        type=event.type,
+        title=event.title,
+        body=event.body,
+        channels=event.channels,
+        metadata=event.metadata,
     )
 
 
 _HANDLERS = {
-    "cookie.expired": _handle_cookie_expired,
-    "notification.trigger": _handle_notification_trigger,
+    COOKIE_EXPIRED_KEY: _handle_cookie_expired,
+    NOTIFICATION_TRIGGER_KEY: _handle_notification_trigger,
 }
 
 

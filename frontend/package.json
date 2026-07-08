@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "gen:api-types": "openapi-typescript ../openapi/job.json -o lib/gen/job.ts && openapi-typescript ../openapi/profile.json -o lib/gen/profile.ts && openapi-typescript ../openapi/discovery.json -o lib/gen/discovery.ts && openapi-typescript ../openapi/agent.json -o lib/gen/agent.ts"
   },
   "dependencies": {
     "@assistant-ui/react": "0.5.100",
@@ -43,6 +44,7 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
     "eslint-config-next": "15.5.19",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.5.4"

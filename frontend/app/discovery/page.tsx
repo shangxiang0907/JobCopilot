@@ -3,31 +3,11 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Play, Plus, Settings2, RefreshCw } from "lucide-react"
-import api from "@/lib/api"
+import api, { type DiscoveryConfig, type DiscoveryRun } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-
-// Mirrors services/discovery DiscoveryConfigResponse
-interface DiscoveryConfig {
-  config_id: string
-  user_id: string
-  keywords: string[]
-  locations: string[]
-  is_active: boolean
-  created_at: string
-}
-
-// Mirrors services/discovery DiscoveryRunResponse
-interface DiscoveryRun {
-  run_id: string
-  config_id: string
-  status: string // pending | running | completed | failed | cookie_expired
-  jobs_discovered: number
-  started_at: string
-  finished_at?: string | null
-}
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
