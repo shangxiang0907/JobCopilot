@@ -32,7 +32,7 @@ services:
 
   # ── Edge proxy: terminates TLS, the only service bound to public 80/443 ──────
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     restart: unless-stopped
     depends_on:
       - frontend
@@ -147,7 +147,7 @@ services:
   #    + temporal databases and roles), keep 7 days. Restore with:
   #      gunzip -c all-YYYYMMDD-HHMMSS.sql.gz | docker compose exec -T postgres psql -U postgres
   pg-backup:
-    image: postgres:15-alpine
+    image: postgres:15-alpine@sha256:57e5b9f69e672385cdf630f42b1306b5ca934c9bf8278b5f8b1948533d75a20b
     restart: unless-stopped
     depends_on:
       postgres:
@@ -182,7 +182,7 @@ services:
   #    a compromised/dead server cannot take the offsite copies with it. Enable
   #    object versioning on the bucket for extra protection against overwrites.
   pg-backup-sync:
-    image: rclone/rclone:1
+    image: rclone/rclone:1@sha256:c61954aaa32328a5486715dd063a81c7879f5195ad3505cd362deddd509dc4a1
     restart: unless-stopped
     profiles: ["offsite-backup"]
     depends_on:

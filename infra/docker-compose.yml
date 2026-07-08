@@ -34,7 +34,7 @@ services:
   # ── Infrastructure ──────────────────────────────────────────────────────────
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15-alpine@sha256:57e5b9f69e672385cdf630f42b1306b5ca934c9bf8278b5f8b1948533d75a20b
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7.2-alpine
+    image: redis:7.2-alpine@sha256:dfa18828cbc07b3ae6a95ec7343f6c214fdee2d836197b4be8e9904420762cd8
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data
@@ -66,7 +66,7 @@ services:
     restart: unless-stopped
 
   rabbitmq:
-    image: rabbitmq:3.13-management-alpine
+    image: rabbitmq:3.13-management-alpine@sha256:606d8c0d6b3c18d1da9afc53bc7cdb2a8d5486df91b5a9830e9e07626c9ae281
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
@@ -83,7 +83,7 @@ services:
     restart: unless-stopped
 
   qdrant:
-    image: qdrant/qdrant:v1.9.2
+    image: qdrant/qdrant:v1.9.2@sha256:21086aeaedfd8276cc8b94cb695079ba75d1cd6614d6689bf82e72c214781a46
     volumes:
       - qdrant_data:/qdrant/storage
     ports:
@@ -97,7 +97,7 @@ services:
     restart: unless-stopped
 
   temporal:
-    image: temporalio/auto-setup:1.29.6
+    image: temporalio/auto-setup:1.29.6@sha256:1263120feed69d82e4ca23b8ca6f1d702c3029fe70714e382966d0192318eab6
     depends_on:
       postgres:
         condition: service_healthy
@@ -119,7 +119,7 @@ services:
     restart: unless-stopped
 
   temporal-ui:
-    image: temporalio/ui:2.26.2
+    image: temporalio/ui:2.26.2@sha256:bb9e9bc2ecb4962f43ef72b7f03a3d3f22f0df3eb5ec7c409bcae3d0135b88bc
     depends_on:
       - temporal
     environment:
@@ -131,7 +131,7 @@ services:
 
   # One-shot container: creates the `jobcopilot` Temporal namespace after server boots.
   temporal-namespace-init:
-    image: temporalio/admin-tools:1.29.6
+    image: temporalio/admin-tools:1.29.6@sha256:951f64e4be3dd5d7c31d501f5c2268eca38f850e9f17ad89f0f35de41d3ba8f1
     depends_on:
       temporal:
         condition: service_healthy
@@ -144,7 +144,7 @@ services:
     restart: "no"
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.2.5
+    image: quay.io/keycloak/keycloak:26.2.5@sha256:4883630ef9db14031cde3e60700c9a9a8eaf1b5c24db1589d6a2d43de38ba2a9
     command: ["start-dev", "--import-realm"]
     depends_on:
       postgres:
@@ -173,7 +173,7 @@ services:
     restart: unless-stopped
 
   kong:
-    image: kong:3.9
+    image: kong:3.9@sha256:62721edc9669e2a96fe9d188ab8950b9105e69abb033129624a72d3e10da6777
     depends_on:
       profile-service:
         condition: service_healthy
@@ -447,7 +447,7 @@ services:
   #   ssh -L 3001:localhost:3001 <server>
 
   prometheus:
-    image: prom/prometheus:v3.13.0
+    image: prom/prometheus:v3.13.0@sha256:c6b27ea434f8389bfe233fbc7be381cf50587c286e871bc842008f5a1b1908a7
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=15d
@@ -459,7 +459,7 @@ services:
     restart: unless-stopped
 
   loki:
-    image: grafana/loki:3.7.3
+    image: grafana/loki:3.7.3@sha256:70b9f699fc9bb868b62f1cfd4f787dfa50242f1fd92e6089787d5d7daea75fe8
     command: ["-config.file=/etc/loki/loki-config.yaml"]
     volumes:
       - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
@@ -469,7 +469,7 @@ services:
     restart: unless-stopped
 
   alloy:
-    image: grafana/alloy:v1.17.1
+    image: grafana/alloy:v1.17.1@sha256:4f6ddc56ffdcf8a6316748fc5162972e20cb301523cac1bb4a31957df733ae9b
     command: ["run", "/etc/alloy/config.alloy"]
     depends_on:
       - loki
@@ -480,7 +480,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:12.4.5
+    image: grafana/grafana:12.4.5@sha256:26b8f35a9e4e4431995cf64c3f396505a4faf17bcfc19f9ed84943ec6bfd5ecd
     depends_on:
       - prometheus
       - loki
@@ -498,7 +498,7 @@ services:
     restart: unless-stopped
 
   keycloak-init:
-    image: python:3.11-alpine
+    image: python:3.11-alpine@sha256:25976e9d34a0fab1f278cae931f34c8303d97bf0c0d7f85b6b4dcf641d7702a4
     depends_on:
       keycloak:
         condition: service_healthy
