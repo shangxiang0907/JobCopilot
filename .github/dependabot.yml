@@ -44,21 +44,25 @@ updates:
     directory: /infra
     schedule:
       interval: weekly
+    # Grouping policy: group ONLY what must move together (temporal siblings)
+    # or what is low-risk enough to merge on green CI (stateless). Stateful
+    # components (postgres, keycloak, qdrant, rabbitmq, redis) deliberately
+    # get ONE PR EACH — their upgrades can require data/schema migrations, and
+    # an individual PR is accepted/deferred by simply merging/not merging it.
+    # Note: Dependabot strips the registry host from compose dependency names
+    # ("keycloak/keycloak", not "quay.io/keycloak/keycloak").
     groups:
-      # Stateful services first (a dependency joins the FIRST matching group):
-      # upgrades here can require data/schema migrations (postgres data-dir
-      # format, Keycloak realm, RabbitMQ mnesia→khepri, Temporal schema — and
-      # temporalio/* siblings must stay on the SAME version, see CLAUDE.md).
-      # Review deliberately; never auto-merge.
-      stateful-images:
-        patterns:
+      # temporalio/* siblings must stay on the SAME version (CLAUDE.md) —
+      # separate PRs would tear them apart.
+      temporal:
+        patterns: ["temporalio/*"]
+      # Edge/observability/helpers: CI-green is usually enough to merge.
+      stateless-images:
+        patterns: ["*"]
+        exclude-patterns:
           - "postgres"
-          - "quay.io/keycloak/keycloak"
-          - "temporalio/*"
+          - "keycloak/keycloak"
           - "qdrant/qdrant"
           - "rabbitmq"
           - "redis"
-      # Everything else (edge/observability/helpers): CI-green is usually
-      # enough to merge.
-      stateless-images:
-        patterns: ["*"]
+          - "temporalio/*"
