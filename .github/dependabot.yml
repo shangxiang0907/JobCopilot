@@ -45,5 +45,20 @@ updates:
     schedule:
       interval: weekly
     groups:
-      compose-images:
+      # Stateful services first (a dependency joins the FIRST matching group):
+      # upgrades here can require data/schema migrations (postgres data-dir
+      # format, Keycloak realm, RabbitMQ mnesia→khepri, Temporal schema — and
+      # temporalio/* siblings must stay on the SAME version, see CLAUDE.md).
+      # Review deliberately; never auto-merge.
+      stateful-images:
+        patterns:
+          - "postgres"
+          - "quay.io/keycloak/keycloak"
+          - "temporalio/*"
+          - "qdrant/qdrant"
+          - "rabbitmq"
+          - "redis"
+      # Everything else (edge/observability/helpers): CI-green is usually
+      # enough to merge.
+      stateless-images:
         patterns: ["*"]
