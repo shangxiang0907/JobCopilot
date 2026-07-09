@@ -480,7 +480,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:12.4.5@sha256:26b8f35a9e4e4431995cf64c3f396505a4faf17bcfc19f9ed84943ec6bfd5ecd
+    image: grafana/grafana:13.1.0@sha256:121a7a9ece6dc10b969f1f96eed64b4f07dfac0d0b8abc070f7cb83bbde86f63
     depends_on:
       - prometheus
       - loki
@@ -498,7 +498,7 @@ services:
     restart: unless-stopped
 
   keycloak-init:
-    image: python:3.11-alpine@sha256:25976e9d34a0fab1f278cae931f34c8303d97bf0c0d7f85b6b4dcf641d7702a4
+    image: python:3.14-alpine@sha256:26730869004e2b9c4b9ad09cab8625e81d256d1ce97e72df5520e806b1709f92
     depends_on:
       keycloak:
         condition: service_healthy
