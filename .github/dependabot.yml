@@ -44,6 +44,10 @@ updates:
     directory: /infra
     schedule:
       interval: weekly
+    # One PR per stateful component + temporal + stateless can exceed the
+    # default limit of 5 concurrent PRs, which starves the queue (observed:
+    # keycloak's PR never surfaced). 10 covers the full matrix.
+    open-pull-requests-limit: 10
     # Grouping policy: group ONLY what must move together (temporal siblings)
     # or what is low-risk enough to merge on green CI (stateless). Stateful
     # components (postgres, keycloak, qdrant, rabbitmq, redis) deliberately
