@@ -147,7 +147,7 @@ services:
   #    + temporal databases and roles), keep 7 days. Restore with:
   #      gunzip -c all-YYYYMMDD-HHMMSS.sql.gz | docker compose exec -T postgres psql -U postgres
   pg-backup:
-    image: postgres:15-alpine@sha256:57e5b9f69e672385cdf630f42b1306b5ca934c9bf8278b5f8b1948533d75a20b
+    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
     restart: unless-stopped
     depends_on:
       postgres:

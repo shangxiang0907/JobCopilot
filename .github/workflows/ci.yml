@@ -144,7 +144,7 @@ jobs:
     needs: [lint, secret-scan, typecheck, frontend, unit-test, contracts]
     services:
       postgres:
-        image: postgres:15-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -157,7 +157,7 @@ jobs:
         ports:
           - 5432:5432
       redis:
-        image: redis:7.2-alpine
+        image: redis:8.8-alpine
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -166,7 +166,7 @@ jobs:
         ports:
           - 6379:6379
       rabbitmq:
-        image: rabbitmq:3.13-management-alpine
+        image: rabbitmq:4.3-management-alpine
         env:
           RABBITMQ_DEFAULT_USER: guest
           RABBITMQ_DEFAULT_PASS: guest
