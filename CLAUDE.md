@@ -21,7 +21,7 @@ All application code is implemented, verified end-to-end, and **live in producti
 5. ✅ AI assistant tool-chain repair (2026-07-08, prod @ `e801133`) — all 5 ReAct tools wired to real Job Service internal endpoints (4 previously called endpoints that never existed and failed silently); HTTP self-calls replaced with in-process shared services; shared structlog config fixed (it crashed on every log call, turning all services' handled errors into bare 500s); tool activity now streamed to the chat UI. See "AI Assistant Tool Contract" below.
 6. ✅ Contract testing in CI (2026-07-09) — three enforcement layers: shared MQ event models (`jobcopilot_shared.events`, publishers construct / consumers validate), consumer-driven HTTP contract tests (`tests/contracts/` — every consumer call site asserted against the provider's real OpenAPI), and OpenAPI-generated frontend types (`openapi/*.json` → `frontend/lib/gen/` via `npm run gen:api-types`; entity types in `lib/api.ts` are re-exports — NEVER hand-write them). CI "Contract Checks" job fails on any drift.
 
-**Next milestone: not yet defined** — decide with the user before starting new feature work. Known open items: Tempo + OpenTelemetry tracing (roadmap), offsite backup enablement (awaiting S3 credentials), production test-account cleanup before public launch, single-URL job scrape pipeline (analyze_job for untracked postings).
+**Next milestone: not yet defined** — decide with the user before starting new feature work. Known open items: Tempo + OpenTelemetry tracing (roadmap), offsite backup enablement (awaiting S3 credentials), production test-account cleanup before public launch, single-URL job scrape pipeline (analyze_job for untracked postings), bulk re-embed backfill job (embeddings are only created on upload; required before any post-launch Qdrant storage migration).
 
 **Local test account:** `testuser@example.com` / `Test1234!` (Keycloak realm: `jobcopilot`; production uses a separate strong-password account — see session memory, never commit it here)
 
@@ -36,7 +36,7 @@ All application code is implemented, verified end-to-end, and **live in producti
 5. ✅ AI 助手工具链修复（2026-07-08，生产 @ `e801133`）——5 个 ReAct 工具全部接通真实的 Job Service 内部端点（此前 4 个调用的端点从不存在、静默失败）；HTTP 自调用改为进程内共享服务；修复共享 structlog 配置（原先每次日志调用都崩溃，全部服务的业务异常退化为裸 500）；工具调用过程实时透出到聊天 UI。详见下文「AI 助手工具契约」。
 6. ✅ 契约测试纳入 CI（2026-07-09）——三层强制：共享 MQ 事件模型（`jobcopilot_shared.events`，发布方构造/消费方校验）、消费者驱动的 HTTP 契约测试（`tests/contracts/`——每个消费方调用点对提供方真实 OpenAPI 断言）、OpenAPI 生成前端类型（`openapi/*.json` → `frontend/lib/gen/`；`lib/api.ts` 中的实体类型均为 re-export——**严禁手写**）。CI 的 "Contract Checks" job 对任何漂移直接失败。
 
-**下一个里程碑：尚未确定**——开始新功能开发前先与用户确认。已知待办：Tempo + OpenTelemetry 链路追踪（roadmap）、异地备份启用（等 S3 凭据）、正式对外前清理生产测试账号、任意 URL 职位抓取分析管线。
+**下一个里程碑：尚未确定**——开始新功能开发前先与用户确认。已知待办：Tempo + OpenTelemetry 链路追踪（roadmap）、异地备份启用（等 S3 凭据）、正式对外前清理生产测试账号、任意 URL 职位抓取分析管线、批量重嵌入回填任务（embedding 目前仅在上传时生成；上线后任何 Qdrant 存储迁移的前置条件）。
 
 **本地测试账号：** `testuser@example.com` / `Test1234!`（Keycloak realm: `jobcopilot`；生产使用独立强口令账号——见会话记忆，切勿写入本文件）
 

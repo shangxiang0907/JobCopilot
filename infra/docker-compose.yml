@@ -137,10 +137,17 @@ services:
         condition: service_healthy
     environment:
       TEMPORAL_ADDRESS: temporal:7233
-    command: >
-      sh -c "temporal operator namespace create -n jobcopilot --retention 7d --address temporal:7233 2>/dev/null
-             && echo 'Namespace jobcopilot created'
-             || echo 'Namespace jobcopilot already exists or creation skipped'"
+    # The admin-tools image ENTRYPOINT is "tini -- sleep infinity", which
+    # swallows any compose `command` as extra sleep args — the namespace was
+    # NEVER created by this container until the entrypoint override below
+    # (prod ran namespace-less; the old "|| echo skipped" masked it too).
+    # describe-first + create fallback; NO error suppression — a failed
+    # create must exit non-zero and be visible.
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        temporal operator namespace describe -n jobcopilot --address temporal:7233
+        || temporal operator namespace create -n jobcopilot --retention 7d --address temporal:7233
     restart: "no"
 
   keycloak:
