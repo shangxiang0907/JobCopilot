@@ -97,7 +97,7 @@ services:
     restart: unless-stopped
 
   temporal:
-    image: temporalio/auto-setup:1.29.6@sha256:1263120feed69d82e4ca23b8ca6f1d702c3029fe70714e382966d0192318eab6
+    image: temporalio/auto-setup:1.29.7@sha256:f14912b699cf73015ad5c4fc18d522d4b014db90e794039214dfb7c022c2644f
     depends_on:
       postgres:
         condition: service_healthy
@@ -119,7 +119,7 @@ services:
     restart: unless-stopped
 
   temporal-ui:
-    image: temporalio/ui:2.26.2@sha256:bb9e9bc2ecb4962f43ef72b7f03a3d3f22f0df3eb5ec7c409bcae3d0135b88bc
+    image: temporalio/ui:2.52.0@sha256:fc47cd8202c98ed868745fd9f2f011585232676d08da621b9a6d7bc4653c17aa
     depends_on:
       - temporal
     environment:
@@ -131,7 +131,7 @@ services:
 
   # One-shot container: creates the `jobcopilot` Temporal namespace after server boots.
   temporal-namespace-init:
-    image: temporalio/admin-tools:1.29.6@sha256:951f64e4be3dd5d7c31d501f5c2268eca38f850e9f17ad89f0f35de41d3ba8f1
+    image: temporalio/admin-tools:1.29.7-tctl-1.18.4-cli-1.7.2@sha256:4a17b5be706c56a9238fb7b5b32a36966cee14939658b20597837b2443b277c8
     depends_on:
       temporal:
         condition: service_healthy
