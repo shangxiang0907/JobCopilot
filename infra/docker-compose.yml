@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7.2-alpine@sha256:dfa18828cbc07b3ae6a95ec7343f6c214fdee2d836197b4be8e9904420762cd8
+    image: redis:8.8-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data
