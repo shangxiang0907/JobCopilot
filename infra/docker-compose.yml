@@ -83,7 +83,7 @@ services:
     restart: unless-stopped
 
   qdrant:
-    image: qdrant/qdrant:v1.9.2@sha256:21086aeaedfd8276cc8b94cb695079ba75d1cd6614d6689bf82e72c214781a46
+    image: qdrant/qdrant:v1.18.2@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c
     volumes:
       - qdrant_data:/qdrant/storage
     ports:
