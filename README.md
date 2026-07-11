@@ -1,26 +1,28 @@
 # JobCopilot
 
-**An AI-powered, multi-tenant job-search management platform** — multi-agent architecture (LangGraph) that discovers LinkedIn jobs, matches them against your resume, and manages the full application pipeline through natural language.
+**An AI-powered job-search management platform** — multi-agent architecture (LangGraph) that discovers jobs from public job boards, matches them against your resume, and manages the full application pipeline through natural language. Add any posting from any site via URL, pasted JD text, or a screenshot.
 
-**AI 驱动的多租户智能求职管理平台** —— 基于多 Agent 架构（LangGraph），自动发现 LinkedIn 职位、与简历智能匹配，并通过自然语言管理完整投递流程。
+**AI 驱动的智能求职管理平台** —— 基于多 Agent 架构（LangGraph），自动从公开职位源发现岗位、与简历智能匹配，并通过自然语言管理完整投递流程。任意站点的岗位均可通过 URL、粘贴 JD 文本或截图录入。
+
+> **Status / 状态：** The v0.2 re-scope (credential-free public-source discovery, JD paste/screenshot entries) is being implemented — see [`docs/PRD.md`](docs/PRD.md) for the authoritative scope. / v0.2 重构（无凭证公开源爬取、JD 粘贴/截图录入）实施中——权威范围见 [`docs/PRD.md`](docs/PRD.md)。
 
 ---
 
 ## 1. What It Does / 功能概览
 
 **EN:**
-- **Job discovery** — Playwright-based LinkedIn crawling on Temporal schedules, using each user's own encrypted cookie (never a shared scraping account).
+- **Job discovery** — crawling of public, no-login job boards on Temporal schedules; **no account credentials are ever collected**. Any posting (including from login-walled sites) can be added manually via URL, pasted JD text, or a screenshot — three mutually-fallback entry paths.
 - **AI analysis & matching** — LangGraph agent pipelines structure job descriptions, score them against the user's resume (Qdrant vector search), and suggest resume tailoring and interview prep.
 - **Application pipeline** — Kanban-style tracking from *discovered* to *offer*, with a full status state machine and event history.
 - **Global AI assistant** — a ReAct agent (Vercel AI SDK + SSE streaming) that can trigger any platform action through chat.
-- **Multi-tenant by design** — tenant identity travels in the JWT (Keycloak), and every tenant-scoped query is filtered at the repository layer.
+- **Open source, two deployment modes** — self-hosted (bring your own OpenAI-compatible LLM key) or the official hosted site (platform-provided LLM). Tenant identity travels in the JWT (Keycloak); every tenant-scoped query is filtered at the repository layer.
 
 **中文：**
-- **职位发现** —— 基于 Playwright 的 LinkedIn 爬取，由 Temporal 定时调度；使用每个用户自己的加密 Cookie（绝不共享爬虫账号）。
+- **职位发现** —— 爬取无需登录的公开职位源，由 Temporal 定时调度；**绝不收集用户账号凭证**。任意岗位（含登录墙站点）可经 URL、粘贴 JD 文本或截图三条互为兜底的路径手动录入。
 - **AI 分析与匹配** —— LangGraph Agent 流水线结构化 JD、与用户简历打分匹配（Qdrant 向量检索），并给出简历改写与面试准备建议。
 - **投递流程管理** —— 看板式跟踪从「已发现」到「Offer」的全流程，内置完整状态机与事件历史。
 - **全局 AI 助手** —— ReAct Agent（Vercel AI SDK + SSE 流式输出），通过对话触发平台任意操作。
-- **原生多租户** —— 租户身份随 JWT（Keycloak）传递，所有租户数据在仓库层强制过滤。
+- **开源，双部署形态** —— 自部署（自配 OpenAI 兼容 LLM Key）或官方托管站（平台提供 LLM）。租户身份随 JWT（Keycloak）传递，所有租户数据在仓库层强制过滤。
 
 ---
 

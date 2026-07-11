@@ -1,181 +1,78 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working in this repository.  
-本文件为 Claude Code 在本仓库协作开发时提供上下文与约定。
+This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
 
-All documentation in this repo is **bilingual (English / Chinese)** in a single-file sectioned format.  
-本仓库所有文档采用**双语（英文 / 中文）单文件分节**格式。
+This file is **English-only** for context efficiency (owner decision, 2026-07-11). All other documentation in this repo (docs/, README) is **bilingual (English / Chinese)** in a single-file sectioned format — see "Docs Convention" below.
 
 ---
 
-## Project Status / 项目状态
+## Project Status
 
-**EN:**  
-All application code is implemented, verified end-to-end, and **live in production** at `https://arnoldshang.com` (single-node Docker Compose on Hetzner, deployed via `infra/scripts/deploy.sh` — CI builds → GHCR → digest-pinned pull; production is never a build/debug environment). The full stack — 5 backend microservices, shared library, Next.js 15 frontend, and infrastructure (PostgreSQL, Redis, RabbitMQ, Qdrant, Temporal, Kong, Keycloak, Caddy edge with TLS + observability) — is committed, pushed, and healthy. Implementation follows `docs/SAD.md` for architecture decisions and `docs/PRD.md` for product requirements.
+All application code is implemented, verified end-to-end, and **live in production** at `https://arnoldshang.com` (single-node Docker Compose on Hetzner, deployed via `infra/scripts/deploy.sh` — CI builds → GHCR → digest-pinned pull; production is never a build/debug environment). The full stack — 5 backend microservices, shared library, Next.js 15 frontend, and infrastructure (PostgreSQL, Redis, RabbitMQ, Qdrant, Temporal, Kong, Keycloak 26, Caddy edge with TLS + observability) — is committed, pushed, and healthy. All six original milestones (auth chain, E2E verification, K8s manifests, production deployment, AI tool-chain repair, contract testing in CI) shipped and were verified in production; history lives in git log.
 
-**Milestone status (updated 2026-07-08):**
-1. ✅ Auth chain (Keycloak OIDC, JWT RS256, tenant_id claim)
-2. ✅ E2E manual verification (login → profile → jobs list/detail/tracking → AI assistant streaming chat → discovery) — completed 2026-07-06, incl. the `/jobs` list page and a full frontend↔backend contract reconciliation
-3. ✅ Kubernetes manifests (`infra/k8s/`) — written; future scaling path (current deployment is Compose)
-4. ✅ Hetzner production deployment (Caddy TLS edge, security hardening, Prometheus/Loki/Grafana observability)
-5. ✅ AI assistant tool-chain repair (2026-07-08, prod @ `e801133`) — all 5 ReAct tools wired to real Job Service internal endpoints (4 previously called endpoints that never existed and failed silently); HTTP self-calls replaced with in-process shared services; shared structlog config fixed (it crashed on every log call, turning all services' handled errors into bare 500s); tool activity now streamed to the chat UI. See "AI Assistant Tool Contract" below.
-6. ✅ Contract testing in CI (2026-07-09) — three enforcement layers: shared MQ event models (`jobcopilot_shared.events`, publishers construct / consumers validate), consumer-driven HTTP contract tests (`tests/contracts/` — every consumer call site asserted against the provider's real OpenAPI), and OpenAPI-generated frontend types (`openapi/*.json` → `frontend/lib/gen/` via `npm run gen:api-types`; entity types in `lib/api.ts` are re-exports — NEVER hand-write them). CI "Contract Checks" job fails on any drift.
+**⚠️ v0.2 re-scope decided 2026-07-11 (PRD v0.2) — NOT YET IMPLEMENTED.** The product was re-scoped: B2C self-registration, credential-free public-source job discovery replacing LinkedIn cookie crawling, JD entry via URL/text/screenshot, email-only notifications, analytics module removed, dual LLM-key deployment modes (self-hosted BYO key vs hosted platform key). `docs/PRD.md` and `docs/SAD.md` describe this **target state**; the current codebase still implements the previous scope (LinkedIn cookie flow, `cookie.expired` event, etc.). Do not assume re-scope features exist in code until the implementation batches below land.
 
-**Next milestone: not yet defined** — decide with the user before starting new feature work. Known open items: Tempo + OpenTelemetry tracing (roadmap), offsite backup enablement (awaiting S3 credentials), production test-account cleanup before public launch, single-URL job scrape pipeline (analyze_job for untracked postings), bulk re-embed backfill job (embeddings are only created on upload; required before any post-launch Qdrant storage migration).
+**Work queue (agreed order):**
+1. ~~Docs batch — PRD/SAD/README/CLAUDE.md v0.2 alignment~~ ✅ done 2026-07-11
+2. **Anti-hallucination guardrails** (before switching to a lower-capability coding model): Claude Code hooks (PostToolUse ruff/mypy on edits; PreToolUse command blocking), automated Playwright E2E smoke in CI, Pydantic validation of LLM JSON outputs in all 4 graphs (currently bare `json.loads`), `alembic check` per service in CI, ruff banned-api for `structlog.stdlib`, import-linter (services may only import `jobcopilot_shared`)
+3. **Operator observability**: surface LangSmith dashboards to the owner; LangGraph Studio (`langgraph dev`, dev-only)
+4. **Re-scope implementation**: remove LinkedIn cookie flow → public-source crawling (source list TBD), three JD entry paths, open self-registration (email verification), deployment-mode LLM key switch, analytics teardown, notification convergence, `/admin/users` + `/admin/usage`
+- Other open items: offsite backup enablement (awaiting S3 credentials), production test-account cleanup before public launch, bulk re-embed backfill job (embeddings are only created on upload; required before any post-launch Qdrant storage migration)
 
 **Local test account:** `testuser@example.com` / `Test1234!` (Keycloak realm: `jobcopilot`; production uses a separate strong-password account — see session memory, never commit it here)
 
-**中文：**  
-所有应用代码已实现、完成端到端验证并已**上线生产** `https://arnoldshang.com`（Hetzner 单节点 Docker Compose，经 `infra/scripts/deploy.sh` 部署——CI 构建 → GHCR → digest 钉死拉取；生产环境绝不用于构建或调试）。完整技术栈——5 个后端微服务、共享库、Next.js 15 前端、基础设施（PostgreSQL、Redis、RabbitMQ、Qdrant、Temporal、Kong、Keycloak、Caddy TLS 边缘 + 可观测性）——均已提交推送并处于健康状态。实现以 `docs/SAD.md` 架构决策和 `docs/PRD.md` 产品需求为准。
+---
 
-**里程碑状态（2026-07-08 更新）：**
-1. ✅ 认证链路（Keycloak OIDC、JWT RS256、tenant_id claim）
-2. ✅ 端到端手动验证（登录 → 简历 → 职位列表/详情/跟踪 → AI 助手流式对话 → 职位发现）——2026-07-06 收官，含 `/jobs` 列表页与前后端契约全面对齐
-3. ✅ Kubernetes 清单文件（`infra/k8s/`）——已编写，作为未来扩容路径（当前部署为 Compose）
-4. ✅ Hetzner 生产部署（Caddy TLS 边缘、安全加固、Prometheus/Loki/Grafana 可观测性）
-5. ✅ AI 助手工具链修复（2026-07-08，生产 @ `e801133`）——5 个 ReAct 工具全部接通真实的 Job Service 内部端点（此前 4 个调用的端点从不存在、静默失败）；HTTP 自调用改为进程内共享服务；修复共享 structlog 配置（原先每次日志调用都崩溃，全部服务的业务异常退化为裸 500）；工具调用过程实时透出到聊天 UI。详见下文「AI 助手工具契约」。
-6. ✅ 契约测试纳入 CI（2026-07-09）——三层强制：共享 MQ 事件模型（`jobcopilot_shared.events`，发布方构造/消费方校验）、消费者驱动的 HTTP 契约测试（`tests/contracts/`——每个消费方调用点对提供方真实 OpenAPI 断言）、OpenAPI 生成前端类型（`openapi/*.json` → `frontend/lib/gen/`；`lib/api.ts` 中的实体类型均为 re-export——**严禁手写**）。CI 的 "Contract Checks" job 对任何漂移直接失败。
+## What This System Is
 
-**下一个里程碑：尚未确定**——开始新功能开发前先与用户确认。已知待办：Tempo + OpenTelemetry 链路追踪（roadmap）、异地备份启用（等 S3 凭据）、正式对外前清理生产测试账号、任意 URL 职位抓取分析管线、批量重嵌入回填任务（embedding 目前仅在上传时生成；上线后任何 Qdrant 存储迁移的前置条件）。
+JobCopilot is a production-grade intelligent job-search management platform. It uses a multi-AI-agent architecture (LangGraph) to discover job listings from public job boards, analyze them against the user's resume, and manage the full application pipeline. Any posting can be added manually via URL, pasted JD text, or screenshot (v0.2). A global AI assistant (Vercel AI SDK + LangGraph ReAct Agent) lets users trigger any action through natural language. Open source, with two deployment modes: self-hosted (BYO LLM key) and the official hosted site (platform LLM key).
 
-**本地测试账号：** `testuser@example.com` / `Test1234!`（Keycloak realm: `jobcopilot`；生产使用独立强口令账号——见会话记忆，切勿写入本文件）
+Product requirements: `docs/PRD.md` (v0.2). Architecture decisions: `docs/SAD.md` (v0.2). Stack overview and repo layout: `README.md`.
 
 ---
 
-## What This System Is / 系统是什么
+## Architecture Constraints
 
-**EN:**  
-JobCopilot is a production-grade, multi-tenant intelligent job-search management platform. It uses a multi-AI-agent architecture (LangGraph) to auto-discover and analyze LinkedIn job listings, match them against the user's resume, and manage the full application pipeline. A global AI assistant (Vercel AI SDK + LangGraph ReAct Agent) lets users trigger any action through natural language.
-
-**中文：**  
-JobCopilot 是一个生产级、多租户的智能求职管理平台。系统采用多 AI Agent 架构（LangGraph）自动发现并分析 LinkedIn 岗位，与用户简历进行匹配，并管理完整的投递流程。全局 AI 助手（Vercel AI SDK + LangGraph ReAct Agent）让用户通过自然语言触发任意操作。
-
----
-
-## Architecture / 架构
-
-Full design in `docs/SAD.md`. Key design constraints (violating any one blocks launch) / 完整设计见 `docs/SAD.md`。关键约束（违反任意一条则不满足上线条件）：
+Key design constraints (violating any one blocks launch):
 
 - **API-first**: Kong gateway fronts all services; no service is directly internet-accessible.
-- **Multi-tenant isolation**: Every DB query against tenant-scoped tables **must** include `WHERE tenant_id = :tenant_id`. Cross-schema JOINs are forbidden.
+- **Multi-tenant isolation**: Every DB query against tenant-scoped tables **must** include `WHERE tenant_id = :tenant_id`. Cross-schema JOINs are forbidden. Each user is provisioned as their own tenant.
 - **Stateless services**: Application pods carry no local state; all state lives in PostgreSQL, Qdrant, or Redis.
-- **Per-user LinkedIn Cookie**: Never use a shared scraping account. Each user's cookie is stored AES-256-GCM encrypted.
+- **Credential-free crawling** (v0.2, ADR-006): never collect or use user account credentials for crawling; public no-login sources only.
 - **Secrets never in code**: All credentials injected via environment variables / K8s Secrets; never committed to Git.
 - **Non-root containers**: All production Docker images run as `uid=1000`.
 
----
+### Microservices
 
-## Microservices / 微服务拆分
-
-| Service | Tech | K8s Unit | Owned DB Schema |
-|---|---|---|---|
-| **Kong API Gateway** | Kong 3.x + KIC | `Deployment` | — |
-| **Auth Service** | Keycloak 24 | `StatefulSet` | `keycloak_schema` |
-| **Profile Service** | Python 3.11 + FastAPI | `Deployment` (HPA) | `profile_schema` |
-| **Job Service** | Python 3.11 + FastAPI | `Deployment` (HPA) | `job_schema` |
-| **Discovery Service** | Python 3.11 + FastAPI + Playwright + Temporal Worker | `Deployment` | `discovery_schema` |
-| **Agent Service** | Python 3.11 + FastAPI + LangGraph | `Deployment` (KEDA) | `agent_schema` |
-| **Notification Service** | Python 3.11 + FastAPI | `Deployment` | `notification_schema` |
-| **Frontend** | Next.js 15 + TypeScript | `Deployment` | — |
-
----
-
-## Tech Stack / 技术选型
-
-### Backend / 后端
-| Component | Choice |
-|---|---|
-| Language | Python 3.11+ |
-| Web Framework | FastAPI |
-| ORM | SQLAlchemy 2.x async + asyncpg |
-| DB Migrations | Alembic |
-| AI Orchestration | LangGraph (stateful graphs, conditional edges) |
-| Workflow Engine | Temporal (durable execution, scheduling) |
-| LLM Provider | DashScope (OpenAI-compatible endpoint) |
-| LLM Observability | LangSmith |
-| Browser Automation | Playwright (LinkedIn crawling) |
-| Message Queue | RabbitMQ (`aio-pika` client) |
-| Cache | Redis |
-| Vector Store | Qdrant |
-| Resilience | `tenacity` (retry / circuit-breaker) |
-
-### Frontend / 前端
-| Component | Choice |
-|---|---|
-| Framework | Next.js 15 (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS + shadcn/ui |
-| AI Chat | Vercel AI SDK (`useChat`) + assistant-ui |
-| State | Zustand (client) + TanStack Query (server) |
-| HTTP Client | Axios / fetch |
-
-### Infrastructure / 基础设施
-| Component | Choice |
-|---|---|
-| API Gateway | Kong 3.x |
-| Auth | Keycloak 24 (OIDC / JWT RS256) |
-| Container Orchestration | Kubernetes (EKS / GKE / AKS compatible) |
-| Elastic Scaling | KEDA (MQ depth) + HPA (CPU) |
-| Local Dev | Docker Compose |
-| CI/CD | GitHub Actions |
-
-### Observability / 可观测性
-| Component | Choice | Status |
+| Service | Tech | Owned DB Schema |
 |---|---|---|
-| Metrics | Prometheus — every service exposes `/metrics` via shared `jobcopilot_shared.metrics` (prefix `jobcopilot_`, identical names across services, distinguished by the scrape `job` label; multi-worker services use `PROMETHEUS_MULTIPROC_DIR`) | ✅ implemented |
-| Logs | Loki + Grafana Alloy (Docker discovery; Promtail is deprecated by Grafana) | ✅ implemented |
-| Dashboards | Grafana — datasources & dashboards provisioned as code in `infra/grafana/` | ✅ implemented |
-| Traces | Tempo + OpenTelemetry SDK | ⬜ roadmap |
-| LLM Traces | LangSmith (enabled via `LANGCHAIN_TRACING_V2` + API key) | ✅ implemented |
+| **Kong API Gateway** | Kong 3.x | — |
+| **Auth Service** | Keycloak 26 | `keycloak_schema` |
+| **Profile Service** | Python 3.11 + FastAPI | `profile_schema` |
+| **Job Service** | Python 3.11 + FastAPI | `job_schema` |
+| **Discovery Service** | Python 3.11 + FastAPI + Playwright + Temporal Worker | `discovery_schema` |
+| **Agent Service** | Python 3.11 + FastAPI + LangGraph | `agent_schema` |
+| **Notification Service** | Python 3.11 + FastAPI | `notification_schema` |
+| **Frontend** | Next.js 15 + TypeScript | — |
 
-### Dev Tools / 开发工具
-| Tool | Purpose |
-|---|---|
-| Ruff | Linting + formatting |
-| mypy | Static type checking |
-| pytest | Unit + integration tests |
-| gitleaks | Secret scanning in CI |
-| Trivy / Snyk | Container vulnerability scanning (blocks Critical CVE) |
+### Stack conventions that matter when coding
 
----
+(Full stack tables: `README.md` §3 and `docs/SAD.md`.)
 
-## Directory Structure / 目录结构
-
-```
-JobCopilot/
-├── services/
-│   ├── profile/          # Profile Service (FastAPI)
-│   ├── job/              # Job Service (FastAPI)
-│   ├── discovery/        # Discovery Service (FastAPI + Playwright + Temporal Worker)
-│   ├── agent/            # Agent Service (FastAPI + LangGraph)
-│   │   ├── graphs/       # AnalyzerGraph, ResumeGraph, InterviewGraph, ReActGraph
-│   │   ├── tools/        # ReAct tool definitions
-│   │   └── prompts/      # All LLM prompt templates
-│   └── notification/     # Notification Service (FastAPI)
-├── frontend/             # Next.js 15 application
-│   ├── app/              # App Router pages
-│   ├── components/       # shadcn/ui + custom components
-│   └── lib/              # API clients, store, utils
-├── packages/
-│   └── shared/           # Shared models, logging, exceptions (imported by all services)
-├── infra/
-│   ├── docker-compose.yml        # Local development
-│   ├── k8s/                      # Kubernetes manifests per service
-│   └── temporal/                 # Temporal server config
-├── docs/
-│   ├── PRD.md            # Product Requirements Document (bilingual)
-│   ├── SAD.md            # Software Architecture Design (bilingual, with Mermaid diagrams)
-├── data/                 # Seed / test data
-├── .github/
-│   └── workflows/        # CI/CD pipelines
-└── CLAUDE.md
-```
+- ORM: SQLAlchemy 2.x async + asyncpg; migrations via Alembic only.
+- MQ: RabbitMQ via `aio-pika`; event payloads are shared Pydantic models in `jobcopilot_shared.events`.
+- LLM: DashScope OpenAI-compatible endpoint; default model `qwen-max`, switchable via `LLM_MODEL`.
+- Metrics: every service exposes `/metrics` via shared `jobcopilot_shared.metrics` — prefix `jobcopilot_`, identical names across services (distinguished by scrape `job` label); multi-worker services need `PROMETHEUS_MULTIPROC_DIR`.
+- Logs: Loki + **Grafana Alloy** (Promtail is deprecated by Grafana). Grafana datasources/dashboards provisioned as code in `infra/grafana/`.
+- Traces: Tempo + OpenTelemetry is **roadmap only**; LangSmith tracing is live (`LANGCHAIN_TRACING_V2` + API key).
+- Resilience: `tenacity` for retry/circuit-breaker.
 
 ---
 
-## Development Conventions / 开发规范
+## Development Conventions
 
-### Environment Variables / 环境变量
+### Environment Variables
+
 ```bash
 # LLM
 DASHSCOPE_API_KEY=sk-...
@@ -193,7 +90,7 @@ KEYCLOAK_URL=http://localhost:8080
 KEYCLOAK_REALM=jobcopilot
 KEYCLOAK_CLIENT_ID=api
 
-# Secrets (AES-256 key for encrypting LinkedIn cookies + API keys)
+# Secrets (AES-256 key for encrypting user API keys)
 ENCRYPTION_KEY=<32-byte hex>
 
 # Temporal
@@ -201,9 +98,8 @@ TEMPORAL_HOST=localhost:7233
 TEMPORAL_NAMESPACE=jobcopilot
 ```
 
-### Running Python Commands / 运行 Python 命令
+### Running Python Commands
 
-**EN:**  
 This project uses a **uv workspace** with a single `.venv` at the repo root shared by all services. Always run Python commands through `uv run` — never call `python` directly or use `uv run --package`.
 
 ```bash
@@ -222,63 +118,54 @@ DATABASE_URL=postgresql+asyncpg://... ENCRYPTION_KEY=... ~/.local/bin/uv run pyt
 ~/.local/bin/uv sync
 ```
 
-**中文：**  
-本项目使用 **uv workspace**，所有服务共享仓库根目录的单一 `.venv`。始终通过 `uv run` 运行 Python 命令——不得直接调用 `python`，也不得使用 `uv run --package`。
+### Running Docker Commands
 
-### Running Docker Commands / 运行 Docker 命令
-
-**EN:**  
-Never use `--parallel` with `docker compose build`. Use the plain form instead:
+Never use `--parallel` with `docker compose build`. Use the plain form:
 
 ```bash
-# Build all services (let Compose manage concurrency)
 docker compose build
-
-# Build specific services
 docker compose build profile-service job-service discovery-service agent-service notification-service
 ```
 
 `--parallel` causes multiple build processes to simultaneously call the `desktop.exe` credential helper (configured via `credsStore` in `~/.docker/config.json`). Concurrent calls overwhelm the WSL–Docker Desktop vsock channel, producing `UtilAcceptVsock: accept4 failed 110` and credential errors for every registry pull — including public images that need no authentication. Docker Compose v2 already parallelizes builds intelligently without the flag.
 
-**中文：**  
-不得对 `docker compose build` 使用 `--parallel` 参数，直接使用不带该参数的形式：
+### Code Style
 
-在 WSL2 + Docker Desktop 环境下，`--parallel` 会导致多个构建进程同时调用 `desktop.exe` 凭据助手，并发调用使 WSL 与 Docker Desktop 之间的 vsock 通道过载，即使是无需认证的公开镜像也会拉取失败。Docker Compose v2 本身已会自动智能并行，无需手动指定。
-
-### Code Style / 代码规范
 - Ruff for linting and formatting (`ruff check .` + `ruff format .`)
 - mypy for type checking (strict mode per service)
-- No inline SQL strings — use SQLAlchemy ORM or text() with bound parameters
+- No inline SQL strings — use SQLAlchemy ORM or `text()` with bound parameters
 - Structured JSON logging via shared `packages/shared/logging.py`; every log entry includes `trace_id`, `tenant_id`, `service`
-- `packages/shared/logging.py` is a **pure native structlog** pipeline (PrintLogger → JSON on stdout). Never add stdlib-only processors (e.g. `structlog.stdlib.add_logger_name`) — they crash every log call in every service, including the exception handlers (regression test: `packages/shared/tests/test_logging.py`). / 共享日志是**纯原生 structlog** 管线，禁止混入 stdlib 专用处理器（如 `add_logger_name`）——会使全部服务的每次日志调用崩溃，连异常处理器一起（回归测试见 `packages/shared/tests/test_logging.py`）。
+- `packages/shared/logging.py` is a **pure native structlog** pipeline (PrintLogger → JSON on stdout). Never add stdlib-only processors (e.g. `structlog.stdlib.add_logger_name`) — they crash every log call in every service, including the exception handlers (regression test: `packages/shared/tests/test_logging.py`).
 - All API responses include `X-Request-Id` header
 
-### API Conventions / API 规范
+### API Conventions
+
 - All external endpoints versioned: `/v1/`
 - Internal service-to-service endpoints: `/internal/` (Kong blocks external access)
-- **Every `/v1` collection endpoint returns `PaginatedResponse` (`{items, total, page, size, has_next}`)** — never a bare JSON array; the frontend reads `.items` everywhere. / **所有 `/v1` 集合端点统一返回 `PaginatedResponse`**，不得返回裸数组。
-- `POST /internal/jobs` is an **idempotent upsert by URL** (returns the existing job refreshed, never 409) — discovery re-runs re-publish the same URLs; callers key their records by the returned `job_id`. / `POST /internal/jobs` 为**按 URL 幂等 upsert**，调用方以响应中的 `job_id` 为准。
-- MQ event contracts: `job.discovered` carries NO job_id (consumer must upsert the job first to obtain one); `cookie.expired` MUST carry `user_id` + `tenant_id` + `run_id`. / MQ 事件契约：`job.discovered` 不含 job_id（消费者先 upsert 职位换取真实 id）；`cookie.expired` 必须携带 `user_id`、`tenant_id`、`run_id`。
+- **Every `/v1` collection endpoint returns `PaginatedResponse` (`{items, total, page, size, has_next}`)** — never a bare JSON array; the frontend reads `.items` everywhere.
+- `POST /internal/jobs` is an **idempotent upsert by URL** (returns the existing job refreshed, never 409) — discovery re-runs re-publish the same URLs; callers key their records by the returned `job_id`.
+- MQ event contracts: `job.discovered` carries NO job_id (consumer must upsert the job first to obtain one).
 - Error response shape: `{ "error": { "code": "...", "message": "..." } }` — no internal stack traces
 - Health probes: `GET /healthz/live` (liveness) and `GET /healthz/ready` (readiness)
 - Streaming (AI chat): Server-Sent Events (`text/event-stream`)
 
-### Database / 数据库
+### Database
+
 - Alembic for all schema changes — no manual `ALTER TABLE`
 - Every query against a tenant-scoped table must include `WHERE tenant_id = :tenant_id`
 - `SELECT *` is forbidden; always list columns explicitly
 - Parameterized queries only; no string-interpolated SQL
-- SQLAlchemy async sessions **autobegin** on the first statement — never call `session.begin()` after a query on the same session (raises `InvalidRequestError`; this 500'd `/v1/agent/match` + `/interview` in prod). Service-layer functions own their unit of work: query → mutate → `commit()`. / SQLAlchemy 异步会话在第一条语句时**自动开启事务**——同一会话查询后不得再调 `session.begin()`（必抛 `InvalidRequestError`，曾导致两个生产端点必然 500）。服务层函数自持工作单元：查询 → 变更 → `commit()`。
+- SQLAlchemy async sessions **autobegin** on the first statement — never call `session.begin()` after a query on the same session (raises `InvalidRequestError`; this 500'd `/v1/agent/match` + `/interview` in prod). Service-layer functions own their unit of work: query → mutate → `commit()`.
 
 ### LLM / AI
-- Default model: `qwen-max` via DashScope; switchable via `LLM_MODEL` env var
-- LangGraph dev mode: `langgraph dev` (development only, never deployed to cluster)
+
+- Default model: `qwen-max` via DashScope; switchable via `LLM_MODEL` env var. JD screenshot parsing (v0.2) requires a vision model (e.g. qwen-vl) on the same endpoint.
+- LangGraph dev mode: `langgraph dev` (development only, never deployed)
 - All LangGraph graphs must define explicit input/output state schemas (TypedDict)
 - Prompts live in `services/agent/prompts/`; never inline prompts in graph code
 
-### AI Assistant Tool Contract / AI 助手工具契约
+### AI Assistant Tool Contract
 
-**EN:**  
 The 5 ReAct tools (`services/agent/.../tools/job_tools.py`) bind to real, tested endpoints — never invent one. Capabilities living in the Agent Service itself run **in-process** through the shared service layer (`services/analysis.py` / `interview.py` / `matching.py`), which the `/v1/agent/*` endpoints call too. Never HTTP-self-call your own service. Tools calling tenant-unscoped internal getters (e.g. `GET /internal/jobs/{job_id}`) must verify `tenant_id` on the response and treat a mismatch as "not found".
 
 | Tool | Binding |
@@ -291,50 +178,30 @@ The 5 ReAct tools (`services/agent/.../tools/job_tools.py`) bind to real, tested
 
 Chat SSE streams tool activity: `{"type":"tool_call","id","name","args"}` and `{"type":"tool_result","id","name","result"}`. The Next.js `/api/chat` proxy maps them to Vercel AI SDK data-stream parts `9:`/`a:`; `ChatPanel` renders them from `message.toolInvocations`. The contract spans three layers (agent SSE → proxy → UI) — change them together.
 
-**中文：**  
-5 个 ReAct 工具必须绑定真实存在、有测试覆盖的端点——不得杜撰。能力在 Agent Service 自身的，必须**进程内**走共享服务层（analysis / interview / matching），与 `/v1/agent/*` 端点共用同一代码路径——严禁 HTTP 自调用。调用无租户过滤的内部端点时必须校验响应中的 `tenant_id`，不匹配按"不存在"处理。聊天 SSE 的 tool_call / tool_result 事件（含 id、result）由前端代理映射为 AI SDK 数据流 `9:`/`a:` 部分，`ChatPanel` 据 `toolInvocations` 渲染；该契约横跨三层（agent SSE → 代理 → UI），修改时必须三层同步。
+### Security
 
-### Security / 安全
-- LinkedIn cookies and API keys: AES-256-GCM encrypted before any persistence
+- User LLM API keys: AES-256-GCM encrypted before any persistence
 - Bcrypt (cost ≥ 12) for password hashing
 - No `logging.debug(credential)` or any credential in log output
 - `gitleaks` blocks commits containing secrets patterns
 
-### Dependency Version Integrity / 依赖版本完整性
+### Dependency Version Integrity
 
-**EN:**  
 LLMs generate version numbers from training data, not from live registry lookups. A version that looks plausible may not exist, or may exist for one package but not its sibling. Every version written into a dependency file must be verifiable.
 
 Rules:
 - **Before writing any version number**, verify it exists: `npm view <pkg>@<ver> version`, `pip index versions <pkg>`, or `docker pull <image>:<tag>`.
 - **Lock files are mandatory and must be committed**. They are the primary defence against version hallucinations — a missing or non-existent version causes an immediate install failure rather than a silent runtime surprise.
   - npm: generate and commit `package-lock.json` (`npm install` inside the target Node image) at the same time the code is scaffolded.
-  - Python: `uv.lock` is already committed at the workspace root. Always run `uv sync` after changing any `pyproject.toml` so the lock file stays current.
+  - Python: `uv.lock` is committed at the workspace root. Always run `uv sync` after changing any `pyproject.toml`.
   - Docker Compose: run `docker pull <image>:<tag>` to confirm every image tag exists before committing.
 - **Version–feature consistency**: when using a feature that belongs to a specific version (e.g. `next.config.ts` requires Next.js 15+), pin the package to that version — never mix a feature from version N with a pin at version N-1.
 - **Align sibling packages**: related packages (e.g. `temporalio/auto-setup` and `temporalio/admin-tools`) must use the same version tag. Never assume version parity across packages with independent release cadences.
-- **Infra compose images are digest-pinned** (`tag@sha256:...` in `infra/docker-compose*.yml`): upstream re-tags (e.g. `postgres:15-alpine` security rebuilds) must arrive as Dependabot PRs through CI, never as silent `docker compose pull` surprises. Never add an unpinned infra image; app images (`ghcr.io/...`) are pinned per-deploy by `deploy.sh` instead.
+- **Infra compose images are digest-pinned** (`tag@sha256:...` in `infra/docker-compose*.yml`): upstream re-tags (e.g. postgres security rebuilds) must arrive as Dependabot PRs through CI, never as silent `docker compose pull` surprises. Never add an unpinned infra image; app images (`ghcr.io/...`) are pinned per-deploy by `deploy.sh` instead.
 - **Every image/version change requires human review — NO auto-merge, ever** (owner decision, 2026-07-10): CI proves a new image runs, not that it should be trusted; a human reviewing the Dependabot PR is the final supply-chain gate. Stateful components additionally need release-notes review + a local upgrade test against existing data before merging.
 
-**中文：**  
-LLM 生成的版本号来源于训练数据，而非实时查询包注册表。看起来合理的版本号可能并不存在，或者在某个包中存在但在其兄弟包中不存在。所有写入依赖文件的版本号都必须可以验证。
+### Infra Image Upgrades
 
-规则：
-- **写任何版本号前**，先验证其存在：`npm view <pkg>@<ver> version`、`pip index versions <pkg>` 或 `docker pull <image>:<tag>`。
-- **锁文件必须存在且必须提交**。锁文件是防止版本幻觉的第一道防线——不存在的版本会在安装时立即报错，而不是在运行时悄悄出问题。
-  - npm：在脚手架代码生成的同时，在目标 Node 镜像内执行 `npm install` 并提交 `package-lock.json`。
-  - Python：`uv.lock` 已在工作区根目录提交 ✅。每次修改任何 `pyproject.toml` 后都必须运行 `uv sync` 保持锁文件更新。
-  - Docker Compose：提交前执行 `docker pull <image>:<tag>` 确认每个镜像 tag 确实存在。
-- **版本–功能一致性**：使用某个特定版本才有的功能（如 `next.config.ts` 需要 Next.js 15+），就必须将包固定到该版本，不得将版本 N 的功能与版本 N-1 的 pin 混用。
-- **兄弟包版本对齐**：相关联的包（如 `temporalio/auto-setup` 与 `temporalio/admin-tools`）必须使用相同的版本 tag。不得假设发版节奏独立的包之间版本号对等。
-- **基础设施 compose 镜像一律钉 digest**（`infra/docker-compose*.yml` 中 `tag@sha256:...`）：上游对同一 tag 的重发（如 `postgres:15-alpine` 安全重建）必须以 Dependabot PR 的形式经 CI 进入，绝不通过 `docker compose pull` 静默生效。不得新增未钉定的基础设施镜像；应用镜像（`ghcr.io/...`）由 `deploy.sh` 按部署钉定。
-- **任何镜像/版本变更必须人工审查——永不开启自动合并**（Owner 决策，2026-07-10）：CI 只能证明新镜像能运行，不能证明它值得信任；人工审阅 Dependabot PR 是供应链的最后一道闸。有状态组件合并前还须过 release notes + 本地带存量数据升级验证。
-
----
-
-### Infra Image Upgrades / 基础设施镜像升级
-
-**EN:**  
 Runbook distilled from the 2026-07 campaign (7 components upgraded, several traps found only by local rehearsal — CI is structurally blind to stateful data-path issues: it runs fresh volumes, and its postgres/redis/rabbitmq come from `ci.yml` services, not compose).
 
 **Per-PR flow (stateful components):** `@dependabot rebase` → official release-notes/upgrading-guide review → **local rehearsal against EXISTING data** (never a fresh volume) → merge → CD green → deploy → prod verify (data reconciliation + real login). Batch multiple verified upgrades into one deploy.
@@ -351,20 +218,8 @@ Runbook distilled from the 2026-07 campaign (7 components upgraded, several trap
 - Dependabot proposes each sibling's registry-latest independently — enforce temporal sibling alignment manually on the PR branch.
 - CI integration services in `ci.yml` must be bumped alongside prod versions or they silently drift.
 
-**中文：**  
-2026-07 升级战役（7 组件）沉淀的操作手册。CI 对有状态数据路径问题结构性失明：它跑全新卷，且其 postgres/redis/rabbitmq 来自 `ci.yml` 服务定义而非 compose。
+### Engineering Philosophy
 
-**每个 PR 的流程（有状态组件）：** rebase → 官方 release notes/升级指南评审 → **本地带存量数据彩排**（绝不空卷）→ 合并 → CD 绿 → 部署 → 生产验证（数据对账 + 真实登录）。多个已验证升级合并为一次部署。
-
-**按数据本质选迁移策略：** 派生可重建数据（qdrant 向量、rabbitmq 拓扑、redis 缓存）→ 全新卷重建是合法且往往更优的路径，前提是切换时验证为空/可重建 + 照样留快照；事实源数据（postgres）→ `pg_dumpall` 逻辑迁移 + 双备份（SQL dump + 卷 tarball 留服务器作回滚），切换顺序必须是"停客户端 → 备份 → 换卷 → 部署（放任客户端初始化污染）→ 再停 → 逐条 `DROP DATABASE ... WITH (FORCE)`（多语句 `-c` 会被裹进事务而失败）→ 恢复 → 重启 → 对账"。
-
-**已付过学费的坑（勿重蹈）：** postgres:18+ 卷必须挂 `/var/lib/postgresql`（版本化子目录布局，挂错即崩溃循环）；qdrant 单节点禁跳 minor；rabbitmq 3.13→4.x 官方要求经 4.2 + 先开全部特性标志（全新卷路径可绕开）；temporalio/admin-tools ≥1.29.7 只有复合 tag 且 ENTRYPOINT 是 `sleep infinity`（一次性用途必须覆盖 entrypoint）；Dependabot 按各自 registry 最新版提案，temporal 兄弟对齐须在 PR 分支手工强制；`ci.yml` 的集成测试服务版本必须与生产同步升级。
-
----
-
-### Engineering Philosophy / 工程原则
-
-**EN:**  
 Always prefer the proper, maintainable solution over a quick workaround. Before implementing any fix, validate it against industry best practices. If a shortcut is tempting, name it explicitly and propose the correct approach instead. Temporary hacks compound into long-term maintenance debt and block future extensibility.
 
 Concretely:
@@ -376,30 +231,17 @@ Concretely:
 - Only proceed with a workaround if the user explicitly accepts it after understanding the trade-offs.
 - This applies to: Dockerfiles, Docker Compose, Alembic config, K8s manifests, CI pipelines, framework rendering models, and all architectural decisions.
 
-**中文：**  
-任何情况下优先选择正确、可维护的方案，而非临时变通。在实现任何修复之前，先验证其是否符合行业最佳实践。如果临时方案很诱人，明确说明并提出正确做法。临时方案会积累成长期维护债务，并阻碍后续扩展。
-
-具体要求：
-- 遇到基础设施/配置错误，修复根本原因，不要仅打补丁。
-- 如果存在两个选项（临时方案 vs. 正确方案），列出各自权衡，默认选正确方案。
-- **在多个_合法_方案中选择时，推荐必须以架构正确性为准——绝不以「改动最小 / 最省事 / 风险最低 / diff 最小」作为依据，也不得把「改动小」列为推荐方案的优点。若不确定哪个是最佳实践，先研究再推荐。**
-- **绝不把生产环境当调试循环。** 每个修复都必须先在本地（`docker compose up`）或 staging 端到端复现并验证，再部署；生产只接收已在别处验证过的变更，不得拿生产试错。调试前后端集成时，一次把契约两侧（schema + 两端端点）审全，一并抓出所有不一致；只靠只读追踪代码不够，必须端到端跑通。相关修复合并成一次部署，不要一个 bug 一次生产往返。
-- **错误路径与服务间契约也必须端到端跑通，不能只测正常路径。** 「契约」不止前端↔后端，还包括 Agent 工具↔内部端点的绑定和异常处理器路径。「优雅失败」的工具（返回错误 JSON）会掩盖端点缺失——LLM 会在其上编出流畅的回答，表面看一切正常（2026-07-08 教训：5 个 ReAct 工具中 4 个自上线起调用的端点根本不存在；共享日志缺陷把所有业务异常变成裸 500，也是靠端到端跑一条出错路径才暴露）。
-- 只有在用户明确理解权衡后主动接受时，才可以采用临时方案。
-- 适用范围：Dockerfile、Docker Compose、Alembic 配置、K8s manifest、CI 流水线、框架渲染模型及所有架构决策。
-
 ---
 
-## Pre-Push Checklist / 推送前必查清单
+## Pre-Push Checklist
 
-**EN:**  
-Run these checks locally **before every `git push`**. CI runs the same steps — a push that fails CI wastes a round-trip and blocks the team. All checks must pass with exit code 0.
+Run these checks locally **before every `git push`**. CI runs the same steps — a push that fails CI wastes a round-trip. All checks must pass with exit code 0.
 
 ```bash
 # 1. Lint — must produce zero errors
 ~/.local/bin/uv run ruff check .
 
-# 2. Format — must produce zero diffs  
+# 2. Format — must produce zero diffs
 ~/.local/bin/uv run ruff format --check .
 
 # 3. Type check — run for every service you touched
@@ -423,46 +265,37 @@ gitleaks detect --no-git
 - New lint suppressions must go in `[tool.ruff.lint.per-file-ignores]` in `pyproject.toml`, not inline `# noqa` comments — this keeps suppression rationale in one place.
 - Adding a new per-file-ignore requires a one-line comment explaining *why* the rule is intentionally suppressed for that path.
 
-**CN:**  
-每次 `git push` 前在本地运行以上检查。CI 执行完全相同的步骤——推送后才发现 CI 失败等于浪费一次往返并影响协作。所有检查必须以退出码 0 通过。
-
-Ruff 规则豁免政策：新增 lint 豁免必须写入 `pyproject.toml` 的 `per-file-ignores`，不得使用行内 `# noqa` 注释；每条豁免必须附一行注释说明*为何*对该路径有意关闭该规则。
-
 ---
 
-## CI Requirements / CI 必须覆盖
+## CI Requirements
 
 1. **Lint**: `ruff check .` + `ruff format --check .`
 2. **Type Check**: `mypy` per service
 3. **Unit Tests**: `pytest` (no real DB/queue)
-4. **Contract Checks**: `pytest tests/contracts` (consumer call sites vs provider OpenAPI) + OpenAPI/TS-type freshness (`scripts/export_openapi.py` → `npm run gen:api-types` → `git diff --exit-code -- openapi frontend/lib/gen`)
+4. **Contract Checks**: `pytest tests/contracts` (consumer call sites vs provider OpenAPI) + OpenAPI/TS-type freshness (`scripts/export_openapi.py` → `npm run gen:api-types` → `git diff --exit-code -- openapi frontend/lib/gen`). Entity types in `frontend/lib/api.ts` are re-exports of generated types — NEVER hand-write them.
 5. **Integration Tests**: `pytest` against real PostgreSQL + Redis + RabbitMQ (Docker Compose in CI)
 6. **Secret Scan**: `gitleaks detect`
-7. **Image Scan**: Trivy or Snyk — Critical CVE blocks the pipeline
+7. **Image Scan**: Trivy — Critical CVE blocks the pipeline
 
 ---
 
-## Git Commit Convention / Git 提交规范
+## Git Commit Convention
 
-**EN:**  
-All commit messages must be **bilingual (English / Chinese)**. Write the subject line in English (following Conventional Commits), then add a Chinese summary in the body.
+All commit messages must be **bilingual (English / Chinese)**. Write the subject line in English (following Conventional Commits). The body must contain a **detailed English description AND its Chinese counterpart, side by side** — not Chinese-only.
 
 ```
 feat(service): add feature X
 
-新增功能 X 的描述（中文）。
+Detailed English description of what changed and why.
 
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+变更内容与原因的详细中文描述。
 ```
-
-**中文：**  
-所有提交信息必须**中英双语**。标题行用英文（遵循 Conventional Commits），正文中附上中文说明。
 
 ---
 
-## Docs Convention / 文档规范
+## Docs Convention
 
-All documentation files use **bilingual single-file format**:
+All documentation files under `docs/` and the `README.md` use **bilingual single-file format**:
 
 ```markdown
 ## N. English Title / 中文标题
@@ -472,5 +305,6 @@ All documentation files use **bilingual single-file format**:
 **中文：** 中文内容...
 ```
 
-Mermaid diagram labels use English (universal for technical diagrams).  
-Mermaid 图表标签使用英文（技术图表通用语言）。
+`CLAUDE.md` is exempt: English-only (owner decision, 2026-07-11).
+
+Mermaid diagram labels use English (universal for technical diagrams).

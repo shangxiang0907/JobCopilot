@@ -1,18 +1,20 @@
 # JobCopilot — Software Architecture Design / 软件架构设计
 
-Version / 版本：v0.1  
-Status / 状态：Draft / 草稿  
-Last Updated / 最后更新：2026-06-10
+Version / 版本：v0.2  
+Status / 状态：Active / 生效  
+Last Updated / 最后更新：2026-07-11
+
+> **v0.2 change summary / 变更摘要：** Aligned with PRD v0.2 re-scope: credential-free public-source discovery replaces LinkedIn cookie crawling (ADR-004 superseded by ADR-006); notifications converge to email; tool signatures and messaging contracts corrected to match the verified implementation (in-process tool delegation, no `job.analyze.priority` queue, no WebSocket push); Keycloak 26; Grafana Alloy replaces Promtail; deployment section reflects the actual single-node Docker Compose production with Kubernetes as the scaling path. / 与 PRD v0.2 重构对齐：无凭证公开源爬取取代 LinkedIn Cookie 爬取（ADR-004 被 ADR-006 取代）；通知收敛为邮件；工具签名与消息契约修正为与已验证实现一致（工具进程内委托、不存在 `job.analyze.priority` 队列与 WebSocket 推送）；Keycloak 26；Grafana Alloy 取代 Promtail；部署章节反映真实的单节点 Docker Compose 生产形态，Kubernetes 为扩容路径。
 
 ---
 
 ## 1. System Overview / 系统概述
 
 **EN:**  
-JobCopilot is built on a microservices architecture with five application services behind a Kong API Gateway, a Keycloak-backed authentication layer, and a multi-agent AI pipeline powered by LangGraph and orchestrated by Temporal. The frontend is a Next.js 15 application. All services are designed for horizontal scaling on Kubernetes.
+JobCopilot is built on a microservices architecture with five application services behind a Kong API Gateway, a Keycloak-backed authentication layer, and a multi-agent AI pipeline powered by LangGraph and orchestrated by Temporal. The frontend is a Next.js 15 application. Production runs as a single-node Docker Compose deployment behind a Caddy TLS edge; all services are stateless and Kubernetes manifests exist as the horizontal-scaling path.
 
 **中文：**  
-JobCopilot 采用微服务架构，Kong API Gateway 后方部署五个应用服务，通过 Keycloak 实现身份认证，AI 流水线基于 LangGraph 多 Agent 图并由 Temporal 负责工作流编排。前端为 Next.js 15 应用。所有服务均以水平扩展为目标，运行于 Kubernetes 之上。
+JobCopilot 采用微服务架构，Kong API Gateway 后方部署五个应用服务，通过 Keycloak 实现身份认证，AI 流水线基于 LangGraph 多 Agent 图并由 Temporal 负责工作流编排。前端为 Next.js 15 应用。生产环境为 Caddy TLS 边缘之后的单节点 Docker Compose 部署；所有服务无状态，Kubernetes 清单作为水平扩容路径。
 
 ---
 
@@ -23,25 +25,23 @@ JobCopilot 采用微服务架构，Kong API Gateway 后方部署五个应用服�
 ```mermaid
 graph TB
     User["👤 Job Seeker\n求职者"]
-    Admin["🔧 Tenant Admin\n租户管理员"]
+    Admin["🔧 Platform Admin\n平台管理员（运营者）"]
 
     subgraph JC["JobCopilot Platform"]
         System["JobCopilot\nMulti-Agent Job Management System\n多 Agent 智能求职管理系统"]
     end
 
-    LinkedIn["🔗 LinkedIn\n(External Platform / 外部平台)"]
-    DashScope["🤖 DashScope LLM API\n(OpenAI-compatible / OpenAI 兼容)"]
+    Boards["🌐 Public Job Boards\n(no-login sources / 无登录公开职位源)"]
+    DashScope["🤖 DashScope LLM API\n(OpenAI-compatible, text + vision / OpenAI 兼容，文本 + 视觉)"]
     LangSmith["🔍 LangSmith\n(LLM Observability / LLM 可观测)"]
     SMTP["📧 Email Service\n邮件服务 (SMTP / AWS SES)"]
-    Webhook["💬 IM Webhooks\n微信 / 钉钉 Webhook"]
 
-    User -->|"Manage jobs, view analysis\n管理岗位、查看分析、AI 对话"| System
-    Admin -->|"Manage members & usage\n管理成员与用量"| System
-    System -->|"Playwright browser automation\nPlaywright 模拟登录爬取"| LinkedIn
-    System -->|"LLM inference (OpenAI-compatible)\nLLM 推理"| DashScope
+    User -->|"Manage jobs, paste JD (URL/text/screenshot), AI chat\n管理岗位、粘贴 JD（URL/文本/截图）、AI 对话"| System
+    Admin -->|"Manage users & view usage\n管理用户与查看用量"| System
+    System -->|"Crawl public listings\n爬取公开岗位"| Boards
+    System -->|"LLM inference\nLLM 推理"| DashScope
     System -->|"Agent trace & debug\nAgent 追踪与调试"| LangSmith
     System -->|"Send email reminders\n发送邮件提醒"| SMTP
-    System -->|"Push IM notifications\n发送即时消息通知"| Webhook
 ```
 
 ### 2.2 Level 2 — Container Diagram / 容器图
@@ -52,15 +52,15 @@ graph TB
 
     subgraph Gateway["Gateway Layer / 网关层"]
         Kong["Kong API Gateway 3.x\nRouting · Rate Limiting · Auth Plugin\n路由 · 限流 · 认证插件"]
-        Keycloak["Keycloak 24\nAuth Service — OIDC / JWT\n身份认证服务"]
+        Keycloak["Keycloak 26\nAuth Service — OIDC / JWT\n身份认证服务"]
     end
 
     subgraph AppLayer["Application Services / 应用服务层"]
         ProfileSvc["Profile Service\nFastAPI · Python 3.11\nUser profiles & resumes\n用户画像 & 简历管理"]
         JobSvc["Job Service\nFastAPI · Python 3.11\nJob CRUD & Kanban\n岗位管理 & 投递看板"]
-        DiscoverySvc["Discovery Service\nFastAPI · Python 3.11\nPlaywright + Temporal Worker\nLinkedIn 爬取 & 工作流"]
+        DiscoverySvc["Discovery Service\nFastAPI · Python 3.11\nPlaywright + Temporal Worker\n公开源爬取 & 工作流"]
         AgentSvc["Agent Service\nFastAPI · Python 3.11\nLangGraph Multi-Agent\nAI 分析 & 助手"]
-        NotifSvc["Notification Service\nFastAPI · Python 3.11\nMulti-channel reminders\n多渠道提醒"]
+        NotifSvc["Notification Service\nFastAPI · Python 3.11\nEmail reminders\n邮件提醒"]
     end
 
     subgraph WorkflowLayer["Workflow Layer / 工作流层"]
@@ -108,10 +108,10 @@ graph TB
         end
 
         subgraph Tools["ReAct Tools / ReAct 工具集"]
-            T1["analyze_job(url)\n分析岗位"]
+            T1["analyze_job(job_id)\n分析岗位"]
             T2["update_kanban(job_id, status)\n更新看板"]
             T3["search_jobs(query)\n搜索岗位"]
-            T4["get_applications(filters)\n查询投递"]
+            T4["get_applications(status?)\n查询投递"]
             T5["prepare_interview(job_id)\n生成面试题"]
         end
 
@@ -121,19 +121,23 @@ graph TB
     API --> AnalyzerG & ResumeG & InterviewG & ReactG
     Consumer --> AnalyzerG
     ReactG --> T1 & T2 & T3 & T4 & T5
-    T1 -.->|"delegates to\n委托执行"| AnalyzerG
-    T5 -.->|"delegates to\n委托执行"| InterviewG
+    T1 -.->|"in-process via shared service layer\n进程内经共享服务层"| AnalyzerG
+    T5 -.->|"in-process via shared service layer\n进程内经共享服务层"| InterviewG
 ```
+
+**EN:** Tools bind to real, tested Job Service `/internal/*` endpoints or run in-process through the shared service layer (`services/analysis.py` / `interview.py` / `matching.py`) — the same code paths the `/v1/agent/*` endpoints use. HTTP self-calls to the Agent Service itself are forbidden. Tool activity (`tool_call` / `tool_result` SSE events) is streamed live to the chat UI. See the AI Assistant Tool Contract in `CLAUDE.md` for the authoritative binding table.
+
+**中文：** 工具绑定真实存在、有测试覆盖的 Job Service `/internal/*` 端点，或经共享服务层进程内执行（与 `/v1/agent/*` 端点共用代码路径）；禁止对 Agent Service 自身发起 HTTP 自调用。工具调用过程（`tool_call` / `tool_result` SSE 事件）实时透出到聊天 UI。权威绑定表见 `CLAUDE.md` 的「AI 助手工具契约」。
 
 ---
 
 ## 3. AI Agent Architecture / AI Agent 体系
 
 **EN:**  
-Four LangGraph graphs share a common DashScope LLM client. Temporal handles durability and scheduling; LangGraph handles agent reasoning logic. These two frameworks are complementary, not competing.
+Four LangGraph graphs share a common DashScope LLM client. The JD screenshot entry uses a vision-capable model (e.g. qwen-vl) via the same OpenAI-compatible endpoint. Temporal handles durability and scheduling; LangGraph handles agent reasoning logic. These two frameworks are complementary, not competing.
 
 **中文：**  
-四个 LangGraph 图共享同一个 DashScope LLM 客户端。Temporal 负责耐久性与调度，LangGraph 负责 Agent 推理逻辑，两者互补而非竞争。
+四个 LangGraph 图共享同一个 DashScope LLM 客户端。JD 截图入口经同一 OpenAI 兼容端点调用视觉模型（如 qwen-vl）。Temporal 负责耐久性与调度，LangGraph 负责 Agent 推理逻辑，两者互补而非竞争。
 
 ```mermaid
 graph LR
@@ -148,7 +152,7 @@ graph LR
         ReactG["ReActGraph (AI Assistant)\n① Parse user intent\n② Select tool\n③ Execute & stream"]
     end
 
-    LLM["DashScope LLM\n(OpenAI-compatible)"]
+    LLM["DashScope LLM\n(text + vision, OpenAI-compatible)"]
     LS["LangSmith\nTrace & Debug"]
 
     TW -->|"crawled job data\n爬取数据"| AG
@@ -161,10 +165,10 @@ graph LR
 ## 4. Temporal Workflow Design / Temporal 工作流设计
 
 **EN:**  
-Discovery workflows are the primary use of Temporal. Each Activity is independently retryable with configurable backoff, so a transient LinkedIn failure does not re-crawl from the beginning.
+Discovery workflows are the primary use of Temporal. Each Activity is independently retryable with configurable backoff, so a transient source failure does not re-crawl from the beginning. Sources are public, no-login job boards — no credential validation step exists.
 
 **中文：**  
-岗位发现工作流是 Temporal 的主要应用场景。每个 Activity 均可独立重试并配置退避策略，LinkedIn 暂时性失败不会导致从头重爬。
+岗位发现工作流是 Temporal 的主要应用场景。每个 Activity 均可独立重试并配置退避策略，源站暂时性失败不会导致从头重爬。爬取源为无登录公开职位站点——不存在凭证校验环节。
 
 ```mermaid
 flowchart TD
@@ -172,16 +176,11 @@ flowchart TD
 
     Sched --> WF["DiscoveryWorkflow\nuser_id · config_id · run_id"]
 
-    WF --> A1["Activity: ValidateCookieActivity\nVerify LinkedIn Cookie validity\n验证 LinkedIn Cookie 有效性\nTimeout: 10s · Retry: 2"]
-    A1 -->|"Cookie valid / Cookie 有效"| A2["Activity: SearchLinkedInActivity\nPlaywright: login + paginated search\nPlaywright 模拟登录 + 分页搜索\nTimeout: 5min · Retry: 3"]
-    A1 -->|"Cookie expired / Cookie 失效"| NF["Publish: cookie.expired\n→ NotificationService 发送失效通知"]
-
-    A2 --> A3["Activity: ParseJobsActivity\nExtract structured fields from HTML\n从 HTML 提取结构化字段\nTimeout: 30s · Retry: 3"]
-    A3 --> A4["Activity: DeduplicateActivity\nFilter by URL against existing jobs DB\n基于 URL 对比已有岗位去重\nTimeout: 10s · Retry: 2"]
-    A4 --> A5["Activity: PublishJobsActivity\nBatch publish to RabbitMQ: job.discovered\n批量发布到 RabbitMQ\nTimeout: 30s · Retry: 3"]
-    A5 --> Done["Workflow Complete\n工作流完成\nUpdate last_run_at"]
-
-    NF --> End["Workflow End\n工作流结束"]
+    WF --> A1["Activity: FetchSourceActivity\nFetch listings from public job sources\n抓取公开职位源列表\nTimeout: 5min · Retry: 3"]
+    A1 --> A2["Activity: ParseJobsActivity\nExtract structured fields\n提取结构化字段\nTimeout: 30s · Retry: 3"]
+    A2 --> A3["Activity: DeduplicateActivity\nFilter by URL against existing jobs DB\n基于 URL 对比已有岗位去重\nTimeout: 10s · Retry: 2"]
+    A3 --> A4["Activity: PublishJobsActivity\nBatch publish to RabbitMQ: job.discovered\n批量发布到 RabbitMQ\nTimeout: 30s · Retry: 3"]
+    A4 --> Done["Workflow Complete\n工作流完成\nUpdate last_run_at"]
 ```
 
 ---
@@ -190,6 +189,10 @@ flowchart TD
 
 ### 5.1 Auto Job Discovery / 自动岗位发现
 
+**EN:** Contract note: `job.discovered` events carry **no job_id**. The consumer (Agent Service) first upserts the job via `POST /internal/jobs` — an idempotent upsert by URL — to obtain the authoritative `job_id`, then analyzes and stores results keyed by that id.
+
+**中文：** 契约要点：`job.discovered` 事件**不含 job_id**。消费方（Agent Service）先调用按 URL 幂等 upsert 的 `POST /internal/jobs` 换取权威 `job_id`，再执行分析并以该 id 存储结果。
+
 ```mermaid
 sequenceDiagram
     actor User
@@ -197,13 +200,13 @@ sequenceDiagram
     participant Kong as Kong Gateway
     participant DS as Discovery Service
     participant TW as Temporal
-    participant PW as Playwright Activity
-    participant LI as LinkedIn
+    participant PW as Crawl Activity (Playwright/HTTP)
+    participant SRC as Public Job Boards
     participant MQ as RabbitMQ
     participant AS as Agent Service
+    participant JS as Job Service
     participant LG as LangGraph (AnalyzerGraph)
     participant LLM as DashScope LLM
-    participant JS as Job Service
     participant DB as PostgreSQL
     participant QD as Qdrant
 
@@ -216,67 +219,71 @@ sequenceDiagram
     Kong-->>FE: 202 { run_id }
     FE-->>User: "Crawl job started / 爬取任务已启动"
 
-    Note over TW,LI: Temporal executes workflow asynchronously / Temporal 异步执行工作流
+    Note over TW,SRC: Temporal executes workflow asynchronously / Temporal 异步执行工作流
 
-    TW->>PW: ValidateCookieActivity
-    PW->>LI: HEAD request to verify cookie
-    LI-->>PW: 200 OK
-    TW->>PW: SearchLinkedInActivity
-    PW->>LI: Playwright login + paginated search
-    LI-->>PW: Job listing HTML
+    TW->>PW: FetchSourceActivity
+    PW->>SRC: Fetch public listings (paginated)
+    SRC-->>PW: Listing pages
     PW-->>TW: raw_jobs[]
     TW->>PW: DeduplicateActivity
     PW-->>TW: new_jobs[] (deduplicated)
     TW->>PW: PublishJobsActivity
-    PW->>MQ: publish job.discovered (batch)
+    PW->>MQ: publish job.discovered (batch, no job_id)
     PW-->>TW: published_count
 
     Note over MQ,AS: Async consumption / 异步消费
 
     AS->>MQ: consume job.discovered
+    AS->>JS: POST /internal/jobs (idempotent upsert by URL)
+    JS->>DB: INSERT ... ON CONFLICT (url) → job_id
+    JS-->>AS: job_id
     AS->>LG: AnalyzerGraph.invoke(job_data)
     LG->>LLM: Extract JD structure + generate embedding
     LLM-->>LG: structured_jd + vector
     LG-->>AS: analysis_result
-    AS->>JS: POST /internal/jobs (save)
-    JS->>DB: INSERT INTO jobs
+    AS->>JS: persist analysis (keyed by job_id)
     AS->>QD: upsert job embedding
-    AS->>MQ: publish notification.job_discovered
+    AS->>MQ: publish notification.trigger
 
-    FE-->>User: Discovery list updated (WebSocket push / polling)
+    FE-->>User: Discovery list updated (polling)
 ```
 
 ### 5.2 AI Assistant Tool Call / AI 助手工具调用
 
+**EN:** Tools execute synchronously within the chat turn: internal Job Service endpoints over HTTP, or in-process graph invocation for the Agent Service's own capabilities. `tool_call` / `tool_result` SSE events are forwarded through the Next.js `/api/chat` proxy (mapped to Vercel AI SDK data-stream parts) and rendered in the chat UI.
+
+**中文：** 工具在对话轮次内同步执行：Job Service 内部端点走 HTTP，Agent Service 自身能力进程内调用图。`tool_call` / `tool_result` SSE 事件经 Next.js `/api/chat` 代理（映射为 AI SDK 数据流部分）在聊天 UI 中渲染。
+
 ```mermaid
 sequenceDiagram
     actor User
-    participant FE as Next.js (useChat)
+    participant FE as Next.js (useChat + /api/chat proxy)
     participant Kong as Kong Gateway
     participant AS as Agent Service
     participant LG as LangGraph (ReActGraph)
     participant LLM as DashScope LLM
     participant JS as Job Service
-    participant MQ as RabbitMQ
 
-    User->>FE: "Analyze this job https://linkedin.com/jobs/xxx"
+    User->>FE: "Analyze the Acme Senior BE job for me"
     FE->>Kong: POST /agent/chat/stream
     Kong->>AS: JWT verified + forward
     AS->>LG: ReActGraph.stream(message, context)
 
-    LG->>LLM: messages + tool definitions (SSE)
-    LLM-->>LG: ToolCall: analyze_job(url="https://...")
+    LG->>LLM: messages + tool definitions
+    LLM-->>LG: ToolCall: analyze_job(job_id)
+    AS-->>FE: SSE {type:"tool_call", id, name, args}
 
-    LG->>AS: execute tool: analyze_job
-    AS->>MQ: publish job.analyze.priority { url, user_id }
-    AS-->>LG: ToolResult { job_id, status: "queued", eta: "2min" }
+    LG->>JS: GET /internal/jobs/{job_id}
+    JS-->>LG: job_data (tenant_id verified by tool)
+    LG->>LG: run_job_analysis(...) — in-process AnalyzerGraph
+    AS-->>FE: SSE {type:"tool_result", id, name, result}
 
     LG->>LLM: append ToolResult, request final reply
-    LLM-->>LG: stream tokens "Job added to analysis queue..."
-    LG-->>AS: token stream (SSE)
+    LLM-->>LG: stream tokens "Analysis complete: match 86/100..."
+    LG-->>AS: token stream
     AS-->>Kong: SSE pass-through
     Kong-->>FE: SSE stream
-    FE-->>User: "已将岗位加入分析队列，预计 2 分钟后完成 ✓"
+    FE-->>User: Streaming answer + tool activity rendered in chat
 ```
 
 ### 5.3 Resume Matching Analysis / 简历匹配分析
@@ -325,6 +332,10 @@ sequenceDiagram
 
 ### 5.4 Notification Reminder Trigger / 通知提醒触发
 
+**EN:** Email is the only active channel. Redis provides send-deduplication. (In-app center and IM webhooks are deferred — see PRD §6.)
+
+**中文：** 邮件为唯一启用渠道，Redis 负责发送去重。（站内通知中心与 IM Webhook 暂缓——见 PRD §6。）
+
 ```mermaid
 sequenceDiagram
     participant TS as Temporal Scheduler
@@ -332,8 +343,6 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant Redis as Redis
     participant Email as SMTP / SES
-    participant WH as WeChat / DingTalk Webhook
-    participant FE as Next.js (WebSocket)
 
     Note over TS,NS: Triggered hourly by Temporal / 每小时由 Temporal 触发
 
@@ -345,19 +354,11 @@ sequenceDiagram
         NS->>DB: SELECT notification_settings WHERE user_id
         NS->>Redis: GET notified:{user_id}:{app_id} (dedup check)
 
-        alt Email channel enabled
+        alt Email enabled and not yet notified
             NS->>Email: Send follow-up reminder email
+            NS->>DB: INSERT INTO notifications (send log)
+            NS->>Redis: SET notified:{user_id}:{app_id} TTL 24h
         end
-        alt WeChat webhook configured
-            NS->>WH: POST WeChat webhook payload
-        end
-        alt DingTalk webhook configured
-            NS->>WH: POST DingTalk webhook payload
-        end
-
-        NS->>DB: INSERT INTO notifications (in-app)
-        NS->>Redis: SET notified:{user_id}:{app_id} TTL 24h
-        NS->>FE: WebSocket push (if user online)
     end
 ```
 
@@ -366,10 +367,10 @@ sequenceDiagram
 ## 6. Application Status Machine / 投递状态机
 
 **EN:**  
-All status transitions are persisted to `application_events` with a timestamp. Transitions from `Rejected` and `Withdrawn` are terminal.
+All status transitions are persisted to `application_events` with a timestamp. Transitions from `Rejected` and `Withdrawn` are terminal. The transition state machine is enforced server-side (including for AI-assistant tool calls).
 
 **中文：**  
-所有状态转换均记录到 `application_events` 表并附时间戳。`Rejected` 和 `Withdrawn` 为终止状态。
+所有状态转换均记录到 `application_events` 表并附时间戳。`Rejected` 和 `Withdrawn` 为终止状态。状态机在服务端强制（包括 AI 助手工具调用路径）。
 
 ```mermaid
 stateDiagram-v2
@@ -395,19 +396,16 @@ stateDiagram-v2
 ## 7. Data Model / 数据模型
 
 **EN:**  
-All tables include `tenant_id` where applicable. Every query against tenant-scoped tables **must** include `WHERE tenant_id = :tenant_id`. Cross-schema JOINs are forbidden; inter-service data exchange uses internal APIs.
+All tables include `tenant_id` where applicable. Every query against tenant-scoped tables **must** include `WHERE tenant_id = :tenant_id`. Cross-schema JOINs are forbidden; inter-service data exchange uses internal APIs. Each user is provisioned as their own tenant. `profiles.llm_api_key_enc` is used in self-hosted mode only (AES-256-GCM).
 
 **中文：**  
-所有表在适用时均含 `tenant_id`。针对租户范围表的每条查询**必须**包含 `WHERE tenant_id = :tenant_id`。禁止跨 Schema JOIN，服务间数据交换通过内部 API 进行。
+所有表在适用时均含 `tenant_id`。针对租户范围表的每条查询**必须**包含 `WHERE tenant_id = :tenant_id`。禁止跨 Schema JOIN，服务间数据交换通过内部 API 进行。每个用户即一个租户。`profiles.llm_api_key_enc` 仅自部署形态使用（AES-256-GCM）。
 
 ```mermaid
 erDiagram
     TENANTS {
         uuid tenant_id PK
         string name
-        string plan
-        int quota_ai_calls
-        int quota_crawls
         timestamp created_at
     }
 
@@ -426,7 +424,6 @@ erDiagram
         uuid user_id FK
         jsonb personal_info
         jsonb preferences
-        text linkedin_cookie_enc
         text llm_api_key_enc
         timestamp updated_at
     }
@@ -566,40 +563,38 @@ erDiagram
 
 | Pattern | Usage | Details |
 |---|---|---|
-| Sync (internal) | Service-to-service API calls | Via K8s DNS (not through Kong); timeout 500ms |
-| Async | Job discovery → AI analysis | RabbitMQ `job.discovered` queue; at-least-once delivery |
+| Sync (internal) | Service-to-service API calls | Direct container DNS (not through Kong); timeout 500ms |
+| Async | Job discovery → AI analysis | RabbitMQ `job.discovered` queue; at-least-once delivery; event carries **no job_id** (consumer upserts first) |
 | Async | AI analysis done → notification | RabbitMQ `notification.trigger` queue |
-| Streaming | AI chat responses | Server-Sent Events (SSE) from Agent Service |
-| Push | Real-time in-app notifications | WebSocket from Notification Service |
+| Streaming | AI chat responses + tool activity | Server-Sent Events (SSE) from Agent Service |
 
 **中文：**
 
 | 模式 | 用途 | 详细 |
 |---|---|---|
-| 同步（内部） | 服务间 API 调用 | 通过 K8s DNS（不经 Kong）；超时 500ms |
-| 异步 | 岗位发现 → AI 分析 | RabbitMQ `job.discovered` 队列；at-least-once 投递 |
+| 同步（内部） | 服务间 API 调用 | 容器 DNS 直连（不经 Kong）；超时 500ms |
+| 异步 | 岗位发现 → AI 分析 | RabbitMQ `job.discovered` 队列；at-least-once 投递；事件**不含 job_id**（消费方先 upsert） |
 | 异步 | AI 分析完成 → 通知 | RabbitMQ `notification.trigger` 队列 |
-| 流式 | AI 聊天响应 | Agent Service 输出 SSE |
-| 推送 | 实时站内通知 | Notification Service 维持 WebSocket |
+| 流式 | AI 聊天响应 + 工具过程 | Agent Service 输出 SSE |
 
 **Queue Definitions / 队列定义：**
 
 | Queue | Producer | Consumer | Dead Letter Queue |
 |---|---|---|---|
 | `job.discovered` | Discovery Service | Agent Service | `job.discovered.dlq` |
-| `job.analyze.priority` | Agent Service (chat tool) | Agent Service | `job.analyze.dlq` |
 | `notification.trigger` | Agent Service | Notification Service | `notification.dlq` |
-| `cookie.expired` | Discovery Service | Notification Service | — |
+
+All event payloads are defined as shared Pydantic models in `jobcopilot_shared.events` — publishers construct them, consumers validate against them. / 所有事件负载在 `jobcopilot_shared.events` 中以共享 Pydantic 模型定义——发布方构造、消费方校验。
 
 ---
 
 ## 9. Observability Design / 可观测性设计
 
 **EN:**  
-All services implement the three pillars of observability. Metric names are prefixed with `jobcopilot_`. LangGraph traces are additionally forwarded to LangSmith for AI-specific debugging.
+Logs and metrics are implemented; distributed tracing (Tempo + OpenTelemetry) is on the roadmap. Metric names are prefixed with `jobcopilot_` and identical across services (distinguished by the scrape `job` label). LangGraph traces are forwarded to LangSmith for AI-specific debugging.
 
 **中文：**  
-所有服务实现可观测性三支柱。指标名称统一前缀 `jobcopilot_`。LangGraph 追踪额外转发至 LangSmith 用于 AI 专项调试。
+日志与指标已实现；分布式追踪（Tempo + OpenTelemetry）在 roadmap。指标名称统一前缀 `jobcopilot_`，各服务同名（以抓取 `job` 标签区分）。LangGraph 追踪转发至 LangSmith 用于 AI 专项调试。
 
 ```mermaid
 graph LR
@@ -611,34 +606,34 @@ graph LR
         NS["Notification\nService"]
     end
 
-    subgraph Logs["Logs / 日志"]
-        Promtail["Promtail\nLog collector"]
+    subgraph Logs["Logs / 日志 ✅"]
+        Alloy["Grafana Alloy\nDocker log discovery"]
         Loki["Loki\nLog aggregation"]
     end
 
-    subgraph Metrics["Metrics / 指标"]
+    subgraph Metrics["Metrics / 指标 ✅"]
         Prometheus["Prometheus\n/metrics scrape"]
     end
 
-    subgraph Traces["Traces / 追踪"]
+    subgraph Traces["Traces / 追踪 ⬜ roadmap"]
         OTel["OpenTelemetry\nCollector"]
         Tempo["Tempo\nDistributed tracing"]
     end
 
-    subgraph LLMObs["LLM Observability"]
+    subgraph LLMObs["LLM Observability ✅"]
         LangSmith["LangSmith\nAgent trace & debug"]
     end
 
-    Grafana["📊 Grafana\nUnified dashboards\n统一可视化看板"]
+    Grafana["📊 Grafana\nDashboards as code\n统一可视化看板"]
 
-    Services -->|"Structured JSON logs"| Promtail --> Loki
+    Services -->|"Structured JSON logs"| Alloy --> Loki
     Services -->|"GET /metrics"| Prometheus
-    Services -->|"OTel SDK traces"| OTel --> Tempo
+    Services -.->|"OTel SDK traces (roadmap)"| OTel -.-> Tempo
     AS -->|"LangGraph traces"| LangSmith
 
     Loki --> Grafana
     Prometheus --> Grafana
-    Tempo --> Grafana
+    Tempo -.-> Grafana
 ```
 
 **Required Metrics / 必需指标：**
@@ -661,54 +656,53 @@ graph LR
 
 | Area | Requirement |
 |---|---|
-| Authentication | Keycloak 24 OIDC; JWT RS256; access token TTL 15 min; refresh token TTL 7 days |
-| Authorization | RBAC: Admin / Member roles; all queries include `tenant_id` filter |
-| Credential storage | LinkedIn Cookie and API Keys encrypted with AES-256-GCM before persistence; plaintext never logged |
-| Cookie revocation | Cookie marked invalid within 60 s across all replicas (Redis cache TTL ≤ 60 s) |
-| API Key storage | Bcrypt or Argon2 hash; no MD5 / SHA-1; no plaintext in DB or Git |
+| Authentication | Keycloak 26 OIDC; JWT RS256; access token TTL 15 min; refresh token TTL 7 days; JWKS validated in every service with issuer/audience checks |
+| Authorization | Roles: `user` / `premium` (reserved) / `admin` (platform); all tenant-scoped queries include `tenant_id` filter |
+| Credential storage | User LLM API keys (self-hosted mode) encrypted with AES-256-GCM before persistence; plaintext never logged |
 | SQL injection | Parameterized queries (SQLAlchemy prepared statements) everywhere; string-interpolated SQL is forbidden |
 | Input validation | Pydantic schema validation on all API inputs; malformed requests rejected at the API layer |
 | Container security | Multi-stage Dockerfile; production stage uses `python:3.11-slim`; runs as non-root (`uid=1000`) |
 | Secrets management | All secrets injected via environment variables / K8s Secrets; never baked into images or committed to Git |
-| Network policy | K8s NetworkPolicy: services only accept traffic from their allowed callers |
+| Network isolation | Production: internal services bound to loopback, only 80/443 public (Caddy). K8s path: NetworkPolicy per service |
 | Rate limiting | Kong rate-limiting plugin: per-tenant sliding window |
+| Crawling ethics | Public no-login sources only; robots.txt respected; no user credentials ever collected for crawling |
 
 **中文：**
 
 | 领域 | 要求 |
 |---|---|
-| 认证 | Keycloak 24 OIDC；JWT RS256；访问令牌 TTL 15 分钟；刷新令牌 TTL 7 天 |
-| 授权 | RBAC：Admin / Member 角色；所有查询必须含 `tenant_id` 过滤条件 |
-| 凭证存储 | LinkedIn Cookie 与 API Key 持久化前 AES-256-GCM 加密；明文绝不写入日志 |
-| Cookie 吊销 | 60 秒内在所有副本上生效（Redis 缓存 TTL ≤ 60 s） |
+| 认证 | Keycloak 26 OIDC；JWT RS256；访问令牌 TTL 15 分钟；刷新令牌 TTL 7 天；各服务基于 JWKS 校验（含 issuer/audience 检查） |
+| 授权 | 角色：`user` / `premium`（预留）/ `admin`（平台）；所有租户范围查询必须含 `tenant_id` 过滤条件 |
+| 凭证存储 | 用户 LLM API Key（自部署形态）持久化前 AES-256-GCM 加密；明文绝不写入日志 |
 | SQL 注入防护 | 全链路 SQLAlchemy 参数化查询；禁止字符串拼接 SQL |
 | 输入校验 | 所有 API 入参 Pydantic 校验；格式非法请求在 API 层拒绝 |
 | 容器安全 | 多阶段 Dockerfile；生产阶段 `python:3.11-slim`；非 root 用户运行（uid=1000） |
 | 密钥管理 | 所有密钥通过环境变量 / K8s Secrets 注入；禁止打入镜像或提交 Git |
-| 网络隔离 | K8s NetworkPolicy：每个服务只接受来自授权调用方的流量 |
+| 网络隔离 | 生产：内部服务仅绑定回环地址，公网只开放 80/443（Caddy）。K8s 路径：按服务 NetworkPolicy |
 | 限流 | Kong rate-limiting 插件：按租户滑动窗口限流 |
+| 爬取伦理 | 只爬无登录公开源；遵守 robots.txt；绝不为爬取收集用户凭证 |
 
 ---
 
 ## 11. Deployment Architecture / 部署架构
 
 **EN:**  
-All workloads run on Kubernetes. The frontend is served as a static Next.js build. Agent Service scales via KEDA based on RabbitMQ queue depth. Profile and Job Services scale via HPA based on CPU.
+**Current production** is a single-node Docker Compose deployment (Hetzner) behind a Caddy TLS edge: CI builds and Trivy-scans images to GHCR; `infra/scripts/deploy.sh` resolves tags to immutable digests and ships over SSH; internal services bind to loopback only. All services are stateless, so the **Kubernetes manifests** (`infra/k8s/`) remain the horizontal-scaling path: Agent Service scales via KEDA on RabbitMQ queue depth; Profile and Job Services via HPA on CPU.
 
 **中文：**  
-所有工作负载运行于 Kubernetes 之上。前端以 Next.js 静态构建产物方式服务。Agent Service 基于 RabbitMQ 队列积压深度由 KEDA 弹性伸缩；Profile Service 和 Job Service 基于 CPU 由 HPA 伸缩。
+**当前生产**为 Caddy TLS 边缘之后的单节点 Docker Compose 部署（Hetzner）：CI 构建镜像并经 Trivy 扫描推送 GHCR；`infra/scripts/deploy.sh` 将 tag 解析为不可变 digest 后经 SSH 下发；内部服务仅绑定回环地址。所有服务无状态，因此 **Kubernetes 清单**（`infra/k8s/`）作为水平扩容路径保留：Agent Service 基于 RabbitMQ 队列深度由 KEDA 伸缩，Profile / Job Service 基于 CPU 由 HPA 伸缩。
 
 ```mermaid
 graph TB
     Internet["🌐 Internet"]
 
-    subgraph K8s["Kubernetes Cluster"]
+    subgraph K8s["Kubernetes Cluster (scaling path / 扩容路径)"]
         subgraph ingress["ingress-nginx namespace"]
             KIC["Kong Ingress Controller\n+ TLS termination"]
         end
 
         subgraph auth["auth namespace"]
-            KC["Keycloak 24\nStatefulSet"]
+            KC["Keycloak 26\nStatefulSet"]
         end
 
         subgraph temporal["temporal namespace"]
@@ -737,7 +731,6 @@ graph TB
             Prom["Prometheus"]
             Graf["Grafana"]
             Loki2["Loki"]
-            Tempo2["Tempo"]
         end
     end
 
@@ -769,21 +762,27 @@ Every application service must provide / 每个应用服务须提供：
 
 ### ADR-001: LangGraph for AI Agent Orchestration
 
-**EN:** LangGraph is selected because it provides stateful, graph-based agent execution with conditional edges, native streaming, and first-class LangSmith tracing integration. Alternatives (vanilla LangChain chains, AutoGen) lack the same level of controllability and observability.
+**Status:** Accepted (re-affirmed 2026-07-11 after evaluating Pydantic AI and OpenAI Agents SDK)
 
-**中文：** 选用 LangGraph，因为它提供有状态的图式 Agent 执行、条件边、原生流式输出，以及与 LangSmith 的一等公民追踪集成。备选方案（原生 LangChain chains、AutoGen）在可控性和可观测性上不及此方案。
+**EN:** LangGraph is selected because it provides stateful, graph-based agent execution with conditional edges, native streaming, checkpointing/time-travel debugging, and first-class LangSmith tracing integration — the strongest node/state-transition observability among current frameworks, which matches the operator's requirement to inspect agent behavior without reading code. Alternatives (Pydantic AI, OpenAI Agents SDK, CrewAI) lack equivalent persistence and debugging depth.
+
+**中文：** 选用 LangGraph：有状态图式执行、条件边、原生流式、检查点/时间旅行调试，以及 LangSmith 一等公民追踪——节点/状态流转可观测性为当前框架中最强，契合运营者"不读代码也能审视 Agent 行为"的要求。备选方案（Pydantic AI、OpenAI Agents SDK、CrewAI）无对等的持久化与调试深度。2026-07-11 经对比评估后再次确认。
 
 ---
 
 ### ADR-002: Temporal for Workflow Orchestration
 
-**EN:** Temporal handles durable execution for long-running LinkedIn crawl workflows. It provides built-in retry semantics, timeouts, and visibility—replacing fragile ad-hoc retry loops. LangGraph and Temporal are used together: Temporal manages workflow lifecycle; LangGraph runs within Temporal Activities for AI reasoning.
+**Status:** Accepted
 
-**中文：** Temporal 负责长时运行的 LinkedIn 爬取工作流的耐久执行，提供内建重试语义、超时控制和可见性，取代脆弱的自定义重试逻辑。Temporal 与 LangGraph 配合使用：Temporal 管理工作流生命周期，LangGraph 在 Temporal Activity 内执行 AI 推理。
+**EN:** Temporal handles durable execution for long-running crawl workflows. It provides built-in retry semantics, timeouts, and visibility—replacing fragile ad-hoc retry loops. LangGraph and Temporal are used together: Temporal manages workflow lifecycle; LangGraph runs within Temporal Activities for AI reasoning.
+
+**中文：** Temporal 负责长时运行爬取工作流的耐久执行，提供内建重试语义、超时控制和可见性，取代脆弱的自定义重试逻辑。Temporal 与 LangGraph 配合使用：Temporal 管理工作流生命周期，LangGraph 在 Temporal Activity 内执行 AI 推理。
 
 ---
 
 ### ADR-003: Qdrant for Vector Storage
+
+**Status:** Accepted
 
 **EN:** Qdrant is chosen over pgvector because it provides dedicated ANN indexing, multi-tenancy via named collections or payload filters, and scales independently of the relational database. pgvector remains available via PostgreSQL for lightweight similarity needs.
 
@@ -793,14 +792,38 @@ Every application service must provide / 每个应用服务须提供：
 
 ### ADR-004: Per-User LinkedIn Cookie (Not Shared Account)
 
-**EN:** Each user supplies their own LinkedIn Session Cookie. This eliminates single-account ban risk, ensures personalized search results, and removes the legal/ethical concern of a shared scraped account. Cookies are encrypted with AES-256-GCM before persistence.
+**Status:** ~~Accepted~~ **Superseded by ADR-006 (2026-07-11)**
 
-**中文：** 每个用户提供自己的 LinkedIn Session Cookie，而非共用账号。这消除了单账号被封的风险，确保个性化搜索结果，也避免了共享爬取账号的法律/道德风险。Cookie 在持久化前经 AES-256-GCM 加密。
+**EN:** Originally, each user supplied their own LinkedIn Session Cookie for Playwright crawling. This was superseded: credential-based crawling of login-walled platforms puts users' real accounts at ban risk, violates platform ToS, and is structurally fragile against anti-bot escalation. See ADR-006.
+
+**中文：** 原方案为每用户提供自己的 LinkedIn Session Cookie 供 Playwright 爬取。已被取代：凭证式爬取登录墙平台使用户真实账号面临封禁风险、违反平台服务条款，且在反爬升级面前结构性脆弱。见 ADR-006。
 
 ---
 
 ### ADR-005: Vercel AI SDK + assistant-ui for Chat Frontend
 
+**Status:** Accepted
+
 **EN:** Vercel AI SDK (`useChat`) handles the SSE streaming protocol and tool-call lifecycle on the frontend. `assistant-ui` provides headless, accessible chat components (Thread, Message, ToolResult) that integrate natively with Vercel AI SDK and support shadcn/ui theming. This avoids building chat UI infrastructure from scratch.
 
 **中文：** Vercel AI SDK (`useChat`) 处理前端 SSE 流式协议和工具调用生命周期。`assistant-ui` 提供 headless、无障碍聊天组件（Thread、Message、ToolResult），与 Vercel AI SDK 原生集成，支持 shadcn/ui 主题。避免从零搭建聊天 UI 基础设施。
+
+---
+
+### ADR-006: Credential-Free Job Discovery (Supersedes ADR-004)
+
+**Status:** Accepted (2026-07-11)
+
+**EN:** The platform never collects or uses user account credentials for crawling. Automated discovery is limited to public, no-login job sources (crawl-friendly boards, respecting robots.txt). Login-walled content enters the system only through user-initiated manual paths: paste a URL (with graceful degradation to text paste when unfetchable), paste JD text, or paste a JD screenshot (multimodal parsing). Rationale: shifts risk from "user's real account gets banned" (unacceptable, borne by users) to "our crawler IP gets rate-limited" (acceptable, borne by the platform); removes the ToS/legal exposure of simulated logins; removes the cookie-management UX barrier that gated user activation.
+
+**中文：** 平台绝不为爬取收集或使用用户账号凭证。自动发现仅限无登录公开职位源（对爬虫友好的站点，遵守 robots.txt）。登录墙内容只经用户主动的手动路径进入系统：粘贴 URL（无法抓取时优雅降级为文本粘贴）、粘贴 JD 文本、粘贴 JD 截图（多模态解析）。理由：将风险从"用户真实账号被封"（不可接受，由用户承担）转为"平台爬虫 IP 被限流"（可接受，由平台承担）；消除模拟登录的 ToS/法律暴露；移除 Cookie 配置这一卡在用户激活最前端的门槛。
+
+---
+
+### ADR-007: Dual Deployment Modes for LLM Key Sourcing
+
+**Status:** Accepted (2026-07-11)
+
+**EN:** The project is open source and defines two deployment modes, switched by configuration: **self-hosted** (users/operator configure their own OpenAI-compatible API key, encrypted at rest) and **hosted site** (platform-provided key only; the BYO-key UI is hidden). The mode flag controls both the key source used by the Agent Service and whether the credentials UI exposes API-key configuration. Per-user quota enforcement on the hosted site is a deferred prerequisite for large-scale open registration (PRD §6).
+
+**中文：** 项目开源，按配置切换两种部署形态：**自部署**（用户/部署者自配 OpenAI 兼容 Key，加密存储）与**托管站**（只用平台 Key，隐藏自带 Key 界面）。形态开关同时控制 Agent Service 的 Key 来源与设置页是否展示 API Key 配置。托管站按用户配额强制为暂缓项，是大规模开放注册的前提（PRD §6）。
