@@ -72,7 +72,7 @@ class RunRepository:
             run.jobs_discovered = jobs_discovered
         if error_message is not None:
             run.error_message = error_message
-        if status in ("completed", "failed", "cookie_expired"):
+        if status in ("completed", "failed"):
             run.finished_at = datetime.now(tz=UTC)
         await self._session.flush()
         return run

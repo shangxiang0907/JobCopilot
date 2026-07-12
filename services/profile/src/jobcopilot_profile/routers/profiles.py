@@ -33,7 +33,6 @@ async def get_my_profile(
             user_id=user_id,
             personal_info=None,
             preferences=None,
-            linkedin_cookie_enc=None,
             llm_api_key_enc=None,
             created_at=now,
             updated_at=now,

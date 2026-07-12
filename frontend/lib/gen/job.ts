@@ -526,7 +526,7 @@ export interface components {
             salary_min?: number | null;
             /**
              * Source
-             * @default linkedin
+             * @default discovery
              */
             source: string;
             /**

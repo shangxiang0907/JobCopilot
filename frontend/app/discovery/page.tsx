@@ -22,6 +22,7 @@ export default function DiscoveryPage() {
   const queryClient = useQueryClient()
   const [keywords, setKeywords] = useState("")
   const [locations, setLocations] = useState("")
+  const [companyBoards, setCompanyBoards] = useState("")
   const [showForm, setShowForm] = useState(false)
 
   const { data: configs = [], isLoading } = useQuery<DiscoveryConfig[]>({
@@ -36,12 +37,13 @@ export default function DiscoveryPage() {
   })
 
   const createConfig = useMutation({
-    mutationFn: (payload: { keywords: string[]; locations: string[] }) =>
+    mutationFn: (payload: { keywords: string[]; locations: string[]; company_boards: string[] }) =>
       api.post("/v1/discovery/configs", payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discovery-configs"] })
       setKeywords("")
       setLocations("")
+      setCompanyBoards("")
       setShowForm(false)
     },
   })
@@ -55,8 +57,9 @@ export default function DiscoveryPage() {
   const handleCreate = () => {
     const kws = keywords.split(",").map((s) => s.trim()).filter(Boolean)
     const locs = locations.split(",").map((s) => s.trim()).filter(Boolean)
-    if (kws.length === 0) return
-    createConfig.mutate({ keywords: kws, locations: locs })
+    const boards = companyBoards.split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
+    if (kws.length === 0 && boards.length === 0) return
+    createConfig.mutate({ keywords: kws, locations: locs, company_boards: boards })
   }
 
   return (
@@ -65,7 +68,7 @@ export default function DiscoveryPage() {
         <div>
           <h1 className="text-2xl font-semibold">Discovery</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Configure and trigger LinkedIn job discovery
+            Discover jobs from public job boards and company career pages
           </p>
         </div>
         <Button size="sm" onClick={() => setShowForm((v) => !v)}>
@@ -101,11 +104,19 @@ export default function DiscoveryPage() {
                   placeholder="San Francisco, Remote"
                 />
               </div>
+              <div className="space-y-1.5">
+                <Label>Company boards (Greenhouse / Lever URLs)</Label>
+                <Input
+                  value={companyBoards}
+                  onChange={(e) => setCompanyBoards(e.target.value)}
+                  placeholder="https://boards.greenhouse.io/stripe, https://jobs.lever.co/spotify"
+                />
+              </div>
               <div className="flex gap-2">
                 <Button
                   size="sm"
                   onClick={handleCreate}
-                  disabled={createConfig.isPending || !keywords.trim()}
+                  disabled={createConfig.isPending || (!keywords.trim() && !companyBoards.trim())}
                 >
                   Create
                 </Button>

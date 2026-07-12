@@ -25,7 +25,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title="Discovery Service",
-    description="LinkedIn job discovery via Playwright + Temporal",
+    description="Public-source job discovery via Temporal (ADR-006)",
     version=settings.version,
     docs_url="/docs" if settings.environment != "production" else None,
     redoc_url=None,

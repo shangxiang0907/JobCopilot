@@ -52,10 +52,6 @@ class ProfileRepository:
             profile = Profile(user_id=user_id)
             self._session.add(profile)
 
-        if data.linkedin_cookie is not None:
-            profile.linkedin_cookie_enc = (
-                encrypt(data.linkedin_cookie) if data.linkedin_cookie else None
-            )
         if data.llm_api_key is not None:
             profile.llm_api_key_enc = encrypt(data.llm_api_key) if data.llm_api_key else None
 

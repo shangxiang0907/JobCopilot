@@ -17,17 +17,6 @@
       },
       "CredentialsUpdate": {
         "properties": {
-          "linkedin_cookie": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Linkedin Cookie"
-          },
           "llm_api_key": {
             "anyOf": [
               {
@@ -79,27 +68,6 @@
         "title": "HealthResponse",
         "type": "object"
       },
-      "InternalCookieResponse": {
-        "description": "Minimal decrypted-cookie payload for the Discovery Service.",
-        "properties": {
-          "linkedin_cookie": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Linkedin Cookie"
-          }
-        },
-        "required": [
-          "linkedin_cookie"
-        ],
-        "title": "InternalCookieResponse",
-        "type": "object"
-      },
       "InternalProfileResponse": {
         "description": "Full profile data for internal service calls \u2014 includes decrypted credentials.",
         "properties": {
@@ -119,17 +87,6 @@
             "default": "",
             "title": "Active Resume Text",
             "type": "string"
-          },
-          "linkedin_cookie": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Linkedin Cookie"
           },
           "llm_api_key": {
             "anyOf": [
@@ -182,7 +139,6 @@
           "user_id",
           "personal_info",
           "preferences",
-          "linkedin_cookie",
           "llm_api_key",
           "active_resume"
         ],
@@ -414,10 +370,6 @@
             "title": "Created At",
             "type": "string"
           },
-          "has_linkedin_cookie": {
-            "title": "Has Linkedin Cookie",
-            "type": "boolean"
-          },
           "has_llm_api_key": {
             "title": "Has Llm Api Key",
             "type": "boolean"
@@ -467,7 +419,6 @@
           "user_id",
           "personal_info",
           "preferences",
-          "has_linkedin_cookie",
           "has_llm_api_key",
           "created_at",
           "updated_at"
@@ -709,50 +660,6 @@
           }
         },
         "summary": "Internal Get Profile",
-        "tags": [
-          "internal"
-        ]
-      }
-    },
-    "/internal/profiles/{user_id}/cookie": {
-      "get": {
-        "description": "Minimal endpoint for Discovery Service to fetch the LinkedIn cookie only.",
-        "operationId": "internal_get_cookie_internal_profiles__user_id__cookie_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "user_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "User Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalCookieResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Internal Get Cookie",
         "tags": [
           "internal"
         ]

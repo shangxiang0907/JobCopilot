@@ -15,9 +15,9 @@ from temporalio import activity
 
 from jobcopilot_discovery.config import settings
 from jobcopilot_discovery.repositories.run_repo import RunRepository
-from jobcopilot_discovery.services import linkedin_scraper
-from jobcopilot_discovery.services.linkedin_scraper import RawJob, SearchConfig
-from jobcopilot_discovery.services.publisher import publish_cookie_expired, publish_jobs_discovered
+from jobcopilot_discovery.services.publisher import publish_jobs_discovered
+from jobcopilot_discovery.sources import GLOBAL_SOURCES, SearchCriteria, fetch_company_board
+from jobcopilot_discovery.sources.base import USER_AGENT
 
 log = structlog.get_logger()
 
@@ -25,25 +25,13 @@ log = structlog.get_logger()
 
 
 @dataclass
-class ValidateCookieInput:
+class FetchSourcesInput:
     user_id: str
-    run_id: str
-
-
-@dataclass
-class ValidateCookieResult:
-    is_valid: bool
-    cookie: str  # decrypted; empty string if invalid
-
-
-@dataclass
-class SearchLinkedInInput:
-    user_id: str
-    cookie: str
     keywords: list[str] = field(default_factory=list)
     locations: list[str] = field(default_factory=list)
     job_types: list[str] = field(default_factory=list)
     salary_min: int | None = None
+    company_boards: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -57,8 +45,10 @@ class RawJobData:
 
 
 @dataclass
-class SearchLinkedInResult:
+class FetchSourcesResult:
     raw_jobs: list[RawJobData] = field(default_factory=list)
+    source_counts: dict[str, int] = field(default_factory=dict)
+    source_errors: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -93,65 +83,72 @@ class UpdateRunStatusInput:
     error_message: str | None = None
 
 
-@dataclass
-class PublishCookieExpiredInput:
-    user_id: str
-    tenant_id: str
-    run_id: str
-
-
 # ── Activities ────────────────────────────────────────────────────────────────
 
 
 @activity.defn
-async def validate_cookie_activity(inp: ValidateCookieInput) -> ValidateCookieResult:
-    """Fetch the user's LinkedIn cookie from Profile Service, then validate it against LinkedIn."""
-    # Purpose-built minimal endpoint; Profile Service owns decryption.
-    url = f"{settings.profile_service_url}/internal/profiles/{inp.user_id}/cookie"
-    async with httpx.AsyncClient(timeout=8.0) as client:
-        resp = await client.get(url)
+async def fetch_sources_activity(inp: FetchSourcesInput) -> FetchSourcesResult:
+    """Fetch from every public source; one failing source never kills the run.
 
-    if resp.status_code != 200:
-        log.warning("profile_fetch_failed", user_id=inp.user_id, status=resp.status_code)
-        return ValidateCookieResult(is_valid=False, cookie="")
-
-    cookie = resp.json().get("linkedin_cookie") or ""
-    if not cookie:
-        return ValidateCookieResult(is_valid=False, cookie="")
-
-    is_valid = await linkedin_scraper.validate_cookie(cookie)
-
-    log.info("cookie_validated", user_id=inp.user_id, is_valid=is_valid)
-    return ValidateCookieResult(is_valid=is_valid, cookie=cookie if is_valid else "")
-
-
-@activity.defn
-async def search_linkedin_activity(inp: SearchLinkedInInput) -> SearchLinkedInResult:
-    """Run Playwright to scrape LinkedIn job search results."""
-    config = SearchConfig(
-        cookie=inp.cookie,
+    Raises (→ Temporal retry) only when *every* source errored, which points
+    at a systemic problem (network egress, DNS) rather than one flaky feed.
+    """
+    criteria = SearchCriteria(
         keywords=inp.keywords,
         locations=inp.locations,
         job_types=inp.job_types,
         salary_min=inp.salary_min,
     )
-    raw_jobs: list[RawJob] = await linkedin_scraper.scrape_jobs(
-        config, headless=settings.playwright_headless
-    )
-    log.info("linkedin_scraped", user_id=inp.user_id, count=len(raw_jobs))
 
-    result_jobs = [
-        RawJobData(
-            url=j.url,
-            title=j.title,
-            company_name=j.company_name,
-            location=j.location,
-            posted_snippet=j.posted_snippet,
-            raw_text=j.raw_text,
-        )
-        for j in raw_jobs
-    ]
-    return SearchLinkedInResult(raw_jobs=result_jobs)
+    raw_jobs: list[RawJobData] = []
+    counts: dict[str, int] = {}
+    errors: dict[str, str] = {}
+    seen_urls: set[str] = set()
+
+    async with httpx.AsyncClient(
+        timeout=20.0, headers={"User-Agent": USER_AGENT}, follow_redirects=True
+    ) as client:
+        fetchers = [(name, fetcher(client, criteria)) for name, fetcher in GLOBAL_SOURCES.items()]
+        fetchers += [
+            (f"board:{url}", fetch_company_board(client, url, criteria))
+            for url in inp.company_boards
+            if url.strip()
+        ]
+
+        for name, coro in fetchers:
+            try:
+                jobs = await coro
+            except Exception as exc:
+                errors[name] = f"{type(exc).__name__}: {exc}"[:300]
+                log.warning("source_fetch_failed", source=name, error=errors[name])
+                continue
+            counts[name] = len(jobs)
+            for j in jobs:
+                if j.url in seen_urls:
+                    continue  # cross-source duplicate within this run
+                seen_urls.add(j.url)
+                raw_jobs.append(
+                    RawJobData(
+                        url=j.url,
+                        title=j.title,
+                        company_name=j.company_name,
+                        location=j.location,
+                        posted_snippet=j.posted_snippet,
+                        raw_text=j.raw_text,
+                    )
+                )
+
+    if errors and not counts:
+        raise RuntimeError(f"all sources failed: {errors}")
+
+    log.info(
+        "sources_fetched",
+        user_id=inp.user_id,
+        total=len(raw_jobs),
+        counts=counts,
+        errors=errors,
+    )
+    return FetchSourcesResult(raw_jobs=raw_jobs, source_counts=counts, source_errors=errors)
 
 
 @activity.defn
@@ -210,13 +207,6 @@ async def publish_jobs_activity(inp: PublishJobsInput) -> PublishJobsResult:
     )
     log.info("jobs_published", user_id=inp.user_id, run_id=inp.run_id, count=count)
     return PublishJobsResult(published_count=count)
-
-
-@activity.defn
-async def publish_cookie_expired_activity(inp: PublishCookieExpiredInput) -> None:
-    """Notify Notification Service that the user's LinkedIn cookie has expired."""
-    await publish_cookie_expired(user_id=inp.user_id, tenant_id=inp.tenant_id, run_id=inp.run_id)
-    log.warning("cookie_expired_published", user_id=inp.user_id, run_id=inp.run_id)
 
 
 @activity.defn

@@ -5,9 +5,7 @@ from typing import Any
 
 import aio_pika
 from jobcopilot_shared.events import (
-    COOKIE_EXPIRED_KEY,
     JOB_DISCOVERED_KEY,
-    CookieExpiredEvent,
     JobDiscoveredEvent,
 )
 
@@ -61,30 +59,3 @@ async def publish_jobs_discovered(
             count += 1
 
     return count
-
-
-async def publish_cookie_expired(user_id: str, tenant_id: str, run_id: str) -> None:
-    """Publish a cookie.expired event so Notification Service can alert the user.
-
-    Contract: Notification Service's cookie.expired handler requires user_id AND tenant_id.
-    """
-    connection = await _get_connection()
-    async with connection:
-        channel = await connection.channel()
-        exchange = await channel.declare_exchange(
-            _EXCHANGE, aio_pika.ExchangeType.TOPIC, durable=True
-        )
-        event = CookieExpiredEvent(
-            user_id=user_id,
-            tenant_id=tenant_id,
-            run_id=run_id,
-            occurred_at=datetime.now(tz=UTC).isoformat(),
-        )
-        await exchange.publish(
-            aio_pika.Message(
-                body=event.model_dump_json().encode(),
-                content_type="application/json",
-                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-            ),
-            routing_key=COOKIE_EXPIRED_KEY,
-        )

@@ -3,6 +3,13 @@
     "schemas": {
       "DiscoveryConfigCreate": {
         "properties": {
+          "company_boards": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Company Boards",
+            "type": "array"
+          },
           "is_active": {
             "default": true,
             "title": "Is Active",
@@ -57,6 +64,13 @@
       },
       "DiscoveryConfigResponse": {
         "properties": {
+          "company_boards": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Company Boards",
+            "type": "array"
+          },
           "config_id": {
             "format": "uuid",
             "title": "Config Id",
@@ -143,6 +157,7 @@
           "keywords",
           "locations",
           "job_types",
+          "company_boards",
           "salary_min",
           "is_active",
           "schedule_cron",
@@ -155,6 +170,20 @@
       },
       "DiscoveryConfigUpdate": {
         "properties": {
+          "company_boards": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Boards"
+          },
           "is_active": {
             "anyOf": [
               {
@@ -484,7 +513,7 @@
     }
   },
   "info": {
-    "description": "LinkedIn job discovery via Playwright + Temporal",
+    "description": "Public-source job discovery via Temporal (ADR-006)",
     "title": "Discovery Service",
     "version": "0.1.0"
   },

@@ -166,14 +166,6 @@ def test_agent_reads_active_resume_text(profile_spec: Spec) -> None:
     assert "active_resume_text" in props
 
 
-# ── Discovery Service → Profile Service (cookie validation) ──────────────────
-
-
-def test_discovery_reads_decrypted_cookie(profile_spec: Spec) -> None:
-    props = _response_properties(profile_spec, "get", "/internal/profiles/{user_id}/cookie")
-    assert "linkedin_cookie" in props
-
-
 # ── /v1 collection endpoints must be PaginatedResponse (CLAUDE.md rule) ──────
 
 _PAGINATED_FIELDS = {"items", "total", "page", "size", "has_next"}

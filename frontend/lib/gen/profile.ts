@@ -58,26 +58,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/internal/profiles/{user_id}/cookie": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Internal Get Cookie
-         * @description Minimal endpoint for Discovery Service to fetch the LinkedIn cookie only.
-         */
-        get: operations["internal_get_cookie_internal_profiles__user_id__cookie_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/profiles/me": {
         parameters: {
             query?: never;
@@ -180,8 +160,6 @@ export interface components {
         };
         /** CredentialsUpdate */
         CredentialsUpdate: {
-            /** Linkedin Cookie */
-            linkedin_cookie?: string | null;
             /** Llm Api Key */
             llm_api_key?: string | null;
         };
@@ -203,14 +181,6 @@ export interface components {
             version: string;
         };
         /**
-         * InternalCookieResponse
-         * @description Minimal decrypted-cookie payload for the Discovery Service.
-         */
-        InternalCookieResponse: {
-            /** Linkedin Cookie */
-            linkedin_cookie: string | null;
-        };
-        /**
          * InternalProfileResponse
          * @description Full profile data for internal service calls — includes decrypted credentials.
          */
@@ -224,8 +194,6 @@ export interface components {
              * @default
              */
             active_resume_text: string;
-            /** Linkedin Cookie */
-            linkedin_cookie: string | null;
             /** Llm Api Key */
             llm_api_key: string | null;
             /** Personal Info */
@@ -322,8 +290,6 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
-            /** Has Linkedin Cookie */
-            has_linkedin_cookie: boolean;
             /** Has Llm Api Key */
             has_llm_api_key: boolean;
             /** Personal Info */
@@ -470,37 +436,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InternalProfileResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    internal_get_cookie_internal_profiles__user_id__cookie_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InternalCookieResponse"];
                 };
             };
             /** @description Validation Error */

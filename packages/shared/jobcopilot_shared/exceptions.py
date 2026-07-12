@@ -42,12 +42,6 @@ class ExternalServiceError(JobCopilotError):
     error_code = "external_service_error"
 
 
-class CookieExpiredError(ExternalServiceError):
-    """LinkedIn session cookie has expired or been invalidated."""
-
-    error_code = "linkedin_cookie_expired"
-
-
 class QuotaExceededError(JobCopilotError):
     status_code = HTTPStatus.TOO_MANY_REQUESTS
     error_code = "quota_exceeded"

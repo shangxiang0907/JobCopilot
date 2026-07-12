@@ -40,6 +40,7 @@ async def trigger_run(
         locations=config.locations,
         job_types=config.job_types,
         salary_min=config.salary_min,
+        company_boards=config.company_boards,
     )
 
     handle = await temporal_client.start_workflow(

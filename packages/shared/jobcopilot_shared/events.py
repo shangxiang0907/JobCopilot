@@ -11,7 +11,6 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 JOB_DISCOVERED_KEY = "job.discovered"
-COOKIE_EXPIRED_KEY = "cookie.expired"
 NOTIFICATION_TRIGGER_KEY = "notification.trigger"
 
 
@@ -29,15 +28,6 @@ class JobDiscoveredEvent(BaseModel):
     location: str = ""
     raw_text: str = ""
     discovered_at: str | None = None
-
-
-class CookieExpiredEvent(BaseModel):
-    """LinkedIn cookie invalid/expired — Notification Service alerts the user."""
-
-    user_id: str
-    tenant_id: str
-    run_id: str
-    occurred_at: str | None = None
 
 
 class NotificationTriggerEvent(BaseModel):

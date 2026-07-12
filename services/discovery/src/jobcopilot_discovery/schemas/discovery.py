@@ -10,6 +10,8 @@ class DiscoveryConfigCreate(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     locations: list[str] = Field(default_factory=list)
     job_types: list[str] = Field(default_factory=list)
+    # Greenhouse/Lever board URLs, e.g. https://boards.greenhouse.io/stripe
+    company_boards: list[str] = Field(default_factory=list)
     salary_min: int | None = None
     is_active: bool = True
     schedule_cron: str | None = None
@@ -19,6 +21,7 @@ class DiscoveryConfigUpdate(BaseModel):
     keywords: list[str] | None = None
     locations: list[str] | None = None
     job_types: list[str] | None = None
+    company_boards: list[str] | None = None
     salary_min: int | None = None
     is_active: bool | None = None
     schedule_cron: str | None = None
@@ -32,6 +35,7 @@ class DiscoveryConfigResponse(BaseModel):
     keywords: list[str]
     locations: list[str]
     job_types: list[str]
+    company_boards: list[str]
     salary_min: int | None
     is_active: bool
     schedule_cron: str | None

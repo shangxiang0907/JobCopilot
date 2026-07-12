@@ -683,7 +683,7 @@
             "title": "Salary Min"
           },
           "source": {
-            "default": "linkedin",
+            "default": "discovery",
             "title": "Source",
             "type": "string"
           },

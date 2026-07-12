@@ -122,6 +122,8 @@ export interface components {
     schemas: {
         /** DiscoveryConfigCreate */
         DiscoveryConfigCreate: {
+            /** Company Boards */
+            company_boards?: string[];
             /**
              * Is Active
              * @default true
@@ -140,6 +142,8 @@ export interface components {
         };
         /** DiscoveryConfigResponse */
         DiscoveryConfigResponse: {
+            /** Company Boards */
+            company_boards: string[];
             /**
              * Config Id
              * Format: uuid
@@ -177,6 +181,8 @@ export interface components {
         };
         /** DiscoveryConfigUpdate */
         DiscoveryConfigUpdate: {
+            /** Company Boards */
+            company_boards?: string[] | null;
             /** Is Active */
             is_active?: boolean | null;
             /** Job Types */

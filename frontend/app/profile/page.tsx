@@ -13,7 +13,6 @@ import { Separator } from "@/components/ui/separator"
 
 export default function ProfilePage() {
   const queryClient = useQueryClient()
-  const [linkedinCookie, setLinkedinCookie] = useState("")
   const [llmApiKey, setLlmApiKey] = useState("")
 
   const { data: profile, isLoading } = useQuery<Profile>({
@@ -28,11 +27,10 @@ export default function ProfilePage() {
   })
 
   const saveCredentials = useMutation({
-    mutationFn: (payload: { linkedin_cookie?: string; llm_api_key?: string }) =>
+    mutationFn: (payload: { llm_api_key?: string }) =>
       api.patch("/v1/profiles/me/credentials", payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] })
-      setLinkedinCookie("")
       setLlmApiKey("")
     },
   })
@@ -100,9 +98,6 @@ export default function ProfilePage() {
               </p>
             )}
             <div className="flex gap-3">
-              <Badge variant={profile?.has_linkedin_cookie ? "default" : "outline"}>
-                LinkedIn {profile?.has_linkedin_cookie ? "Connected" : "Not Connected"}
-              </Badge>
               <Badge variant={profile?.has_llm_api_key ? "default" : "outline"}>
                 LLM Key {profile?.has_llm_api_key ? "Set" : "Not Set"}
               </Badge>
@@ -123,16 +118,6 @@ export default function ProfilePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="linkedin-cookie">LinkedIn Cookie (li_at)</Label>
-              <Input
-                id="linkedin-cookie"
-                type="password"
-                placeholder="Paste your li_at cookie value"
-                value={linkedinCookie}
-                onChange={(e) => setLinkedinCookie(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
               <Label htmlFor="llm-key">LLM API Key</Label>
               <Input
                 id="llm-key"
@@ -143,16 +128,8 @@ export default function ProfilePage() {
               />
             </div>
             <Button
-              disabled={
-                saveCredentials.isPending ||
-                (!linkedinCookie.trim() && !llmApiKey.trim())
-              }
-              onClick={() =>
-                saveCredentials.mutate({
-                  ...(linkedinCookie.trim() && { linkedin_cookie: linkedinCookie }),
-                  ...(llmApiKey.trim() && { llm_api_key: llmApiKey }),
-                })
-              }
+              disabled={saveCredentials.isPending || !llmApiKey.trim()}
+              onClick={() => saveCredentials.mutate({ llm_api_key: llmApiKey })}
             >
               Save Credentials
             </Button>

@@ -2,7 +2,6 @@
 RabbitMQ consumer for notification-related events.
 
 Routing keys consumed:
-  - cookie.expired       → remind user to refresh LinkedIn cookie
   - notification.trigger → generic notification forwarded to dispatcher
 """
 
@@ -14,9 +13,7 @@ from typing import Any
 
 import aio_pika
 from jobcopilot_shared.events import (
-    COOKIE_EXPIRED_KEY,
     NOTIFICATION_TRIGGER_KEY,
-    CookieExpiredEvent,
     NotificationTriggerEvent,
 )
 
@@ -27,23 +24,7 @@ log = logging.getLogger(__name__)
 
 _EXCHANGE = settings.rabbitmq_exchange
 _QUEUE = "notification.events"
-_ROUTING_KEYS = [COOKIE_EXPIRED_KEY, NOTIFICATION_TRIGGER_KEY]
-
-
-async def _handle_cookie_expired(body: dict[str, Any]) -> None:
-    event = CookieExpiredEvent.model_validate(body)
-    await dispatch_standalone(
-        tenant_id=uuid.UUID(event.tenant_id),
-        user_id=uuid.UUID(event.user_id),
-        type="cookie_expired",
-        title="LinkedIn Cookie Expired",
-        body=(
-            "Your LinkedIn session cookie has expired. "
-            "Please update it in your profile settings to resume job discovery."
-        ),
-        channels=["in_app", "email", "wechat", "dingtalk"],
-        metadata={"run_id": event.run_id},
-    )
+_ROUTING_KEYS = [NOTIFICATION_TRIGGER_KEY]
 
 
 async def _handle_notification_trigger(body: dict[str, Any]) -> None:
@@ -60,7 +41,6 @@ async def _handle_notification_trigger(body: dict[str, Any]) -> None:
 
 
 _HANDLERS = {
-    COOKIE_EXPIRED_KEY: _handle_cookie_expired,
     NOTIFICATION_TRIGGER_KEY: _handle_notification_trigger,
 }
 

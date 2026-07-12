@@ -64,7 +64,7 @@ class InternalJobCreate(BaseModel):
     title: str
     company_name: str
     url: str
-    source: str = "linkedin"
+    source: str = "discovery"
     company_id: uuid.UUID | None = None
     raw_jd: str | None = None
     analysis: dict[str, Any] | None = None

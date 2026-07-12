@@ -1,6 +1,5 @@
 from jobcopilot_shared.config import BaseServiceSettings
 from jobcopilot_shared.exceptions import (
-    CookieExpiredError,
     ExternalServiceError,
     JobCopilotError,
     NotFoundError,
@@ -12,7 +11,6 @@ from jobcopilot_shared.logging import configure_logging, get_logger
 
 __all__ = [
     "BaseServiceSettings",
-    "CookieExpiredError",
     "ExternalServiceError",
     "JobCopilotError",
     "NotFoundError",

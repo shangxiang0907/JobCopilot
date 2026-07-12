@@ -34,7 +34,6 @@ class ProfileUpsert(BaseModel):
 
 
 class CredentialsUpdate(BaseModel):
-    linkedin_cookie: str | None = None
     llm_api_key: str | None = None
 
 
@@ -43,7 +42,6 @@ class ProfileResponse(BaseModel):
     user_id: uuid.UUID
     personal_info: dict[str, Any] | None
     preferences: dict[str, Any] | None
-    has_linkedin_cookie: bool
     has_llm_api_key: bool
     created_at: datetime
     updated_at: datetime
@@ -57,17 +55,10 @@ class ProfileResponse(BaseModel):
             user_id=profile.user_id,
             personal_info=profile.personal_info,
             preferences=profile.preferences,
-            has_linkedin_cookie=bool(profile.linkedin_cookie_enc),
             has_llm_api_key=bool(profile.llm_api_key_enc),
             created_at=profile.created_at,
             updated_at=profile.updated_at,
         )
-
-
-class InternalCookieResponse(BaseModel):
-    """Minimal decrypted-cookie payload for the Discovery Service."""
-
-    linkedin_cookie: str | None
 
 
 class InternalProfileResponse(BaseModel):
@@ -77,7 +68,6 @@ class InternalProfileResponse(BaseModel):
     user_id: uuid.UUID
     personal_info: dict[str, Any] | None
     preferences: dict[str, Any] | None
-    linkedin_cookie: str | None
     llm_api_key: str | None
     active_resume: dict[str, Any] | None
     # Flat convenience field consumed by the Agent Service — kept in sync with

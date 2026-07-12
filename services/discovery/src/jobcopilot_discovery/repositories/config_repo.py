@@ -18,6 +18,7 @@ class ConfigRepository:
             keywords=body.keywords,
             locations=body.locations,
             job_types=body.job_types,
+            company_boards=body.company_boards,
             salary_min=body.salary_min,
             is_active=body.is_active,
             schedule_cron=body.schedule_cron,
