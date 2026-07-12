@@ -365,7 +365,11 @@ services:
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       LLM_MODEL: ${LLM_MODEL:-qwen-max}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      # Must match the LangSmith account's region (ours: AWS US) — the default
+      # endpoint rejects other regions' keys with a bare 403.
+      LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
       LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2:-false}
+      LANGCHAIN_PROJECT: ${LANGCHAIN_PROJECT:-jobcopilot-local}
       PROFILE_SERVICE_URL: http://profile-service:8000
       JOB_SERVICE_URL: http://job-service:8000
       KEYCLOAK_URL: http://keycloak:8080

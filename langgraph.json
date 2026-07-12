@@ -1,0 +1,10 @@
+{
+  "dependencies": ["./services/agent"],
+  "graphs": {
+    "analyzer": "./services/agent/src/jobcopilot_agent/graphs/analyzer_graph.py:analyzer_graph",
+    "resume": "./services/agent/src/jobcopilot_agent/graphs/resume_graph.py:resume_graph",
+    "interview": "./services/agent/src/jobcopilot_agent/graphs/interview_graph.py:interview_graph",
+    "react": "./services/agent/src/jobcopilot_agent/graphs/studio.py:react_graph"
+  },
+  "env": "./infra/.env"
+}

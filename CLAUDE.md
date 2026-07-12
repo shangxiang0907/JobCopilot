@@ -15,7 +15,7 @@ All application code is implemented, verified end-to-end, and **live in producti
 **Work queue (agreed order):**
 1. ~~Docs batch — PRD/SAD/README/CLAUDE.md v0.2 alignment~~ ✅ done 2026-07-11
 2. ~~Anti-hallucination guardrails~~ ✅ done 2026-07-12: Claude Code hooks (`.claude/hooks/` — PostToolUse ruff on every .py edit, PreToolUse blocks bare python / `--parallel` / `uv run --package`), Playwright E2E smoke (`frontend/e2e/`, runs in CD `e2e-smoke` job against the exact pushed images and gates deploy), Pydantic validation of LLM JSON outputs (`graphs/llm_outputs.py` — schemas mirror prompts, change together), `alembic check` per service in CI (models now declare index/constraint names matching the live DB; env.py filters autogenerate to own schema), ruff TID251 bans `structlog.stdlib`, import-linter service-independence contracts
-3. **Operator observability**: surface LangSmith dashboards to the owner; LangGraph Studio (`langgraph dev`, dev-only)
+3. ~~Operator observability~~ ✅ done 2026-07-12: `LANGCHAIN_PROJECT` per environment, repo-root `langgraph.json` + Studio factory wrapper (`graphs/studio.py`) — `langgraph dev` verified serving all 4 graphs; operator guide in `docs/OBSERVABILITY.md`. **LangSmith tracing ACTIVE locally, verified end-to-end** (trace arrival confirmed via API). Hard-won config facts: account region is AWS US → `LANGSMITH_ENDPOINT=https://aws.api.smith.langchain.com` is REQUIRED (default endpoint bare-403s everything); Personal orgs must use a PERSONAL ACCESS TOKEN (Service Keys 403 even on the right endpoint — both verified empirically). Production enablement pending the privacy decision (traces carry resume/JD content to LangChain's cloud — see the guide).
 4. **Re-scope implementation**: remove LinkedIn cookie flow → public-source crawling (source list TBD), three JD entry paths, open self-registration (email verification), deployment-mode LLM key switch, analytics teardown, notification convergence, `/admin/users` + `/admin/usage`
 - Other open items: offsite backup enablement (awaiting S3 credentials), production test-account cleanup before public launch, bulk re-embed backfill job (embeddings are only created on upload; required before any post-launch Qdrant storage migration)
 
@@ -64,7 +64,8 @@ Key design constraints (violating any one blocks launch):
 - LLM: DashScope OpenAI-compatible endpoint; default model `qwen-max`, switchable via `LLM_MODEL`.
 - Metrics: every service exposes `/metrics` via shared `jobcopilot_shared.metrics` — prefix `jobcopilot_`, identical names across services (distinguished by scrape `job` label); multi-worker services need `PROMETHEUS_MULTIPROC_DIR`.
 - Logs: Loki + **Grafana Alloy** (Promtail is deprecated by Grafana). Grafana datasources/dashboards provisioned as code in `infra/grafana/`.
-- Traces: Tempo + OpenTelemetry is **roadmap only**; LangSmith tracing is live (`LANGCHAIN_TRACING_V2` + API key).
+- Traces: Tempo + OpenTelemetry is **roadmap only**. LangSmith plumbing is wired (`LANGCHAIN_TRACING_V2` + `LANGSMITH_API_KEY` + `LANGCHAIN_PROJECT`) but INACTIVE until the owner supplies a key — see `docs/OBSERVABILITY.md`.
+- LangGraph Studio: `~/.local/bin/uv run langgraph dev` from the repo root (graphs registered in `langgraph.json`; dev-only).
 - Resilience: `tenacity` for retry/circuit-breaker.
 
 ---

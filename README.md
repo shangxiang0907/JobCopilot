@@ -67,9 +67,9 @@ flowchart LR
     Agent -->|LLM| DS[DashScope / qwen-max]
 ```
 
-**EN:** Kong fronts all APIs (no service is internet-facing); JWTs are validated in every service against Keycloak's JWKS with issuer/audience checks; each service owns its PostgreSQL schema (cross-schema JOINs forbidden); all services are stateless. Full design: [`docs/SAD.md`](docs/SAD.md) · Product requirements: [`docs/PRD.md`](docs/PRD.md).
+**EN:** Kong fronts all APIs (no service is internet-facing); JWTs are validated in every service against Keycloak's JWKS with issuer/audience checks; each service owns its PostgreSQL schema (cross-schema JOINs forbidden); all services are stateless. Full design: [`docs/SAD.md`](docs/SAD.md) · Product requirements: [`docs/PRD.md`](docs/PRD.md) · Operator observability guide: [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
 
-**中文：** Kong 统一收口全部 API（任何服务不直接暴露公网）；每个服务基于 Keycloak JWKS 校验 JWT（含 issuer/audience 检查）；每个服务独占自己的 PostgreSQL schema（禁止跨 schema JOIN）；服务全部无状态。完整设计见 [`docs/SAD.md`](docs/SAD.md)，产品需求见 [`docs/PRD.md`](docs/PRD.md)。
+**中文：** Kong 统一收口全部 API（任何服务不直接暴露公网）；每个服务基于 Keycloak JWKS 校验 JWT（含 issuer/audience 检查）；每个服务独占自己的 PostgreSQL schema（禁止跨 schema JOIN）；服务全部无状态。完整设计见 [`docs/SAD.md`](docs/SAD.md)，产品需求见 [`docs/PRD.md`](docs/PRD.md)，运营者可观测性指南见 [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md)。
 
 ---
 

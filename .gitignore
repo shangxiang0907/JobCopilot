@@ -43,3 +43,6 @@ infra/.env.production
 # Playwright E2E artifacts
 frontend/test-results/
 frontend/playwright-report/
+
+# LangGraph Studio dev-server runtime state
+.langgraph_api/
