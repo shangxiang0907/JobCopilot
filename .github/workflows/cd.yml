@@ -95,7 +95,9 @@ jobs:
           E2E_IMAGE_OWNER: ${{ github.repository_owner }}
           E2E_IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
         run: |
-          cp .env.example .env
+          # .env.e2e, NOT .env.example — the latter is the production template
+          # and would point the browser at the production Keycloak.
+          cp .env.e2e .env
           docker compose -f docker-compose.yml -f docker-compose.e2e.yml \
             up -d --no-build --quiet-pull
 

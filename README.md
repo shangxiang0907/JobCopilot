@@ -96,7 +96,10 @@ flowchart LR
 
 ```bash
 cd infra
-cp .env.example .env        # fill in at least ENCRYPTION_KEY (see file comments)
+cp .env.e2e .env            # local template (loopback URLs, dummy secrets);
+                            # add a real DASHSCOPE_API_KEY for AI features.
+                            # .env.example is the PRODUCTION template — do not
+                            # use it for local runs.
 docker compose up --build -d
 ```
 
