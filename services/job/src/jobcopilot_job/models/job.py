@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 
 from jobcopilot_shared.models.base import Base
-from sqlalchemy import DateTime, Integer, String, Text, func
+from sqlalchemy import DateTime, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,12 +13,16 @@ _TS = DateTime(timezone=True)
 
 class Job(Base):
     __tablename__ = "jobs"
-    __table_args__ = {"schema": _SCHEMA}
+    # Names must match migration 0001 / the live DB exactly (alembic check).
+    __table_args__ = (
+        Index("ix_jobs_tenant_id", "tenant_id"),
+        {"schema": _SCHEMA},
+    )
 
     job_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     company_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     company_name: Mapped[str] = mapped_column(String(255), nullable=False)

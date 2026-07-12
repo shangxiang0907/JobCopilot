@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 
 from jobcopilot_shared.models.base import Base
-from sqlalchemy import Boolean, DateTime, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,12 +13,17 @@ _TS = DateTime(timezone=True)
 
 class Resume(Base):
     __tablename__ = "resumes"
-    __table_args__ = {"schema": _SCHEMA}
+    # Names must match migration 0001 / the live DB exactly (alembic check).
+    __table_args__ = (
+        Index("ix_resumes_user_id", "user_id"),
+        Index("ix_resumes_user_active", "user_id", "is_active"),
+        {"schema": _SCHEMA},
+    )
 
     resume_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_url: Mapped[str] = mapped_column(String(1000), nullable=False)
     # Extracted text + basic section structure; embedding lives in Qdrant

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from jobcopilot_shared.models.base import Base
-from sqlalchemy import Boolean, DateTime, String, Text, func
+from sqlalchemy import Boolean, DateTime, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,12 +12,16 @@ _TS = DateTime(timezone=True)
 
 class Company(Base):
     __tablename__ = "companies"
-    __table_args__ = {"schema": _SCHEMA}
+    # Names must match migration 0001 / the live DB exactly (alembic check).
+    __table_args__ = (
+        Index("ix_companies_tenant_id", "tenant_id"),
+        {"schema": _SCHEMA},
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     industry: Mapped[str | None] = mapped_column(String(100))
     size: Mapped[str | None] = mapped_column(String(50))

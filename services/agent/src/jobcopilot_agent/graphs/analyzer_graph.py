@@ -16,6 +16,7 @@ from langgraph.graph import END, StateGraph
 
 from jobcopilot_agent.config import settings
 from jobcopilot_agent.graphs._content import response_text
+from jobcopilot_agent.graphs.llm_outputs import JDStructure, MatchScoreOutput
 from jobcopilot_agent.prompts.analyzer import (
     EXTRACT_STRUCTURE_SYSTEM,
     EXTRACT_STRUCTURE_USER,
@@ -83,10 +84,10 @@ async def _extract_structure_node(state: AnalyzerState) -> dict[str, Any]:
     ]
     try:
         response = await llm.ainvoke(messages)
-        jd = json.loads(response_text(response))
+        jd = JDStructure.model_validate_json(response_text(response))
         return {
-            "jd_structured": jd,
-            "skills_required": jd.get("skills_required", []),
+            "jd_structured": jd.model_dump(),
+            "skills_required": jd.skills_required,
         }
     except Exception as exc:
         log.warning("extract_structure_failed", extra={"error": str(exc)})
@@ -115,8 +116,8 @@ async def _compute_match_node(state: AnalyzerState) -> dict[str, Any]:
     ]
     try:
         response = await llm.ainvoke(messages)
-        result = json.loads(response_text(response))
-        return {"match_score": float(result.get("match_score", 0))}
+        result = MatchScoreOutput.model_validate_json(response_text(response))
+        return {"match_score": result.match_score}
     except Exception as exc:
         log.warning("compute_match_failed", extra={"error": str(exc)})
         return {"match_score": 0.0}

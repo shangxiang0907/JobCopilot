@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 
 from jobcopilot_shared.models.base import Base
-from sqlalchemy import Boolean, DateTime, String, Text, func
+from sqlalchemy import Boolean, DateTime, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,11 +13,17 @@ _SCHEMA = "notification_schema"
 
 class Notification(Base):
     __tablename__ = "notifications"
-    __table_args__ = {"schema": _SCHEMA}
+    # Names must match migration 0001 / the live DB exactly (alembic check).
+    __table_args__ = (
+        Index("ix_notifications_tenant_id", "tenant_id"),
+        Index("ix_notifications_user_id", "user_id"),
+        Index("ix_notifications_status", "status"),
+        {"schema": _SCHEMA},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
 
     # "cookie_expired" | "job_discovered" | "analysis_complete" | "reminder" | "custom"
     type: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -28,7 +34,7 @@ class Notification(Base):
     channel: Mapped[str] = mapped_column(String(32), nullable=False)
 
     # "pending" | "sent" | "failed"
-    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Extra context (job_id, run_id, etc.)
@@ -47,11 +53,17 @@ class Notification(Base):
 
 class NotificationPreference(Base):
     __tablename__ = "notification_preferences"
-    __table_args__ = {"schema": _SCHEMA}
+    # Names must match migration 0001 / the live DB exactly (alembic check):
+    # user_id uniqueness lives in a UNIQUE INDEX, not a table constraint.
+    __table_args__ = (
+        Index("ix_notification_preferences_user_id", "user_id", unique=True),
+        Index("ix_notification_preferences_tenant_id", "tenant_id"),
+        {"schema": _SCHEMA},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, unique=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
 
     in_app_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 

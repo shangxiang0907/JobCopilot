@@ -241,3 +241,116 @@ async def test_interview_graph_generates_questions() -> None:
     assert len(result["behavioral_questions"]) == 5
     assert len(result["technical_questions"]) == 5
     assert result["technical_questions"][0]["topic"] == "Python async"
+
+
+# ── LLM output validation (llm_outputs.py schemas) ───────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_analyzer_graph_rejects_wrong_shaped_llm_output() -> None:
+    """A hallucinated shape (skills as a string) must fail into the error path."""
+    bad_jd = {"title": "Engineer", "skills_required": "Python, FastAPI"}
+
+    with (
+        patch("jobcopilot_agent.graphs.analyzer_graph.get_llm") as mock_get_llm,
+        patch("jobcopilot_agent.graphs.analyzer_graph.httpx.AsyncClient") as mock_client_cls,
+    ):
+        llm = AsyncMock()
+        llm.bind = MagicMock(return_value=llm)
+        llm.ainvoke = AsyncMock(return_value=_make_llm_response(bad_jd))
+        mock_get_llm.return_value = llm
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"active_resume_text": "Python developer"}
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.get = AsyncMock(return_value=mock_resp)
+        mock_client_cls.return_value = mock_client
+
+        state: AnalyzerState = {
+            "job_id": "job-1",
+            "user_id": "user-1",
+            "tenant_id": "tenant-1",
+            "url": "https://example.com/jobs/1",
+            "title": "Engineer",
+            "company_name": "Acme",
+            "location": "Remote",
+            "raw_text": "Job text...",
+            "resume_text": "",
+            "jd_structured": {},
+            "skills_required": [],
+            "match_score": 0.0,
+            "error": None,
+        }
+        result = await analyzer_graph.ainvoke(state)
+
+    assert result["jd_structured"] == {}
+    assert result["skills_required"] == []
+    assert result["error"] is not None
+    assert result["match_score"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_resume_graph_rejects_out_of_range_score() -> None:
+    """match_score outside 0-100 must fail validation, not leak downstream."""
+    payload = {
+        "match_score": 150,
+        "hard_skills_gap": [],
+        "soft_skills_gap": [],
+        "experience_gap": "",
+        "education_gap": None,
+        "strengths": [],
+        "suggestions": [],
+    }
+
+    with patch("jobcopilot_agent.graphs.resume_graph.get_llm") as mock_get_llm:
+        llm = AsyncMock()
+        llm.bind = MagicMock(return_value=llm)
+        llm.ainvoke = AsyncMock(return_value=_make_llm_response(payload))
+        mock_get_llm.return_value = llm
+
+        state: ResumeState = {
+            "job_id": "job-1",
+            "user_id": "user-1",
+            "tenant_id": "tenant-1",
+            "jd_structured": {"title": "Engineer"},
+            "resume_text": "Python developer",
+            "match_score": 0.0,
+            "gap_analysis": {},
+            "suggestions": [],
+            "error": None,
+        }
+        result = await resume_graph.ainvoke(state)
+
+    assert result["match_score"] == 0.0
+    assert result["gap_analysis"] == {}
+    assert result["error"] is not None
+
+
+@pytest.mark.asyncio
+async def test_interview_graph_rejects_questions_without_text() -> None:
+    """Question entries missing the required `question` field must be rejected."""
+    bad = {"questions": [{"intent": "no question text"}]}
+
+    with patch("jobcopilot_agent.graphs.interview_graph.get_llm") as mock_get_llm:
+        llm = AsyncMock()
+        llm.bind = MagicMock(return_value=llm)
+        llm.ainvoke = AsyncMock(return_value=_make_llm_response(bad))
+        mock_get_llm.return_value = llm
+
+        state: InterviewState = {
+            "job_id": "job-1",
+            "user_id": "user-1",
+            "tenant_id": "tenant-1",
+            "jd_structured": {"title": "Engineer", "skills_required": ["Python"]},
+            "behavioral_questions": [],
+            "technical_questions": [],
+            "error": None,
+        }
+        result = await interview_graph.ainvoke(state)
+
+    assert result["behavioral_questions"] == []
+    assert result["technical_questions"] == []
+    assert result["error"] is not None

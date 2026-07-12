@@ -13,6 +13,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 
 from jobcopilot_agent.graphs._content import response_text
+from jobcopilot_agent.graphs.llm_outputs import GapAnalysisOutput
 from jobcopilot_agent.prompts.resume import GAP_ANALYSIS_SYSTEM, GAP_ANALYSIS_USER
 from jobcopilot_agent.services.llm import get_llm
 
@@ -49,17 +50,19 @@ async def _gap_analysis_node(state: ResumeState) -> dict[str, Any]:
     ]
     try:
         response = await llm.ainvoke(messages)
-        result = json.loads(response_text(response))
+        result = GapAnalysisOutput.model_validate_json(response_text(response))
         return {
-            "match_score": float(result.get("match_score", 0)),
-            "gap_analysis": {
-                "hard_skills_gap": result.get("hard_skills_gap", []),
-                "soft_skills_gap": result.get("soft_skills_gap", []),
-                "experience_gap": result.get("experience_gap", ""),
-                "education_gap": result.get("education_gap"),
-                "strengths": result.get("strengths", []),
-            },
-            "suggestions": result.get("suggestions", []),
+            "match_score": result.match_score,
+            "gap_analysis": result.model_dump(
+                include={
+                    "hard_skills_gap",
+                    "soft_skills_gap",
+                    "experience_gap",
+                    "education_gap",
+                    "strengths",
+                }
+            ),
+            "suggestions": [s.model_dump() for s in result.suggestions],
         }
     except Exception as exc:
         log.warning("gap_analysis_failed", extra={"error": str(exc)})

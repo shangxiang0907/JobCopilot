@@ -14,7 +14,7 @@ All application code is implemented, verified end-to-end, and **live in producti
 
 **Work queue (agreed order):**
 1. ~~Docs batch — PRD/SAD/README/CLAUDE.md v0.2 alignment~~ ✅ done 2026-07-11
-2. **Anti-hallucination guardrails** (before switching to a lower-capability coding model): Claude Code hooks (PostToolUse ruff/mypy on edits; PreToolUse command blocking), automated Playwright E2E smoke in CI, Pydantic validation of LLM JSON outputs in all 4 graphs (currently bare `json.loads`), `alembic check` per service in CI, ruff banned-api for `structlog.stdlib`, import-linter (services may only import `jobcopilot_shared`)
+2. ~~Anti-hallucination guardrails~~ ✅ done 2026-07-12: Claude Code hooks (`.claude/hooks/` — PostToolUse ruff on every .py edit, PreToolUse blocks bare python / `--parallel` / `uv run --package`), Playwright E2E smoke (`frontend/e2e/`, runs in CD `e2e-smoke` job against the exact pushed images and gates deploy), Pydantic validation of LLM JSON outputs (`graphs/llm_outputs.py` — schemas mirror prompts, change together), `alembic check` per service in CI (models now declare index/constraint names matching the live DB; env.py filters autogenerate to own schema), ruff TID251 bans `structlog.stdlib`, import-linter service-independence contracts
 3. **Operator observability**: surface LangSmith dashboards to the owner; LangGraph Studio (`langgraph dev`, dev-only)
 4. **Re-scope implementation**: remove LinkedIn cookie flow → public-source crawling (source list TBD), three JD entry paths, open self-registration (email verification), deployment-mode LLM key switch, analytics teardown, notification convergence, `/admin/users` + `/admin/usage`
 - Other open items: offsite backup enablement (awaiting S3 credentials), production test-account cleanup before public launch, bulk re-embed backfill job (embeddings are only created on upload; required before any post-launch Qdrant storage migration)
@@ -244,6 +244,9 @@ Run these checks locally **before every `git push`**. CI runs the same steps —
 # 2. Format — must produce zero diffs
 ~/.local/bin/uv run ruff format --check .
 
+# 2b. Import boundaries — services must not import each other
+~/.local/bin/uv run lint-imports
+
 # 3. Type check — run for every service you touched
 ~/.local/bin/uv run mypy services/<name>/
 
@@ -269,13 +272,14 @@ gitleaks detect --no-git
 
 ## CI Requirements
 
-1. **Lint**: `ruff check .` + `ruff format --check .`
+1. **Lint**: `ruff check .` + `ruff format --check .` + `lint-imports` (service independence contracts)
 2. **Type Check**: `mypy` per service
 3. **Unit Tests**: `pytest` (no real DB/queue)
 4. **Contract Checks**: `pytest tests/contracts` (consumer call sites vs provider OpenAPI) + OpenAPI/TS-type freshness (`scripts/export_openapi.py` → `npm run gen:api-types` → `git diff --exit-code -- openapi frontend/lib/gen`). Entity types in `frontend/lib/api.ts` are re-exports of generated types — NEVER hand-write them.
-5. **Integration Tests**: `pytest` against real PostgreSQL + Redis + RabbitMQ (Docker Compose in CI)
+5. **Integration Tests**: `pytest` against real PostgreSQL + Redis + RabbitMQ, then `alembic check` per service (model↔migration drift fails CI)
 6. **Secret Scan**: `gitleaks detect`
 7. **Image Scan**: Trivy — Critical CVE blocks the pipeline
+8. **E2E Smoke** (CD, gates deploy): Playwright journey (Keycloak login → dashboard → jobs/discovery/profile → chat panel) against the stack running the exact images just pushed to GHCR (`frontend/e2e/`, `infra/docker-compose.e2e.yml`, `infra/scripts/create-test-user.sh`). Run locally with `cd frontend && npm run test:e2e` against a running compose stack.
 
 ---
 

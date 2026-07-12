@@ -39,3 +39,7 @@ Thumbs.db
 # Docker
 infra/.env
 infra/.env.production
+
+# Playwright E2E artifacts
+frontend/test-results/
+frontend/playwright-report/

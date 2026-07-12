@@ -18,6 +18,18 @@ target_metadata = Base.metadata
 _SCHEMA = "job_schema"
 
 
+def _include_name(name, type_, parent_names):  # type: ignore[no-untyped-def]
+    """Limit autogenerate/check to this service's own schema.
+
+    The database hosts one schema per service; without this filter,
+    include_schemas=True makes autogenerate see sibling services' tables
+    and propose dropping them.
+    """
+    if type_ == "schema":
+        return name == _SCHEMA
+    return True
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=settings.database_url,
@@ -25,6 +37,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         include_schemas=True,
+        include_name=_include_name,
         version_table="alembic_version",
         version_table_schema=_SCHEMA,
     )
@@ -37,6 +50,7 @@ def do_run_migrations(connection):  # type: ignore[no-untyped-def]
         connection=connection,
         target_metadata=target_metadata,
         include_schemas=True,
+        include_name=_include_name,
         version_table="alembic_version",
         version_table_schema=_SCHEMA,
     )

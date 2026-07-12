@@ -6,7 +6,11 @@ target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP", "ASYNC", "S", "B"]
+# TID251 enforces banned-api below (mechanized lessons; see CLAUDE.md).
+select = ["E", "F", "I", "N", "UP", "ASYNC", "S", "B", "TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"structlog.stdlib".msg = "stdlib-only structlog processors crash EVERY log call in the pure-native pipeline (packages/shared/logging.py) — 2026-07-08 prod incident; regression test in packages/shared/tests/test_logging.py"
 
 [tool.ruff.lint.per-file-ignores]
 # Tests may use assert, fixed credentials, etc. (S) and long fixture names (N).
@@ -19,6 +23,45 @@ select = ["E", "F", "I", "N", "UP", "ASYNC", "S", "B"]
 # The OpenAPI export script re-invokes its own interpreter with literal service
 # names (no untrusted input); S603 subprocess auditing is intentional here.
 "scripts/export_openapi.py" = ["S603"]
+# Claude Code hooks invoke a fixed local uv binary on harness-supplied file
+# paths (local dev tooling, no untrusted input); S603 auditing is intentional.
+".claude/hooks/*.py" = ["S603"]
+
+[tool.importlinter]
+root_packages = [
+    "jobcopilot_shared",
+    "jobcopilot_profile",
+    "jobcopilot_job",
+    "jobcopilot_discovery",
+    "jobcopilot_agent",
+    "jobcopilot_notification",
+]
+
+# Services communicate only via HTTP internal APIs and MQ events — never by
+# importing each other. In the single workspace .venv a cross-service import
+# runs locally but crashes inside the per-service containers.
+[[tool.importlinter.contracts]]
+name = "Services are independent of each other"
+type = "independence"
+modules = [
+    "jobcopilot_profile",
+    "jobcopilot_job",
+    "jobcopilot_discovery",
+    "jobcopilot_agent",
+    "jobcopilot_notification",
+]
+
+[[tool.importlinter.contracts]]
+name = "Shared library never depends on services"
+type = "forbidden"
+source_modules = ["jobcopilot_shared"]
+forbidden_modules = [
+    "jobcopilot_profile",
+    "jobcopilot_job",
+    "jobcopilot_discovery",
+    "jobcopilot_agent",
+    "jobcopilot_notification",
+]
 
 [tool.mypy]
 python_version = "3.11"
@@ -35,6 +78,7 @@ markers = [
 
 [dependency-groups]
 dev = [
+    "import-linter>=2.13",
     "mypy>=1.10.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",

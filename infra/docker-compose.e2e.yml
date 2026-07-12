@@ -1,0 +1,22 @@
+# E2E overlay: run the stack from the exact images CD just built and pushed,
+# instead of building from source on the runner.
+#
+#   E2E_IMAGE_OWNER=<gh-owner> E2E_IMAGE_TAG=<commit-sha> \
+#     docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --no-build
+#
+# Only app services are overridden; infrastructure images stay digest-pinned
+# from the base file.
+
+services:
+  profile-service:
+    image: ghcr.io/${E2E_IMAGE_OWNER}/jobcopilot-profile:${E2E_IMAGE_TAG}
+  job-service:
+    image: ghcr.io/${E2E_IMAGE_OWNER}/jobcopilot-job:${E2E_IMAGE_TAG}
+  discovery-service:
+    image: ghcr.io/${E2E_IMAGE_OWNER}/jobcopilot-discovery:${E2E_IMAGE_TAG}
+  agent-service:
+    image: ghcr.io/${E2E_IMAGE_OWNER}/jobcopilot-agent:${E2E_IMAGE_TAG}
+  notification-service:
+    image: ghcr.io/${E2E_IMAGE_OWNER}/jobcopilot-notification:${E2E_IMAGE_TAG}
+  frontend:
+    image: ghcr.io/${E2E_IMAGE_OWNER}/jobcopilot-frontend:${E2E_IMAGE_TAG}

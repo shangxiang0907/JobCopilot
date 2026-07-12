@@ -71,6 +71,67 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # ── 1b. E2E smoke against the exact images just pushed ───────────────────────
+  e2e-smoke:
+    name: E2E Smoke
+    runs-on: ubuntu-latest
+    needs: build-push
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: docker/login-action@v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start the stack from the just-built images
+        working-directory: infra
+        env:
+          E2E_IMAGE_OWNER: ${{ github.repository_owner }}
+          E2E_IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          cp .env.example .env
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml \
+            up -d --no-build --quiet-pull
+
+      - name: Wait for Keycloak and frontend readiness
+        run: |
+          for i in $(seq 1 60); do
+            kc=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/realms/jobcopilot || true)
+            fe=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 || true)
+            if [ "$kc" = "200" ] && [ "$fe" = "200" ]; then
+              echo "Stack ready after ${i} polls"; exit 0
+            fi
+            sleep 5
+          done
+          echo "Stack failed to become ready" >&2; exit 1
+
+      - name: Create E2E test user
+        run: ./infra/scripts/create-test-user.sh
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Run Playwright smoke suite
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test
+
+      - name: Dump stack logs on failure
+        if: failure()
+        working-directory: infra
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml logs --tail=80
+
   # ── 2. Trivy image scan — Critical CVE blocks the pipeline ───────────────────
   image-scan:
     name: Image Scan / ${{ matrix.service }}
@@ -116,7 +177,7 @@ jobs:
   deploy:
     name: Deploy to Kubernetes
     runs-on: ubuntu-latest
-    needs: image-scan
+    needs: [image-scan, e2e-smoke]
     environment: production
     steps:
       - uses: actions/checkout@v6

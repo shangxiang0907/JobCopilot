@@ -25,6 +25,7 @@ jobs:
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      - run: uv run lint-imports
 
   # ── 2. Secret Scan ───────────────────────────────────────────────────────────
   secret-scan:
@@ -195,4 +196,9 @@ jobs:
           (cd services/profile      && uv run alembic upgrade head)
           (cd services/job          && uv run alembic upgrade head)
           (cd services/notification && uv run alembic upgrade head)
+      - name: Check ORM models match migrations
+        run: |
+          (cd services/profile      && uv run alembic check)
+          (cd services/job          && uv run alembic check)
+          (cd services/notification && uv run alembic check)
       - run: uv run pytest packages/ services/ -v -m integration
