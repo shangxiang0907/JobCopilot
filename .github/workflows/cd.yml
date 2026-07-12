@@ -99,17 +99,27 @@ jobs:
           docker compose -f docker-compose.yml -f docker-compose.e2e.yml \
             up -d --no-build --quiet-pull
 
-      - name: Wait for Keycloak and frontend readiness
+      - name: Wait for stack readiness
+        working-directory: infra
         run: |
-          for i in $(seq 1 60); do
+          # Keycloak realm + frontend up, and Kong answering 401 on a routed
+          # /v1 path (proves gateway, route table, and JWT plugin are live).
+          for i in $(seq 1 90); do
             kc=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/realms/jobcopilot || true)
             fe=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 || true)
-            if [ "$kc" = "200" ] && [ "$fe" = "200" ]; then
-              echo "Stack ready after ${i} polls"; exit 0
+            kong=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/v1/applications || true)
+            if [ "$kc" = "200" ] && [ "$fe" = "200" ] && [ "$kong" = "401" ]; then
+              echo "Stack ready after ${i} polls"
+              # The realm init one-shot must have finished (declares the
+              # tenant_id user-profile attribute) before creating users.
+              docker compose -f docker-compose.yml -f docker-compose.e2e.yml wait keycloak-init
+              exit 0
             fi
             sleep 5
           done
-          echo "Stack failed to become ready" >&2; exit 1
+          echo "Stack failed to become ready" >&2
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml ps -a
+          exit 1
 
       - name: Create E2E test user
         run: ./infra/scripts/create-test-user.sh
@@ -126,6 +136,15 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
           npx playwright test
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: playwright-artifacts
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Dump stack logs on failure
         if: failure()

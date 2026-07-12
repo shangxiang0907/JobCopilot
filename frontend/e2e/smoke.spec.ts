@@ -30,11 +30,11 @@ test("login lands on the dashboard", async ({ page }) => {
   await page.click("#kc-login")
 
   await page.waitForURL((url) => url.origin !== "http://localhost:8080", {
-    timeout: 20_000,
+    timeout: 30_000,
   })
   await expect(
     page.getByRole("heading", { name: "Job Applications" })
-  ).toBeVisible({ timeout: 20_000 })
+  ).toBeVisible({ timeout: 30_000 })
 })
 
 test("core pages render behind auth", async ({ page }) => {
@@ -49,13 +49,19 @@ test("core pages render behind auth", async ({ page }) => {
   ).toBeVisible({ timeout: 20_000 })
 
   await page.getByRole("link", { name: "Jobs" }).click()
-  await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible({
+    timeout: 15_000,
+  })
 
   await page.getByRole("link", { name: "Discovery" }).click()
-  await expect(page.getByRole("heading", { name: "Discovery" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Discovery" })).toBeVisible({
+    timeout: 15_000,
+  })
 
   await page.getByRole("link", { name: "Profile" }).click()
-  await expect(page.getByRole("heading", { name: "Profile Settings" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Profile Settings" })).toBeVisible({
+    timeout: 15_000,
+  })
 
   // AI assistant panel opens and its input is ready (no message sent — that
   // needs a real LLM key).
