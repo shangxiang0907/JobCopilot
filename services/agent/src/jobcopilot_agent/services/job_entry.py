@@ -6,11 +6,11 @@ by URL) → run in-process analysis.
 """
 
 import hashlib
+import logging
 import uuid
 from dataclasses import dataclass
 
 import httpx
-import structlog
 from langchain_core.messages import HumanMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,10 @@ from jobcopilot_agent.config import settings
 from jobcopilot_agent.services.analysis import run_job_analysis
 from jobcopilot_agent.services.llm import get_vision_llm
 
-log = structlog.get_logger()
+# stdlib logging like every other agent module — a bare structlog logger here
+# binds a PrintLogger to whichever stdout exists at first use, which under the
+# full pytest suite is a closed capture stream (CI-only failure, 2026-07-14).
+log = logging.getLogger(__name__)
 
 _TRANSCRIBE_PROMPT = (
     "Transcribe the job posting in this image into plain text. Include the job "
@@ -96,7 +99,9 @@ async def add_job_and_analyze(
     async with httpx.AsyncClient(timeout=15.0) as client:
         resp = await client.post(f"{settings.job_service_url}/internal/jobs", json=payload)
     if resp.status_code not in (200, 201):
-        log.warning("job_upsert_failed", status=resp.status_code, body=resp.text[:200])
+        log.warning(
+            "job_upsert_failed", extra={"status": resp.status_code, "body": resp.text[:200]}
+        )
         return JobEntryOutcome(ok=False, error=f"Job Service returned {resp.status_code}")
     job = resp.json()
     job_id = uuid.UUID(job["job_id"])
