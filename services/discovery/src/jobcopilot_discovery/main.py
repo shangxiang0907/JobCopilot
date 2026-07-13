@@ -10,6 +10,7 @@ from jobcopilot_shared.middleware.tenant import RequestContextMiddleware
 
 from jobcopilot_discovery.config import settings
 from jobcopilot_discovery.routers.configs import router as configs_router
+from jobcopilot_discovery.routers.internal import router as internal_router
 from jobcopilot_discovery.routers.runs import router as runs_router
 from jobcopilot_discovery.worker.worker import start_worker_background
 
@@ -37,5 +38,6 @@ instrument_app(app)
 add_exception_handlers(app)
 
 app.include_router(build_health_router(settings.service_name, settings.version))
+app.include_router(internal_router)
 app.include_router(configs_router)
 app.include_router(runs_router)

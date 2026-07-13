@@ -253,6 +253,8 @@ export interface components {
         ChatMessage: {
             /** Content */
             content: string;
+            /** Images */
+            images?: string[];
             /** Role */
             role: string;
         };

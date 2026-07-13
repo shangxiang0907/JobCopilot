@@ -195,6 +195,13 @@
             "title": "Content",
             "type": "string"
           },
+          "images": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Images",
+            "type": "array"
+          },
           "role": {
             "title": "Role",
             "type": "string"

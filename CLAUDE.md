@@ -160,7 +160,8 @@ docker compose build profile-service job-service discovery-service agent-service
 
 ### LLM / AI
 
-- Default model: `qwen-max` via DashScope; switchable via `LLM_MODEL` env var. JD screenshot parsing (v0.2) requires a vision model (e.g. qwen-vl) on the same endpoint.
+- **Token frugality (owner rule, 2026-07-13):** LLM calls cost the owner real money. Before triggering ANY flow in dev/testing, trace whether it fans out into per-item LLM calls downstream (MQ consumers especially). Verify LLM logic with mocked models; live verification is a SINGLE-item smoke at most — never a bulk run (one discovery run auto-analyzed 143 jobs ≈ 300 LLM calls and drained the owner's token budget). The same restraint applies to spawning Claude subagents for ordinary tasks.
+- Default model: `qwen-max` via DashScope; switchable via `LLM_MODEL` env var. JD screenshot parsing (v0.2) requires a vision model (`LLM_VISION_MODEL`, default qwen-vl-max) on the same endpoint.
 - LangGraph dev mode: `langgraph dev` (development only, never deployed)
 - All LangGraph graphs must define explicit input/output state schemas (TypedDict)
 - Prompts live in `services/agent/prompts/`; never inline prompts in graph code

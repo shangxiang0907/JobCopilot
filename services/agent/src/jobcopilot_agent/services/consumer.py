@@ -1,16 +1,17 @@
 """
 RabbitMQ consumer for job.discovered events.
 
-Order matters: the job is upserted in Job Service FIRST so the analysis is
-keyed by the real job_id (the MQ payload carries no job_id — see the
-Discovery publisher contract). Then AnalyzerGraph runs and the structured
-analysis is pushed back onto the job record.
+Ingest is LLM-free (owner decision, 2026-07-13): the consumer only upserts
+the job in Job Service (idempotent by URL — the MQ payload carries no job_id,
+see the Discovery publisher contract). AnalyzerGraph runs ON DEMAND — when the
+user opens the job, clicks analyze, or asks the assistant — never on ingest:
+a public-source discovery run yields 100+ jobs and auto-analysis at 2 LLM
+calls each made every run a token bomb.
 """
 
 import asyncio
 import json
 import logging
-import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -20,8 +21,6 @@ from jobcopilot_shared.events import JOB_DISCOVERED_KEY, JobDiscoveredEvent
 from pydantic import ValidationError
 
 from jobcopilot_agent.config import settings
-from jobcopilot_agent.deps import open_db_session
-from jobcopilot_agent.services.analysis import run_job_analysis
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +30,7 @@ _ROUTING_KEY = JOB_DISCOVERED_KEY
 
 
 async def _process_job_message(body: dict[str, Any]) -> None:
-    """Upsert the job, run AnalyzerGraph keyed by the real job_id, persist results."""
+    """Idempotently upsert the discovered job in Job Service. No LLM calls."""
     try:
         event = JobDiscoveredEvent.model_validate(body)
     except ValidationError as exc:
@@ -45,7 +44,6 @@ async def _process_job_message(body: dict[str, Any]) -> None:
         )
         return
 
-    # 1. Idempotent upsert in Job Service → authoritative job_id
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
             f"{settings.job_service_url}/internal/jobs",
@@ -66,40 +64,10 @@ async def _process_job_message(body: dict[str, Any]) -> None:
             extra={"status": resp.status_code, "url": event.url},
         )
         return
-    job_id = resp.json()["job_id"]
-
-    # 2. Analyze and persist, keyed by the real job_id
-    async with open_db_session() as session:
-        outcome = await run_job_analysis(
-            session,
-            job_id=uuid.UUID(job_id),
-            user_id=uuid.UUID(event.user_id),
-            tenant_id=uuid.UUID(event.tenant_id),
-            url=event.url,
-            title=event.title,
-            company_name=event.company_name,
-            location=event.location,
-            raw_text=event.raw_text,
-        )
-
-    # 3. Push the structured analysis back onto the job record
-    if outcome.jd_structured:
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                await client.patch(
-                    f"{settings.job_service_url}/internal/jobs/{job_id}",
-                    json={"analysis": outcome.jd_structured},
-                )
-        except Exception as exc:
-            log.warning("job_analysis_patch_failed", extra={"error": str(exc), "job_id": job_id})
 
     log.info(
-        "job_analyzed",
-        extra={
-            "job_id": job_id,
-            "user_id": event.user_id,
-            "match_score": outcome.match_score,
-        },
+        "job_ingested",
+        extra={"job_id": resp.json()["job_id"], "user_id": event.user_id, "url": event.url},
     )
 
 

@@ -20,6 +20,7 @@ from langchain_core.messages import HumanMessage
 from jobcopilot_agent.deps import CurrentUser
 from jobcopilot_agent.graphs.react_graph import build_react_agent
 from jobcopilot_agent.schemas.agent import ChatRequest
+from jobcopilot_agent.services.job_entry import transcribe_jd_image
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/agent/chat", tags=["chat"])
@@ -88,13 +89,44 @@ async def _event_stream(
     yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
 
+async def _inline_screenshot_transcripts(req: ChatRequest) -> list[dict[str, Any]]:
+    """Transcribe JD screenshots on the last user message into its text.
+
+    The ReAct model is text-only (qwen-max); the vision model transcribes the
+    image up front so the agent can act on it (add_job_from_text). Transcription
+    failure degrades into a note the LLM relays to the user — never a 500.
+    """
+    messages = [{"role": m.role, "content": m.content} for m in req.messages]
+    last = req.messages[-1] if req.messages else None
+    if last is None or last.role != "user" or not last.images:
+        return messages
+
+    transcripts: list[str] = []
+    for image in last.images[:3]:  # bound vision-model cost per message
+        try:
+            text = await transcribe_jd_image(image)
+        except Exception as exc:
+            log.warning("screenshot_transcription_failed: %s", exc)
+            transcripts.append("[A screenshot was attached but could not be processed.]")
+            continue
+        transcripts.append(
+            f"[Transcribed job posting from attached screenshot]\n{text}"
+            if text
+            else "[The attached screenshot does not appear to contain a job posting.]"
+        )
+    messages[-1]["content"] = (
+        str(messages[-1]["content"]) + "\n\n" + "\n\n".join(transcripts)
+    ).strip()
+    return messages
+
+
 @router.post("/stream")
 async def chat_stream(
     req: ChatRequest,
     user: CurrentUser,
 ) -> StreamingResponse:
     """Stream AI assistant responses as Server-Sent Events."""
-    messages = [{"role": m.role, "content": m.content} for m in req.messages]
+    messages = await _inline_screenshot_transcripts(req)
     return StreamingResponse(
         _event_stream(
             messages=messages,

@@ -26,6 +26,8 @@ class BaseServiceSettings(BaseSettings):
     dashscope_api_key: str = ""
     dashscope_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     llm_model: str = "qwen-max"
+    # Multimodal model for JD screenshot parsing (same OpenAI-compatible endpoint)
+    llm_vision_model: str = "qwen-vl-max"
 
     # LangSmith tracing (optional)
     langsmith_api_key: str = ""

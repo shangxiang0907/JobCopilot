@@ -11,13 +11,23 @@ export async function POST(req: NextRequest) {
       "Content-Type": "application/json",
       Authorization: req.headers.get("Authorization") ?? "",
     },
-    // Backend contract is ChatRequest { messages: [{ role, content }] } — forward
-    // the full conversation as-is rather than splitting into message/history.
+    // Backend contract is ChatRequest { messages: [{ role, content, images }] } —
+    // forward the full conversation; image attachments (Vercel AI SDK
+    // experimental_attachments, data URLs) become the backend's images list.
     body: JSON.stringify({
-      messages: messages.map((m: { role: string; content: string }) => ({
-        role: m.role,
-        content: m.content,
-      })),
+      messages: messages.map(
+        (m: {
+          role: string
+          content: string
+          experimental_attachments?: { contentType?: string; url: string }[]
+        }) => ({
+          role: m.role,
+          content: m.content,
+          images: (m.experimental_attachments ?? [])
+            .filter((a) => a.contentType?.startsWith("image/") && a.url.startsWith("data:"))
+            .map((a) => a.url),
+        }),
+      ),
     }),
   })
 

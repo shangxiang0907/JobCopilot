@@ -27,6 +27,9 @@ class PrepareInterviewRequest(BaseModel):
 class ChatMessage(BaseModel):
     role: str  # "user" | "assistant"
     content: str
+    # JD screenshots as data URLs (data:image/...;base64,...) — only meaningful
+    # on the LAST user message; transcribed server-side before the ReAct run.
+    images: list[str] = Field(default_factory=list)
 
 
 class ChatRequest(BaseModel):

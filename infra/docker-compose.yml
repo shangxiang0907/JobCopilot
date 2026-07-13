@@ -325,6 +325,9 @@ services:
       TEMPORAL_NAMESPACE: jobcopilot
       PROFILE_SERVICE_URL: http://profile-service:8000
       PLAYWRIGHT_HEADLESS: "true"
+      # Per-source fetch cap; production overrides to 50 via .env. Small local
+      # default keeps dev runs (and their pages/logs) cheap to inspect.
+      DISCOVERY_PER_SOURCE_LIMIT: ${DISCOVERY_PER_SOURCE_LIMIT:-3}
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_ISSUER_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
       KEYCLOAK_REALM: jobcopilot

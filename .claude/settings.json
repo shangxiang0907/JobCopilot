@@ -1,8 +1,4 @@
 {
-  "enabledPlugins": {
-    "andrej-karpathy-skills@karpathy-skills": true,
-    "claude-code-setup@claude-plugins-official": true
-  },
   "hooks": {
     "PreToolUse": [
       {
@@ -26,5 +22,10 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "andrej-karpathy-skills@karpathy-skills": true,
+    "claude-code-setup@claude-plugins-official": true,
+    "cc-usage@cc-helper": true
   }
 }

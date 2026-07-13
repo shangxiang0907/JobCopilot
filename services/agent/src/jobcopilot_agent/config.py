@@ -12,6 +12,7 @@ class Settings(BaseServiceSettings):
     # Internal service URLs
     profile_service_url: str = "http://profile-service:8000"
     job_service_url: str = "http://job-service:8000"
+    discovery_service_url: str = "http://discovery-service:8000"
 
 
 settings = Settings()

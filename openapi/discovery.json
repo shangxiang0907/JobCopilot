@@ -450,6 +450,47 @@
         "title": "PaginatedResponse[DiscoveryRunResponse]",
         "type": "object"
       },
+      "ScrapeRequest": {
+        "properties": {
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "ScrapeRequest",
+        "type": "object"
+      },
+      "ScrapeResponse": {
+        "properties": {
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "ScrapeResponse",
+        "type": "object"
+      },
       "TriggerRunRequest": {
         "properties": {
           "config_id": {
@@ -558,6 +599,48 @@
         "summary": "Readiness",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/internal/scrape": {
+      "post": {
+        "description": "Fetch and text-extract a job posting URL for the manual entry path.\n\nNever errors at the HTTP layer \u2014 failures come back as {ok: false, error}\nso the AI assistant can degrade gracefully (prompt the user to paste text).",
+        "operationId": "internal_scrape_internal_scrape_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScrapeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScrapeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Internal Scrape",
+        "tags": [
+          "internal"
         ]
       }
     },

@@ -38,6 +38,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/scrape": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Internal Scrape
+         * @description Fetch and text-extract a job posting URL for the manual entry path.
+         *
+         *     Never errors at the HTTP layer — failures come back as {ok: false, error}
+         *     so the AI assistant can degrade gracefully (prompt the user to paste text).
+         */
+        post: operations["internal_scrape_internal_scrape_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/discovery/configs": {
         parameters: {
             query?: never;
@@ -272,6 +295,31 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** ScrapeRequest */
+        ScrapeRequest: {
+            /** Url */
+            url: string;
+        };
+        /** ScrapeResponse */
+        ScrapeResponse: {
+            /**
+             * Error
+             * @default
+             */
+            error: string;
+            /** Ok */
+            ok: boolean;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+        };
         /** TriggerRunRequest */
         TriggerRunRequest: {
             /**
@@ -338,6 +386,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    internal_scrape_internal_scrape_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScrapeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScrapeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

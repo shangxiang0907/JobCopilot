@@ -1,14 +1,17 @@
 """Shared types and helpers for source adapters."""
 
 import html
+import os
 import re
 from dataclasses import dataclass, field
 
 USER_AGENT = "JobCopilot/0.2 (+https://github.com/shangxiang0907/JobCopilot)"
 
 # Each source contributes at most this many jobs per run — keeps a single run
-# bounded no matter how large the upstream feed is.
-PER_SOURCE_LIMIT = 50
+# bounded no matter how large the upstream feed is. Overridable so dev/test
+# environments stay small (one full run at 50/source flooded local dev with
+# 143 jobs, bloating every page and log downstream).
+PER_SOURCE_LIMIT = int(os.environ.get("DISCOVERY_PER_SOURCE_LIMIT", "50"))
 
 # Downstream LLM analysis caps its input anyway; don't ship megabytes around.
 RAW_TEXT_LIMIT = 8000

@@ -1,8 +1,8 @@
 "use client"
 
-import { useRef, useEffect } from "react"
+import { useRef, useEffect, useState } from "react"
 import { useChat } from "ai/react"
-import { Check, Loader2, X, Send, Bot, User } from "lucide-react"
+import { Check, Loader2, X, Send, Bot, User, ImagePlus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,16 +32,38 @@ const TOOL_LABELS: Record<string, string> = {
   search_jobs: "Searching jobs",
   get_applications: "Fetching applications",
   prepare_interview: "Preparing interview questions",
+  add_job_from_url: "Fetching job posting from URL",
+  add_job_from_text: "Adding job from description",
 }
 
 export function ChatPanel() {
   const closeChat = useUIStore((s) => s.closeChat)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [attachments, setAttachments] = useState<FileList | undefined>(undefined)
 
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     api: "/api/chat",
     fetch: fetchWithAuth,
   })
+
+  const clearAttachments = () => {
+    setAttachments(undefined)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  const submitWithAttachments = (e: React.FormEvent<HTMLFormElement>) => {
+    handleSubmit(e, { experimental_attachments: attachments })
+    clearAttachments()
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const images = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"))
+    if (images.length === 0) return
+    const dt = new DataTransfer()
+    images.forEach((f) => dt.items.add(f))
+    setAttachments(dt.files)
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -138,20 +160,53 @@ export function ChatPanel() {
       </ScrollArea>
 
       {/* Input */}
-      <form
-        onSubmit={handleSubmit}
-        className="flex items-center gap-2 px-4 py-3 border-t shrink-0"
-      >
-        <Input
-          value={input}
-          onChange={handleInputChange}
-          placeholder="Ask anything…"
-          disabled={isLoading}
-          className="flex-1"
-        />
-        <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
-          <Send className="h-4 w-4" />
-        </Button>
+      <form onSubmit={submitWithAttachments} className="px-4 py-3 border-t shrink-0 space-y-1.5">
+        {attachments && attachments.length > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <ImagePlus className="h-3 w-3" />
+            <span>
+              {attachments.length} screenshot{attachments.length > 1 ? "s" : ""} attached
+            </span>
+            <button type="button" className="underline" onClick={clearAttachments}>
+              remove
+            </button>
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => setAttachments(e.target.files ?? undefined)}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={isLoading}
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach a job-posting screenshot"
+          >
+            <ImagePlus className="h-4 w-4" />
+          </Button>
+          <Input
+            value={input}
+            onChange={handleInputChange}
+            onPaste={handlePaste}
+            placeholder="Ask anything… (paste a JD screenshot to add a job)"
+            disabled={isLoading}
+            className="flex-1"
+          />
+          <Button
+            type="submit"
+            size="icon"
+            disabled={isLoading || (!input.trim() && !attachments?.length)}
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
       </form>
     </div>
   )

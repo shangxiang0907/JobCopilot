@@ -12,6 +12,7 @@ from jobcopilot_agent.config import settings
 from jobcopilot_agent.deps import open_db_session
 from jobcopilot_agent.services.analysis import run_job_analysis
 from jobcopilot_agent.services.interview import prepare_interview_questions
+from jobcopilot_agent.services.job_entry import add_job_and_analyze, scrape_job_url
 
 log = logging.getLogger(__name__)
 
@@ -231,4 +232,118 @@ async def prepare_interview(job_id: str, config: RunnableConfig) -> str:
         return json.dumps({"status": "error", "message": str(exc)})
 
 
-ALL_TOOLS = [analyze_job, update_kanban, search_jobs, get_applications, prepare_interview]
+@tool
+async def add_job_from_url(url: str, config: RunnableConfig) -> str:
+    """Add a job posting to the user's list by fetching a URL, then analyze it.
+    Works with any public job page. If the page cannot be fetched (login wall,
+    anti-bot), tell the user to paste the job description text instead — then
+    call add_job_from_text with it.
+
+    Args:
+        url: The job posting URL, e.g. https://example.com/careers/123.
+    """
+    user_id, tenant_id = _ctx(config)
+    try:
+        user_uuid = uuid.UUID(user_id)
+        tenant_uuid = uuid.UUID(tenant_id)
+    except ValueError:
+        return json.dumps({"status": "error", "message": "Missing user context"})
+
+    try:
+        scraped = await scrape_job_url(url)
+        if not scraped.get("ok"):
+            return json.dumps(
+                {
+                    "status": "scrape_failed",
+                    "message": str(scraped.get("error", "fetch failed")),
+                    "hint": "Ask the user to paste the job description text instead.",
+                }
+            )
+
+        async with open_db_session() as session:
+            outcome = await add_job_and_analyze(
+                session,
+                user_id=user_uuid,
+                tenant_id=tenant_uuid,
+                raw_text=str(scraped.get("text", "")),
+                url=url,
+                title=str(scraped.get("title", "")),
+            )
+        if not outcome.ok and not outcome.job_id:
+            return json.dumps({"status": "error", "message": outcome.error})
+        return json.dumps(
+            {
+                "status": "added",
+                "job_id": outcome.job_id,
+                "title": outcome.title,
+                "company": outcome.company_name,
+                "match_score": outcome.match_score,
+                "skills_required": outcome.skills_required,
+            }
+        )
+    except Exception as exc:
+        log.warning("add_job_from_url_tool_failed", extra={"error": str(exc)})
+        return json.dumps({"status": "error", "message": str(exc)})
+
+
+@tool
+async def add_job_from_text(
+    jd_text: str, config: RunnableConfig, title: str = "", company_name: str = ""
+) -> str:
+    """Add a job posting from pasted job-description text, then analyze it.
+    Use when the user pastes a JD directly, when a screenshot was transcribed,
+    or as the fallback after add_job_from_url fails.
+
+    Args:
+        jd_text: The full job description text.
+        title: Job title if known (otherwise extracted by analysis).
+        company_name: Company name if known.
+    """
+    user_id, tenant_id = _ctx(config)
+    try:
+        user_uuid = uuid.UUID(user_id)
+        tenant_uuid = uuid.UUID(tenant_id)
+    except ValueError:
+        return json.dumps({"status": "error", "message": "Missing user context"})
+
+    if len(jd_text.strip()) < 50:
+        return json.dumps(
+            {"status": "error", "message": "Job description text is too short to analyze."}
+        )
+
+    try:
+        async with open_db_session() as session:
+            outcome = await add_job_and_analyze(
+                session,
+                user_id=user_uuid,
+                tenant_id=tenant_uuid,
+                raw_text=jd_text,
+                title=title,
+                company_name=company_name,
+            )
+        if not outcome.ok and not outcome.job_id:
+            return json.dumps({"status": "error", "message": outcome.error})
+        return json.dumps(
+            {
+                "status": "added",
+                "job_id": outcome.job_id,
+                "title": outcome.title,
+                "company": outcome.company_name,
+                "match_score": outcome.match_score,
+                "skills_required": outcome.skills_required,
+            }
+        )
+    except Exception as exc:
+        log.warning("add_job_from_text_tool_failed", extra={"error": str(exc)})
+        return json.dumps({"status": "error", "message": str(exc)})
+
+
+ALL_TOOLS = [
+    analyze_job,
+    update_kanban,
+    search_jobs,
+    get_applications,
+    prepare_interview,
+    add_job_from_url,
+    add_job_from_text,
+]
