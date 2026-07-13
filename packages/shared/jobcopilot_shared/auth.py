@@ -62,6 +62,7 @@ class TokenClaims(BaseModel):
     tenant_id: uuid.UUID
     iss: str
     exp: int
+    roles: list[str] = []
 
 
 async def verify_token(
@@ -108,11 +109,17 @@ async def verify_token(
         )
 
     try:
+        sub = uuid.UUID(str(raw["sub"]))
+        # Self-registered users carry no tenant_id attribute: each user is
+        # their own tenant (PRD v0.2 §2), so identity defaults to sub. An
+        # explicit claim (legacy/managed users) always wins.
+        tenant_id = uuid.UUID(str(raw["tenant_id"])) if raw.get("tenant_id") else sub
         return TokenClaims(
-            sub=uuid.UUID(str(raw["sub"])),
-            tenant_id=uuid.UUID(str(raw["tenant_id"])),
+            sub=sub,
+            tenant_id=tenant_id,
             iss=raw["iss"],
             exp=int(raw["exp"]),
+            roles=list((raw.get("realm_access") or {}).get("roles") or []),
         )
     except (KeyError, ValueError) as exc:
         raise HTTPException(
@@ -123,3 +130,13 @@ async def verify_token(
 
 
 TokenClaimsDep = Annotated[TokenClaims, Depends(verify_token)]
+
+
+async def require_admin(claims: TokenClaimsDep) -> TokenClaims:
+    """Guard for /v1/admin/* endpoints — platform operator only (realm role `admin`)."""
+    if "admin" not in claims.roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
+    return claims
+
+
+AdminClaimsDep = Annotated[TokenClaims, Depends(require_admin)]

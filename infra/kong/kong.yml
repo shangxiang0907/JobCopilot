@@ -38,6 +38,7 @@ services:
         paths:
           - /v1/profiles
           - /v1/resumes
+          - /v1/admin/users
         strip_path: false
         preserve_host: false
 
@@ -67,6 +68,7 @@ services:
     routes:
       - name: discovery-routes
         paths:
+          - /v1/admin/usage/crawls
           - /v1/discovery
         strip_path: false
         preserve_host: false
@@ -81,6 +83,7 @@ services:
     routes:
       - name: agent-routes
         paths:
+          - /v1/admin/usage/ai
           - /v1/agent
         strip_path: false
         preserve_host: false

@@ -2,10 +2,19 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Search, User, MessageSquare, Briefcase } from "lucide-react"
+import {
+  LayoutDashboard,
+  Search,
+  User,
+  MessageSquare,
+  Briefcase,
+  Users,
+  BarChart3,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useUIStore } from "@/lib/store"
+import { getKeycloak } from "@/lib/keycloak"
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,9 +23,28 @@ const NAV_ITEMS = [
   { href: "/profile", label: "Profile", icon: User },
 ]
 
+// Platform-operator pages — shown only when the JWT carries realm role `admin`
+// (the backend enforces the same guard; hiding here is UX, not security).
+const ADMIN_ITEMS = [
+  { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/usage", label: "Usage", icon: BarChart3 },
+]
+
+function isAdmin(): boolean {
+  try {
+    const parsed = getKeycloak().tokenParsed as
+      | { realm_access?: { roles?: string[] } }
+      | undefined
+    return parsed?.realm_access?.roles?.includes("admin") ?? false
+  } catch {
+    return false
+  }
+}
+
 export function Sidebar() {
   const pathname = usePathname()
   const { chatOpen, toggleChat } = useUIStore()
+  const items = isAdmin() ? [...NAV_ITEMS, ...ADMIN_ITEMS] : NAV_ITEMS
 
   return (
     <aside className="flex flex-col w-56 shrink-0 border-r bg-background h-full">
@@ -30,7 +58,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-4 space-y-1">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+        {items.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href}>
             <span
               className={cn(

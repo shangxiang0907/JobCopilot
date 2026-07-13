@@ -252,8 +252,10 @@ Run these checks locally **before every `git push`**. CI runs the same steps —
 # 3. Type check — run for every service you touched
 ~/.local/bin/uv run mypy services/<name>/
 
-# 4. Unit tests — run for every service you touched (no real DB/queue needed)
-~/.local/bin/uv run pytest services/<name>/tests/ -v -m "not integration"
+# 4. Unit tests — ALWAYS the full suite, exactly as CI runs it. Per-service runs
+#    miss cross-module test-isolation failures (a bare structlog logger passed
+#    per-service but broke under the full suite's logging reconfiguration).
+~/.local/bin/uv run pytest packages/ services/ -m "not integration"
 
 # 5. Contract checks — ALWAYS when any API schema, router, event, or frontend
 #    type changed. Regenerate + commit openapi/ and frontend/lib/gen/ if they diff.

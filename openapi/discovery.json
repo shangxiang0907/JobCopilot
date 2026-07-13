@@ -1,6 +1,27 @@
 {
   "components": {
     "schemas": {
+      "CrawlUsageResponse": {
+        "properties": {
+          "total_runs": {
+            "title": "Total Runs",
+            "type": "integer"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/UserCrawlUsage"
+            },
+            "title": "Users",
+            "type": "array"
+          }
+        },
+        "required": [
+          "users",
+          "total_runs"
+        ],
+        "title": "CrawlUsageResponse",
+        "type": "object"
+      },
       "DiscoveryConfigCreate": {
         "properties": {
           "company_boards": {
@@ -505,6 +526,47 @@
         "title": "TriggerRunRequest",
         "type": "object"
       },
+      "UserCrawlUsage": {
+        "properties": {
+          "jobs_discovered": {
+            "title": "Jobs Discovered",
+            "type": "integer"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run"
+          },
+          "runs_this_month": {
+            "title": "Runs This Month",
+            "type": "integer"
+          },
+          "total_runs": {
+            "title": "Total Runs",
+            "type": "integer"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "total_runs",
+          "runs_this_month",
+          "jobs_discovered",
+          "last_run"
+        ],
+        "title": "UserCrawlUsage",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -641,6 +703,32 @@
         "summary": "Internal Scrape",
         "tags": [
           "internal"
+        ]
+      }
+    },
+    "/v1/admin/usage/crawls": {
+      "get": {
+        "operationId": "admin_crawl_usage_v1_admin_usage_crawls_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrawlUsageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Admin Crawl Usage",
+        "tags": [
+          "admin"
         ]
       }
     },

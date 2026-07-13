@@ -9,6 +9,7 @@ from jobcopilot_shared.metrics import instrument_app
 from jobcopilot_shared.middleware.tenant import RequestContextMiddleware
 
 from jobcopilot_agent.config import settings
+from jobcopilot_agent.routers.admin import router as admin_router
 from jobcopilot_agent.routers.agent import router as agent_router
 from jobcopilot_agent.routers.chat import router as chat_router
 from jobcopilot_agent.routers.internal import router as internal_router
@@ -38,6 +39,7 @@ instrument_app(app)
 add_exception_handlers(app)
 
 app.include_router(build_health_router(settings.service_name, settings.version))
+app.include_router(admin_router)
 app.include_router(agent_router)
 app.include_router(chat_router)
 app.include_router(internal_router)

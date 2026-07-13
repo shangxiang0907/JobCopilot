@@ -57,6 +57,7 @@ def _make_token(
     aud: str = _AUDIENCE,
     exp_offset: int = 300,
     signing_key: str = _PRIVATE_PEM,
+    roles: list[str] | None = None,
 ) -> str:
     claims: dict[str, Any] = {
         "iss": iss,
@@ -66,6 +67,8 @@ def _make_token(
     }
     if tenant_id != "":
         claims["tenant_id"] = tenant_id if tenant_id is not None else str(uuid.uuid4())
+    if roles is not None:
+        claims["realm_access"] = {"roles": roles}
     token: str = jwt.encode(claims, signing_key, algorithm="RS256", headers={"kid": _KID})
     return token
 
@@ -116,11 +119,29 @@ async def test_wrong_issuer_rejected() -> None:
     assert exc.value.detail == "Invalid token issuer"
 
 
-async def test_missing_tenant_id_rejected() -> None:
+async def test_missing_tenant_id_defaults_to_sub() -> None:
+    """Self-registered users carry no tenant_id attribute — each user is their
+    own tenant (PRD v0.2 §2), so identity falls back to sub."""
+    sub = str(uuid.uuid4())
+    claims = await auth.verify_token(_credentials(_make_token(sub=sub, tenant_id="")))
+    assert claims.tenant_id == uuid.UUID(sub)
+
+
+async def test_roles_parsed_from_realm_access() -> None:
+    claims = await auth.verify_token(_credentials(_make_token(roles=["user", "admin"])))
+    assert "admin" in claims.roles
+    no_roles = await auth.verify_token(_credentials(_make_token()))
+    assert no_roles.roles == []
+
+
+async def test_require_admin_guard() -> None:
+    admin = await auth.verify_token(_credentials(_make_token(roles=["admin"])))
+    assert (await auth.require_admin(admin)) is admin
+
+    plain = await auth.verify_token(_credentials(_make_token(roles=["user"])))
     with pytest.raises(HTTPException) as exc:
-        await auth.verify_token(_credentials(_make_token(tenant_id="")))
-    assert exc.value.status_code == 401
-    assert exc.value.detail == "Token missing required claims"
+        await auth.require_admin(plain)
+    assert exc.value.status_code == 403
 
 
 async def test_non_uuid_tenant_id_rejected() -> None:

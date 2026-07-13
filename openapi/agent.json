@@ -1,6 +1,27 @@
 {
   "components": {
     "schemas": {
+      "AiUsageResponse": {
+        "properties": {
+          "total_analyses": {
+            "title": "Total Analyses",
+            "type": "integer"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/UserAiUsage"
+            },
+            "title": "Users",
+            "type": "array"
+          }
+        },
+        "required": [
+          "users",
+          "total_analyses"
+        ],
+        "title": "AiUsageResponse",
+        "type": "object"
+      },
       "AnalysisResponse": {
         "properties": {
           "analysis_id": {
@@ -491,6 +512,42 @@
         "title": "ResumeSuggestions",
         "type": "object"
       },
+      "UserAiUsage": {
+        "properties": {
+          "analyses_this_month": {
+            "title": "Analyses This Month",
+            "type": "integer"
+          },
+          "last_activity": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Activity"
+          },
+          "total_analyses": {
+            "title": "Total Analyses",
+            "type": "integer"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "total_analyses",
+          "analyses_this_month",
+          "last_activity"
+        ],
+        "title": "UserAiUsage",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -649,6 +706,32 @@
         "summary": "Get Analysis Internal",
         "tags": [
           "internal"
+        ]
+      }
+    },
+    "/v1/admin/usage/ai": {
+      "get": {
+        "operationId": "admin_ai_usage_v1_admin_usage_ai_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiUsageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Admin Ai Usage",
+        "tags": [
+          "admin"
         ]
       }
     },

@@ -241,6 +241,8 @@ services:
       KEYCLOAK_ISSUER_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: api
+      # Service-account client for /v1/admin/users (created by keycloak-init)
+      KEYCLOAK_ADMIN_API_SECRET: ${KEYCLOAK_ADMIN_API_SECRET:-dev-admin-api-secret}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       EMBEDDING_MODEL: text-embedding-v3
@@ -525,6 +527,18 @@ services:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       FRONTEND_URL: ${FRONTEND_PUBLIC_URL:-http://localhost:3000}
+      # v0.2 self-registration wiring: registration email verification + Google
+      # login + the least-privilege service account used by /v1/admin/users.
+      # All optional — the script skips whatever is unset.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-noreply@jobcopilot.ai}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      KEYCLOAK_ADMIN_API_SECRET: ${KEYCLOAK_ADMIN_API_SECRET:-dev-admin-api-secret}
     restart: "no"
 
 # ── Volumes ─────────────────────────────────────────────────────────────────

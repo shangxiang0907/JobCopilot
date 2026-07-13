@@ -15,5 +15,9 @@ class Settings(BaseServiceSettings):
     resume_storage_path: str = Field(default="/tmp/jobcopilot/resumes")  # noqa: S108
     max_resume_size_mb: int = 10
 
+    # Client secret of the `admin-api` service account (created by keycloak-init;
+    # scoped to view-users + manage-users only). Powers /v1/admin/users.
+    keycloak_admin_api_secret: str = ""
+
 
 settings = Settings()

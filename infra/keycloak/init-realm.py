@@ -130,11 +130,149 @@ def ensure_redirect_uri(token: str) -> None:
     print("==> frontend client redirect URI / web origin configured successfully")
 
 
+def ensure_self_registration(token: str) -> None:
+    """Enable self-registration (PRD v0.2 B2C). Email verification switches on
+    only when SMTP is configured — otherwise new users could never verify."""
+    realm_url = f"{KEYCLOAK_URL}/admin/realms/{REALM}"
+    realm = _http("GET", realm_url, token=token)
+
+    smtp_host = os.environ.get("SMTP_HOST", "")
+    desired = {
+        "registrationAllowed": True,
+        "registrationEmailAsUsername": True,
+        "verifyEmail": bool(smtp_host),
+        "resetPasswordAllowed": True,
+        "loginWithEmailAllowed": True,
+    }
+    if smtp_host:
+        desired["smtpServer"] = {
+            "host": smtp_host,
+            "port": os.environ.get("SMTP_PORT", "587"),
+            "from": os.environ.get("SMTP_FROM_ADDRESS", "noreply@jobcopilot.ai"),
+            "fromDisplayName": "JobCopilot",
+            "auth": "true" if os.environ.get("SMTP_USERNAME") else "false",
+            "user": os.environ.get("SMTP_USERNAME", ""),
+            "password": os.environ.get("SMTP_PASSWORD", ""),
+            "starttls": os.environ.get("SMTP_USE_TLS", "true"),
+            "ssl": "false",
+        }
+
+    # smtpServer comparison would leak the password into logs; compare flags only.
+    flags_current = {k: realm.get(k) for k in desired if k != "smtpServer"}
+    flags_desired = {k: v for k, v in desired.items() if k != "smtpServer"}
+    if flags_current == flags_desired and not smtp_host:
+        print("==> self-registration flags already set — nothing to do")
+        return
+
+    realm.update(desired)
+    print(f"==> Enabling self-registration (verifyEmail={desired['verifyEmail']}) ...")
+    _http("PUT", realm_url, data=json.dumps(realm).encode(), token=token)
+    print("==> self-registration configured successfully")
+
+
+def ensure_google_idp(token: str) -> None:
+    """Register Google as an identity provider when credentials are supplied.
+
+    Secrets arrive via env (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) — never
+    committed to the realm export. Skipped silently when unset.
+    """
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+    if not client_id or not client_secret:
+        print("==> GOOGLE_CLIENT_ID/SECRET unset — skipping Google IdP")
+        return
+
+    idp_url = f"{KEYCLOAK_URL}/admin/realms/{REALM}/identity-provider/instances"
+    payload = {
+        "alias": "google",
+        "providerId": "google",
+        "enabled": True,
+        "trustEmail": True,
+        "config": {
+            "clientId": client_id,
+            "clientSecret": client_secret,
+            "syncMode": "IMPORT",
+        },
+    }
+    try:
+        _http("GET", f"{idp_url}/google", token=token)
+        print("==> Google IdP exists — updating credentials ...")
+        _http("PUT", f"{idp_url}/google", data=json.dumps(payload).encode(), token=token)
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            raise
+        print("==> Creating Google IdP ...")
+        _http("POST", idp_url, data=json.dumps(payload).encode(), token=token)
+    print("==> Google IdP configured successfully")
+
+
+def ensure_admin_api_client(token: str) -> None:
+    """Service-account client for the profile service's /v1/admin user management.
+
+    Grants only realm-management view-users + manage-users (least privilege) —
+    never the master admin credentials. Secret from KEYCLOAK_ADMIN_API_SECRET.
+    """
+    secret = os.environ.get("KEYCLOAK_ADMIN_API_SECRET", "")
+    if not secret:
+        print("==> KEYCLOAK_ADMIN_API_SECRET unset — skipping admin-api client")
+        return
+
+    clients_url = f"{KEYCLOAK_URL}/admin/realms/{REALM}/clients"
+    existing = _http("GET", f"{clients_url}?clientId=admin-api", token=token)
+    payload = {
+        "clientId": "admin-api",
+        "protocol": "openid-connect",
+        "publicClient": False,
+        "serviceAccountsEnabled": True,
+        "standardFlowEnabled": False,
+        "directAccessGrantsEnabled": False,
+        "secret": secret,
+    }
+    if existing:
+        client_uuid = existing[0]["id"]
+        _http(
+            "PUT",
+            f"{clients_url}/{client_uuid}",
+            data=json.dumps({**existing[0], **payload}).encode(),
+            token=token,
+        )
+        print("==> admin-api client updated")
+    else:
+        _http("POST", clients_url, data=json.dumps(payload).encode(), token=token)
+        client_uuid = _http("GET", f"{clients_url}?clientId=admin-api", token=token)[0]["id"]
+        print("==> admin-api client created")
+
+    # Assign realm-management roles to the service account.
+    svc_user = _http("GET", f"{clients_url}/{client_uuid}/service-account-user", token=token)
+    rm_client = _http("GET", f"{clients_url}?clientId=realm-management", token=token)[0]
+    available = _http(
+        "GET",
+        f"{KEYCLOAK_URL}/admin/realms/{REALM}/users/{svc_user['id']}"
+        f"/role-mappings/clients/{rm_client['id']}/available",
+        token=token,
+    )
+    wanted = [r for r in available if r["name"] in ("view-users", "manage-users")]
+    if wanted:
+        _http(
+            "POST",
+            f"{KEYCLOAK_URL}/admin/realms/{REALM}/users/{svc_user['id']}"
+            f"/role-mappings/clients/{rm_client['id']}",
+            data=json.dumps(wanted).encode(),
+            token=token,
+        )
+        print(f"==> granted {[r['name'] for r in wanted]} to admin-api service account")
+    else:
+        print("==> admin-api service account roles already granted")
+
+
 def main() -> None:
     print("==> Fetching admin token ...")
     token = get_admin_token()
     configure_user_profile(token)
     ensure_redirect_uri(token)
+    ensure_self_registration(token)
+    ensure_google_idp(token)
+    ensure_admin_api_client(token)
 
 
 if __name__ == "__main__":
