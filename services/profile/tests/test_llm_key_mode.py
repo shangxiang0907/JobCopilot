@@ -31,6 +31,7 @@ async def test_update_credentials_encryptor_round_trips(
             tenant_id=_USER,
             user_id=_USER,
         )
+    assert update.await_args is not None
     encryptor = update.await_args.args[2]
     assert decrypt(encryptor("sk-round-trip"), settings.encryption_key) == "sk-round-trip"
 
