@@ -31,6 +31,8 @@ data:
   TEMPORAL_NAMESPACE: "jobcopilot"
 
   # LLM
+  # ADR-007: platform = env key serves all users; byo = per-user saved keys
+  LLM_KEY_MODE: "platform"
   DASHSCOPE_BASE_URL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
   LLM_MODEL: "qwen-max"
   LANGCHAIN_TRACING_V2: "false"

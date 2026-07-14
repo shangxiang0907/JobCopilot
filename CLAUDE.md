@@ -76,6 +76,7 @@ Key design constraints (violating any one blocks launch):
 
 ```bash
 # LLM
+LLM_KEY_MODE=byo            # ADR-007: byo = per-user saved keys (self-hosted default); platform = env key serves all users, key UI hidden (hosted site)
 DASHSCOPE_API_KEY=sk-...
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LANGSMITH_API_KEY=ls__...

@@ -1,5 +1,5 @@
 import uuid
-from typing import Any
+from collections.abc import Callable
 
 from jobcopilot_shared.exceptions import NotFoundError
 from sqlalchemy import select
@@ -45,7 +45,7 @@ class ProfileRepository:
         self,
         user_id: uuid.UUID,
         data: CredentialsUpdate,
-        encrypt: Any,
+        encrypt: Callable[[str], str],
     ) -> Profile:
         profile = await self.get_by_user_or_none(user_id)
         if profile is None:

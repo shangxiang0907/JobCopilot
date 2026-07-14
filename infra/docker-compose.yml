@@ -243,6 +243,8 @@ services:
       KEYCLOAK_CLIENT_ID: api
       # Service-account client for /v1/admin/users (created by keycloak-init)
       KEYCLOAK_ADMIN_API_SECRET: ${KEYCLOAK_ADMIN_API_SECRET:-dev-admin-api-secret}
+      # ADR-007: byo = per-user keys (self-hosted default); platform = env key serves all
+      LLM_KEY_MODE: ${LLM_KEY_MODE:-byo}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       EMBEDDING_MODEL: text-embedding-v3
@@ -366,6 +368,8 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/jobcopilot
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://guest:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
+      # ADR-007: byo = per-user keys (self-hosted default); platform = env key serves all
+      LLM_KEY_MODE: ${LLM_KEY_MODE:-byo}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       LLM_MODEL: ${LLM_MODEL:-qwen-max}
@@ -451,6 +455,8 @@ services:
       KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
       KEYCLOAK_REALM: jobcopilot
       KEYCLOAK_CLIENT_ID: frontend
+      # ADR-007: platform mode hides the BYO key UI (served via /env.js)
+      LLM_KEY_MODE: ${LLM_KEY_MODE:-byo}
     ports:
       - "127.0.0.1:3000:3000"
     restart: unless-stopped

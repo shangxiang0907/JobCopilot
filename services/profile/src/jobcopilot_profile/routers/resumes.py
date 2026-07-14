@@ -43,11 +43,15 @@ async def upload_resume(
     repo = ResumeRepository(session)
     resume = await repo.create(user_id, file_name, file_url, parsed)
 
+    # Resolve the key now (needs the request's DB session); the background task
+    # must not touch the session after the response is sent.
+    embedding_api_key = await embedding.resolve_embedding_api_key(session, user_id)
     background_tasks.add_task(
         embedding.embed_and_upsert,
         resume.resume_id,
         user_id,
         parsed.get("raw_text", ""),
+        embedding_api_key,
     )
 
     logger.info("resume_uploaded", user_id=str(user_id), resume_id=str(resume.resume_id))

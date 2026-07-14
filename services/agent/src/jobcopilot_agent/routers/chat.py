@@ -17,7 +17,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 
-from jobcopilot_agent.deps import CurrentUser
+from jobcopilot_agent.deps import CurrentUser, LLMKeyDep
 from jobcopilot_agent.graphs.react_graph import build_react_agent
 from jobcopilot_agent.schemas.agent import ChatRequest
 from jobcopilot_agent.services.job_entry import transcribe_jd_image
@@ -120,7 +120,7 @@ async def _inline_screenshot_transcripts(req: ChatRequest) -> list[dict[str, Any
     return messages
 
 
-@router.post("/stream")
+@router.post("/stream", dependencies=[LLMKeyDep])
 async def chat_stream(
     req: ChatRequest,
     user: CurrentUser,

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Upload, Trash2, CheckCircle, User, Key } from "lucide-react"
 import api, { type Profile, type Resume } from "@/lib/api"
@@ -14,6 +14,13 @@ import { Separator } from "@/components/ui/separator"
 export default function ProfilePage() {
   const queryClient = useQueryClient()
   const [llmApiKey, setLlmApiKey] = useState("")
+
+  // Deployment mode (ADR-007): hosted platform deployments hide the BYO key UI.
+  // Read after mount — window.__ENV__ (served by /env.js) is a browser-only global.
+  const [byoKeyEnabled, setByoKeyEnabled] = useState(false)
+  useEffect(() => {
+    setByoKeyEnabled(window.__ENV__?.LLM_KEY_MODE !== "platform")
+  }, [])
 
   const { data: profile, isLoading } = useQuery<Profile>({
     queryKey: ["profile"],
@@ -97,15 +104,18 @@ export default function ProfilePage() {
                 {personalName}
               </p>
             )}
-            <div className="flex gap-3">
-              <Badge variant={profile?.has_llm_api_key ? "default" : "outline"}>
-                LLM Key {profile?.has_llm_api_key ? "Set" : "Not Set"}
-              </Badge>
-            </div>
+            {byoKeyEnabled && (
+              <div className="flex gap-3">
+                <Badge variant={profile?.has_llm_api_key ? "default" : "outline"}>
+                  LLM Key {profile?.has_llm_api_key ? "Set" : "Not Set"}
+                </Badge>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Credentials */}
+        {/* Credentials — self-hosted (byo) deployments only */}
+        {byoKeyEnabled && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -135,6 +145,7 @@ export default function ProfilePage() {
             </Button>
           </CardContent>
         </Card>
+        )}
 
         {/* Resumes */}
         <Card>

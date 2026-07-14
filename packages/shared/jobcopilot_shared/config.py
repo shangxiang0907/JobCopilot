@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,6 +25,10 @@ class BaseServiceSettings(BaseSettings):
     keycloak_client_id: str = "api"
 
     # LLM — switchable via env var; defaults to DashScope
+    # Deployment mode for LLM key sourcing (ADR-007):
+    #   byo      — each user saves their own key (self-hosted default; key UI shown)
+    #   platform — dashscope_api_key serves every user (hosted site; key UI hidden)
+    llm_key_mode: Literal["byo", "platform"] = "byo"
     dashscope_api_key: str = ""
     dashscope_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     llm_model: str = "qwen-max"

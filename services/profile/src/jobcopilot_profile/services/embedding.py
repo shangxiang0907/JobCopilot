@@ -2,23 +2,52 @@
 
 import uuid
 
+from jobcopilot_shared.crypto import decrypt
+from jobcopilot_shared.exceptions import NotFoundError
 from jobcopilot_shared.logging import get_logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from jobcopilot_profile.config import settings
 
 logger = get_logger(__name__)
 
 
-async def embed_and_upsert(resume_id: uuid.UUID, user_id: uuid.UUID, text: str) -> bool:
+async def resolve_embedding_api_key(session: AsyncSession, user_id: uuid.UUID) -> str | None:
+    """Key for embedding calls, by deployment mode (ADR-007).
+
+    platform → the deployment-wide env key; byo → the user's own stored key.
+    None means "skip embedding" — resumes still upload fine without a vector.
+    """
+    if settings.llm_key_mode == "platform":
+        return settings.dashscope_api_key or None
+
+    from jobcopilot_profile.repositories.profile_repo import ProfileRepository
+
+    try:
+        profile = await ProfileRepository(session).get_by_user(user_id)
+    except NotFoundError:
+        return None
+    if not profile.llm_api_key_enc:
+        return None
+    try:
+        return decrypt(profile.llm_api_key_enc, settings.encryption_key)
+    except Exception as exc:
+        logger.error("embedding_key_decrypt_failed", user_id=str(user_id), error=str(exc))
+        return None
+
+
+async def embed_and_upsert(
+    resume_id: uuid.UUID, user_id: uuid.UUID, text: str, api_key: str | None
+) -> bool:
     """Compute embedding and upsert to Qdrant. Returns False if skipped (no API key)."""
-    if not settings.dashscope_api_key:
-        logger.info("embedding_skipped", reason="DASHSCOPE_API_KEY not set")
+    if not api_key:
+        logger.info("embedding_skipped", reason="no API key for current llm_key_mode")
         return False
     if not text.strip():
         logger.info("embedding_skipped", reason="empty text")
         return False
 
-    vector = await _get_embedding(text)
+    vector = await _get_embedding(text, api_key)
     if not vector:
         return False
 
@@ -27,9 +56,7 @@ async def embed_and_upsert(resume_id: uuid.UUID, user_id: uuid.UUID, text: str) 
 
 
 async def delete_embedding(resume_id: uuid.UUID) -> None:
-    """Remove a resume's vector from Qdrant."""
-    if not settings.dashscope_api_key:
-        return
+    """Remove a resume's vector from Qdrant. Needs no LLM key — Qdrant only."""
     try:
         from qdrant_client import AsyncQdrantClient
 
@@ -42,12 +69,12 @@ async def delete_embedding(resume_id: uuid.UUID) -> None:
         logger.warning("qdrant_delete_failed", resume_id=str(resume_id), error=str(exc))
 
 
-async def _get_embedding(text: str) -> list[float] | None:
+async def _get_embedding(text: str, api_key: str) -> list[float] | None:
     try:
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(
-            api_key=settings.dashscope_api_key,
+            api_key=api_key,
             base_url=settings.dashscope_base_url,
         )
         # Truncate to ~8000 tokens to stay within model limits

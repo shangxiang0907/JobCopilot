@@ -45,3 +45,10 @@ class ExternalServiceError(JobCopilotError):
 class QuotaExceededError(JobCopilotError):
     status_code = HTTPStatus.TOO_MANY_REQUESTS
     error_code = "quota_exceeded"
+
+
+class LLMKeyNotConfiguredError(JobCopilotError):
+    """BYO deployment mode (ADR-007): the user has not saved an LLM API key yet."""
+
+    status_code = HTTPStatus.CONFLICT
+    error_code = "llm_key_not_configured"

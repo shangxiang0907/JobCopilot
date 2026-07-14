@@ -2,9 +2,10 @@ from datetime import UTC
 
 from fastapi import APIRouter, status
 from jobcopilot_shared.crypto import encrypt
-from jobcopilot_shared.exceptions import NotFoundError
+from jobcopilot_shared.exceptions import NotFoundError, PermissionDeniedError
 from jobcopilot_shared.logging import get_logger
 
+from jobcopilot_profile.config import settings
 from jobcopilot_profile.deps import SessionDep, TenantIdDep, UserIdDep
 from jobcopilot_profile.repositories.profile_repo import ProfileRepository
 from jobcopilot_profile.schemas.profile import CredentialsUpdate, ProfileResponse, ProfileUpsert
@@ -63,6 +64,14 @@ async def update_credentials(
     tenant_id: TenantIdDep,
     user_id: UserIdDep,
 ) -> None:
+    # Hosted site (ADR-007): the platform key serves everyone; BYO keys are
+    # rejected server-side, not just hidden in the UI.
+    if settings.llm_key_mode == "platform":
+        raise PermissionDeniedError(
+            "API key configuration is disabled on this deployment; the platform provides LLM access"
+        )
     repo = ProfileRepository(session)
-    await repo.update_credentials(user_id, body, encrypt)
+    await repo.update_credentials(
+        user_id, body, lambda value: encrypt(value, settings.encryption_key)
+    )
     logger.info("credentials_updated", user_id=str(user_id))

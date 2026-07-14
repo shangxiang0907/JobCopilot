@@ -12,7 +12,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, status
 
-from jobcopilot_agent.deps import CurrentUser, DbDep
+from jobcopilot_agent.deps import CurrentUser, DbDep, LLMKeyDep
 from jobcopilot_agent.repositories.analysis_repo import AnalysisRepository
 from jobcopilot_agent.schemas.agent import (
     AnalysisResponse,
@@ -34,7 +34,12 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/agent", tags=["agent"])
 
 
-@router.post("/analyze", response_model=AnalyzeJobResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/analyze",
+    response_model=AnalyzeJobResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[LLMKeyDep],
+)
 async def analyze_job(
     req: AnalyzeJobRequest,
     user: CurrentUser,
@@ -63,7 +68,12 @@ async def analyze_job(
     )
 
 
-@router.post("/match", response_model=MatchResumeResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/match",
+    response_model=MatchResumeResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[LLMKeyDep],
+)
 async def match_resume(
     req: MatchResumeRequest,
     user: CurrentUser,
@@ -96,7 +106,12 @@ async def match_resume(
     )
 
 
-@router.post("/interview", response_model=PrepareInterviewResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/interview",
+    response_model=PrepareInterviewResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[LLMKeyDep],
+)
 async def prepare_interview(
     req: PrepareInterviewRequest,
     user: CurrentUser,

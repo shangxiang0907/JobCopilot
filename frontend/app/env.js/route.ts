@@ -17,6 +17,8 @@ export function GET() {
     KEYCLOAK_URL: process.env.KEYCLOAK_PUBLIC_URL ?? "http://localhost:8080",
     KEYCLOAK_REALM: process.env.KEYCLOAK_REALM ?? "jobcopilot",
     KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID ?? "frontend",
+    // Deployment mode for LLM key sourcing (ADR-007); platform hides the BYO key UI.
+    LLM_KEY_MODE: process.env.LLM_KEY_MODE === "platform" ? "platform" : "byo",
   }
   return new Response(`window.__ENV__=${JSON.stringify(env)}`, {
     headers: {
