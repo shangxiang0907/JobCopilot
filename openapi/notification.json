@@ -191,10 +191,6 @@
             "title": "Created At",
             "type": "string"
           },
-          "dingtalk_configured": {
-            "title": "Dingtalk Configured",
-            "type": "boolean"
-          },
           "email_address": {
             "anyOf": [
               {
@@ -223,10 +219,6 @@
             "format": "date-time",
             "title": "Updated At",
             "type": "string"
-          },
-          "wechat_configured": {
-            "title": "Wechat Configured",
-            "type": "boolean"
           }
         },
         "required": [
@@ -234,8 +226,6 @@
           "in_app_enabled",
           "email_enabled",
           "email_address",
-          "wechat_configured",
-          "dingtalk_configured",
           "created_at",
           "updated_at"
         ],
@@ -244,17 +234,6 @@
       },
       "PreferenceUpdate": {
         "properties": {
-          "dingtalk_webhook_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dingtalk Webhook Url"
-          },
           "email_address": {
             "anyOf": [
               {
@@ -287,17 +266,6 @@
               }
             ],
             "title": "In App Enabled"
-          },
-          "wechat_webhook_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Wechat Webhook Url"
           }
         },
         "title": "PreferenceUpdate",

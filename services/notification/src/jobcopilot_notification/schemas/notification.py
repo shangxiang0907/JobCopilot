@@ -31,8 +31,6 @@ class PreferenceOut(BaseModel):
     in_app_enabled: bool
     email_enabled: bool
     email_address: str | None
-    wechat_configured: bool
-    dingtalk_configured: bool
     created_at: datetime
     updated_at: datetime
 
@@ -43,9 +41,6 @@ class PreferenceUpdate(BaseModel):
     in_app_enabled: bool | None = None
     email_enabled: bool | None = None
     email_address: str | None = None
-    # Plain-text webhooks — service encrypts before persisting
-    wechat_webhook_url: str | None = None
-    dingtalk_webhook_url: str | None = None
 
     @field_validator("email_address", mode="before")
     @classmethod

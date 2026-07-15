@@ -20,6 +20,8 @@ test("unauthenticated visit redirects to Keycloak login", async ({ page }) => {
   await page.goto("/")
   await page.waitForURL(/\/realms\/jobcopilot\/protocol\/openid-connect\//)
   await expect(page.locator("#username")).toBeVisible()
+  // Self-registration (v0.2) — keycloak-init must have enabled it on the realm.
+  await expect(page.getByRole("link", { name: /register/i })).toBeVisible()
 })
 
 test("login lands on the dashboard", async ({ page }) => {
@@ -67,4 +69,33 @@ test("core pages render behind auth", async ({ page }) => {
   // needs a real LLM key).
   await page.getByRole("button", { name: "AI Assistant" }).click()
   await expect(page.getByPlaceholder("Ask anything…")).toBeVisible()
+})
+
+test("admin pages render for the admin role", async ({ page }) => {
+  // The test user carries realm role `admin` (create-test-user.sh), so the
+  // role-gated sidebar section and both operator pages must work end-to-end
+  // (JWT roles → sidebar gate → Kong admin routes → per-service endpoints).
+  await page.goto("/")
+  await page.waitForURL(/openid-connect/)
+  await page.fill("#username", USER)
+  await page.fill("#password", PASSWORD)
+  await page.click("#kc-login")
+  await expect(
+    page.getByRole("heading", { name: "Job Applications" })
+  ).toBeVisible({ timeout: 20_000 })
+
+  await page.getByRole("link", { name: "Users" }).click()
+  await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible({
+    timeout: 15_000,
+  })
+  // Real data, not just the page shell: the test user itself must be listed.
+  await expect(page.getByText(USER).first()).toBeVisible({ timeout: 15_000 })
+
+  await page.getByRole("link", { name: "Usage" }).click()
+  await expect(page.getByRole("heading", { name: "Usage", exact: true })).toBeVisible({
+    timeout: 15_000,
+  })
+  // Subtitle renders this only after BOTH usage queries succeed (works for a
+  // fresh stack too — zero counts still produce the "all time" summary line).
+  await expect(page.getByText(/discovery runs, all time/)).toBeVisible({ timeout: 15_000 })
 })

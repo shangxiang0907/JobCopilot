@@ -7,7 +7,6 @@ import logging
 import uuid
 from typing import Any
 
-from jobcopilot_shared.crypto import decrypt as _decrypt
 from jobcopilot_shared.db import build_engine, build_session_factory
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,7 +14,6 @@ from jobcopilot_notification.config import settings
 from jobcopilot_notification.models.notification import Notification
 from jobcopilot_notification.repositories.notification_repo import NotificationRepository
 from jobcopilot_notification.services.channels.email import send_email
-from jobcopilot_notification.services.channels.webhook import send_dingtalk, send_wechat
 
 log = logging.getLogger(__name__)
 
@@ -58,22 +56,6 @@ async def dispatch(
                     await repo.mark_sent(n)
                 else:
                     await repo.mark_failed(n, "email_not_configured")
-
-            elif channel == "wechat":
-                if pref and pref.wechat_webhook_enc:
-                    webhook_url = _decrypt(pref.wechat_webhook_enc, settings.encryption_key)
-                    await send_wechat(webhook_url=webhook_url, title=title, body=body)
-                    await repo.mark_sent(n)
-                else:
-                    await repo.mark_failed(n, "wechat_not_configured")
-
-            elif channel == "dingtalk":
-                if pref and pref.dingtalk_webhook_enc:
-                    webhook_url = _decrypt(pref.dingtalk_webhook_enc, settings.encryption_key)
-                    await send_dingtalk(webhook_url=webhook_url, title=title, body=body)
-                    await repo.mark_sent(n)
-                else:
-                    await repo.mark_failed(n, "dingtalk_not_configured")
 
             else:
                 await repo.mark_failed(n, f"unknown_channel:{channel}")

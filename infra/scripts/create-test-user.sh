@@ -44,3 +44,31 @@ case "$status" in
     exit 1
     ;;
 esac
+
+# Grant the realm role `admin` so the E2E smoke can exercise the /admin pages.
+# Re-adding an existing mapping is a no-op in Keycloak, so this is idempotent.
+# Lookup by email, not username: Keycloak returns [] for a `username=` search
+# containing "@" even when the username is exactly that (verified empirically).
+email_encoded=$(printf '%s' "$E2E_USER" | sed 's/@/%40/')
+user_id=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/users?email=$email_encoded&exact=true" \
+  -H "Authorization: Bearer $token" |
+  sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+
+if [ -z "$user_id" ]; then
+  echo "ERROR: could not resolve user id for $E2E_USER" >&2
+  exit 1
+fi
+
+admin_role=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/roles/admin" \
+  -H "Authorization: Bearer $token")
+
+status=$(curl -s -o /dev/null -w '%{http_code}' \
+  -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users/$user_id/role-mappings/realm" \
+  -H "Authorization: Bearer $token" -H "Content-Type: application/json" \
+  -d "[$admin_role]")
+
+if [ "$status" != "204" ]; then
+  echo "ERROR: admin role grant returned HTTP $status" >&2
+  exit 1
+fi
+echo "Realm role 'admin' granted to $E2E_USER"

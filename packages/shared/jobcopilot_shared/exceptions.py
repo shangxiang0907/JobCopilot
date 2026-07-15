@@ -52,3 +52,10 @@ class LLMKeyNotConfiguredError(JobCopilotError):
 
     status_code = HTTPStatus.CONFLICT
     error_code = "llm_key_not_configured"
+
+
+class NoActiveResumeError(JobCopilotError):
+    """The user has no active resume; resume-dependent flows must fail before any LLM call."""
+
+    status_code = HTTPStatus.CONFLICT
+    error_code = "no_active_resume"

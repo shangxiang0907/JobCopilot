@@ -88,8 +88,6 @@ async def test_dispatch_email_with_preference_sends(
     pref = MagicMock(
         email_enabled=True,
         email_address="user@example.com",
-        wechat_webhook_enc=None,
-        dingtalk_webhook_enc=None,
     )
     mock_repo.get_preference.return_value = pref
 
@@ -111,6 +109,30 @@ async def test_dispatch_email_with_preference_sends(
         to_address="user@example.com", subject="Subject", body="Content"
     )
     mock_repo.mark_sent.assert_awaited_once_with(fake_notification)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["wechat", "dingtalk"])
+async def test_dispatch_removed_im_channels_fail_as_unknown(
+    mock_session: AsyncMock, mock_repo: MagicMock, channel: str
+) -> None:
+    """WeChat/DingTalk were removed in v0.2 — any stale producer gets unknown_channel."""
+    fake_notification = MagicMock(id=uuid.uuid4())
+    mock_repo.create.return_value = fake_notification
+
+    with patch(_REPO, return_value=mock_repo):
+        await dispatch(
+            mock_session,
+            tenant_id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            type="test",
+            title="T",
+            body="B",
+            channels=[channel],
+        )
+
+    mock_repo.mark_failed.assert_awaited_once_with(fake_notification, f"unknown_channel:{channel}")
+    mock_repo.mark_sent.assert_not_awaited()
 
 
 @pytest.mark.asyncio

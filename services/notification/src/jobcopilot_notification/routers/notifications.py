@@ -1,9 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query, status
-from jobcopilot_shared.crypto import encrypt as _encrypt
 
-from jobcopilot_notification.config import settings
 from jobcopilot_notification.deps import SessionDep, TenantIdDep, UserIdDep
 from jobcopilot_notification.repositories.notification_repo import NotificationRepository
 from jobcopilot_notification.schemas.notification import (
@@ -71,16 +69,7 @@ async def get_preferences(
     pref = await repo.get_preference(user_id)
     if pref is None:
         pref = await repo.upsert_preference(tenant_id=tenant_id, user_id=user_id)
-    return PreferenceOut(
-        id=pref.id,
-        in_app_enabled=pref.in_app_enabled,
-        email_enabled=pref.email_enabled,
-        email_address=pref.email_address,
-        wechat_configured=pref.wechat_webhook_enc is not None,
-        dingtalk_configured=pref.dingtalk_webhook_enc is not None,
-        created_at=pref.created_at,
-        updated_at=pref.updated_at,
-    )
+    return PreferenceOut.model_validate(pref)
 
 
 @router.put("/preferences", response_model=PreferenceOut)
@@ -97,25 +86,7 @@ async def update_preferences(
         updates["email_enabled"] = payload.email_enabled
     if payload.email_address is not None:
         updates["email_address"] = payload.email_address
-    if payload.wechat_webhook_url is not None:
-        updates["wechat_webhook_enc"] = _encrypt(
-            payload.wechat_webhook_url, settings.encryption_key
-        )
-    if payload.dingtalk_webhook_url is not None:
-        updates["dingtalk_webhook_enc"] = _encrypt(
-            payload.dingtalk_webhook_url, settings.encryption_key
-        )
 
     repo = NotificationRepository(session)
     pref = await repo.upsert_preference(tenant_id=tenant_id, user_id=user_id, **updates)
-
-    return PreferenceOut(
-        id=pref.id,
-        in_app_enabled=pref.in_app_enabled,
-        email_enabled=pref.email_enabled,
-        email_address=pref.email_address,
-        wechat_configured=pref.wechat_webhook_enc is not None,
-        dingtalk_configured=pref.dingtalk_webhook_enc is not None,
-        created_at=pref.created_at,
-        updated_at=pref.updated_at,
-    )
+    return PreferenceOut.model_validate(pref)

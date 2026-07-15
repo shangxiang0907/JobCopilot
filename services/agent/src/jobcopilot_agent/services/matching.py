@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
+from jobcopilot_shared.exceptions import ExternalServiceError, NoActiveResumeError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from jobcopilot_agent.config import settings
@@ -28,14 +29,24 @@ class ResumeMatchOutcome:
 
 
 async def _fetch_resume_text(user_id: uuid.UUID) -> str:
+    """Return the active resume text, "" when the user has none.
+
+    A profile-service failure raises ExternalServiceError instead of being
+    folded into "" — otherwise a transient outage would be misreported to the
+    user as "no resume uploaded".
+    """
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"{settings.profile_service_url}/internal/profiles/{user_id}")
-        if resp.status_code == 200:
-            return str(resp.json().get("active_resume_text") or "")
-    except Exception as exc:
+    except httpx.HTTPError as exc:
         log.warning("profile_fetch_failed", extra={"error": str(exc)})
-    return ""
+        raise ExternalServiceError("Profile service is unavailable") from exc
+    if resp.status_code == 200:
+        return str(resp.json().get("active_resume_text") or "")
+    if resp.status_code == 404:
+        return ""
+    log.warning("profile_fetch_failed", extra={"status_code": resp.status_code})
+    raise ExternalServiceError("Profile service returned an unexpected response")
 
 
 async def run_resume_match(
@@ -47,6 +58,8 @@ async def run_resume_match(
     """Run ResumeGraph against the stored JD structure and persist the results.
 
     Returns None when no prior analysis exists for (job, user, tenant).
+    Raises NoActiveResumeError before any LLM call when the user has no active
+    resume, and ExternalServiceError when the profile service is unreachable.
     Commits the session on success.
     """
     repo = AnalysisRepository(session)
@@ -54,12 +67,18 @@ async def run_resume_match(
     if not analysis or not analysis.jd_structured:
         return None
 
+    # Fail before the LLM call — an empty resume would only produce a
+    # meaningless gap analysis at real token cost.
+    resume_text = await _fetch_resume_text(user_id)
+    if not resume_text.strip():
+        raise NoActiveResumeError("Upload and activate a resume before running a match")
+
     state: ResumeState = {
         "job_id": str(job_id),
         "user_id": str(user_id),
         "tenant_id": str(tenant_id),
         "jd_structured": analysis.jd_structured,
-        "resume_text": await _fetch_resume_text(user_id),
+        "resume_text": resume_text,
         "match_score": 0.0,
         "gap_analysis": {},
         "suggestions": [],
