@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Upload, Trash2, CheckCircle, User, Key } from "lucide-react"
+import { Upload, Trash2, CheckCircle, User, Key, ExternalLink, KeyRound } from "lucide-react"
 import api, { type Profile, type Resume } from "@/lib/api"
+import { useAuth } from "@/components/auth/AuthProvider"
+import { getKeycloak } from "@/lib/keycloak"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,6 +15,7 @@ import { Separator } from "@/components/ui/separator"
 
 export default function ProfilePage() {
   const queryClient = useQueryClient()
+  const { email, name, identityProvider } = useAuth()
   const [llmApiKey, setLlmApiKey] = useState("")
 
   // Deployment mode (ADR-007): hosted platform deployments hide the BYO key UI.
@@ -89,7 +92,8 @@ export default function ProfilePage() {
       </div>
 
       <div className="flex-1 p-6 max-w-3xl space-y-6">
-        {/* Profile info */}
+        {/* Account identity — read from the ID token; credential management is
+            delegated to the Keycloak Account Console (never rebuilt in-app). */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -97,20 +101,51 @@ export default function ProfilePage() {
               Account
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {personalName && (
-              <p>
-                <span className="text-muted-foreground">Name: </span>
-                {personalName}
-              </p>
-            )}
-            {byoKeyEnabled && (
-              <div className="flex gap-3">
-                <Badge variant={profile?.has_llm_api_key ? "default" : "outline"}>
-                  LLM Key {profile?.has_llm_api_key ? "Set" : "Not Set"}
+          <CardContent className="space-y-4 text-sm">
+            <div className="space-y-2">
+              {(name ?? personalName) && (
+                <p>
+                  <span className="text-muted-foreground">Name: </span>
+                  {name ?? personalName}
+                </p>
+              )}
+              {email && (
+                <p>
+                  <span className="text-muted-foreground">Email: </span>
+                  {email}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">
+                  {identityProvider
+                    ? `Signed in with ${identityProvider.charAt(0).toUpperCase()}${identityProvider.slice(1)}`
+                    : "Email & password"}
                 </Badge>
+                {byoKeyEnabled && (
+                  <Badge variant={profile?.has_llm_api_key ? "default" : "outline"}>
+                    LLM Key {profile?.has_llm_api_key ? "Set" : "Not Set"}
+                  </Badge>
+                )}
               </div>
-            )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => getKeycloak().accountManagement()}>
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                Manage account
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => getKeycloak().login({ action: "UPDATE_PASSWORD" })}
+              >
+                <KeyRound className="h-3.5 w-3.5 mr-1.5" />
+                {identityProvider ? "Set password" : "Change password"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Password, two-factor auth, linked sign-in providers, and active sessions are managed
+              in your account console.
+            </p>
           </CardContent>
         </Card>
 
@@ -221,8 +256,7 @@ export default function ProfilePage() {
 
         <Separator />
         <p className="text-xs text-muted-foreground pb-6">
-          Authentication is handled via Keycloak OIDC. Connect the Keycloak JS adapter to enable
-          SSO login and token refresh.
+          Authentication is handled via Keycloak OIDC with automatic token refresh.
         </p>
       </div>
     </div>

@@ -7,12 +7,19 @@ interface AuthState {
   ready: boolean
   userId: string | undefined
   tenantId: string | undefined
+  email: string | undefined
+  name: string | undefined
+  /** Broker alias (e.g. "google") when the session came from an IdP; absent for password logins. */
+  identityProvider: string | undefined
 }
 
 const AuthContext = createContext<AuthState>({
   ready: false,
   userId: undefined,
   tenantId: undefined,
+  email: undefined,
+  name: undefined,
+  identityProvider: undefined,
 })
 
 export function useAuth(): AuthState {
@@ -24,6 +31,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ready: false,
     userId: undefined,
     tenantId: undefined,
+    email: undefined,
+    name: undefined,
+    identityProvider: undefined,
   })
 
   useEffect(() => {
@@ -40,6 +50,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ready: true,
           userId: parsed?.sub,
           tenantId: parsed?.tenant_id as string | undefined,
+          email: parsed?.email as string | undefined,
+          name: parsed?.name as string | undefined,
+          identityProvider: parsed?.identity_provider as string | undefined,
         })
 
         // Silently refresh the token 30 s before it expires

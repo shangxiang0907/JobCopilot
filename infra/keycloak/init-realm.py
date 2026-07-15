@@ -206,6 +206,47 @@ def ensure_google_idp(token: str) -> None:
     print("==> Google IdP configured successfully")
 
 
+def ensure_identity_provider_mapper(token: str) -> None:
+    """Expose the broker alias (e.g. `google`) as an `identity_provider` claim.
+
+    Keycloak records the broker used for a login in the `identity_provider`
+    user-session note; a session-note protocol mapper surfaces it in tokens so
+    the frontend can show "Signed in with Google". Password logins carry no
+    such note, so the claim is simply absent for them.
+    """
+    clients_url = f"{KEYCLOAK_URL}/admin/realms/{REALM}/clients"
+    clients = _http(
+        "GET", f"{clients_url}?clientId={urllib.parse.quote(FRONTEND_CLIENT_ID)}", token=token
+    )
+    if not clients:
+        print(f"==> client '{FRONTEND_CLIENT_ID}' not found — skipping identity_provider mapper")
+        return
+
+    client_uuid = clients[0]["id"]
+    mappers_url = f"{clients_url}/{client_uuid}/protocol-mappers/models"
+    existing = _http("GET", mappers_url, token=token)
+    if any(m.get("name") == "identity-provider" for m in existing):
+        print("==> identity_provider mapper already present — nothing to do")
+        return
+
+    payload = {
+        "name": "identity-provider",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-usersessionmodel-note-mapper",
+        "consentRequired": False,
+        "config": {
+            "user.session.note": "identity_provider",
+            "claim.name": "identity_provider",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+        },
+    }
+    print("==> Adding identity_provider session-note mapper to frontend client ...")
+    _http("POST", mappers_url, data=json.dumps(payload).encode(), token=token)
+    print("==> identity_provider mapper configured successfully")
+
+
 def ensure_admin_api_client(token: str) -> None:
     """Service-account client for the profile service's /v1/admin user management.
 
@@ -272,6 +313,7 @@ def main() -> None:
     ensure_redirect_uri(token)
     ensure_self_registration(token)
     ensure_google_idp(token)
+    ensure_identity_provider_mapper(token)
     ensure_admin_api_client(token)
 
 
