@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
+  LogOut,
   Search,
   User,
   MessageSquare,
@@ -75,8 +76,8 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Chat toggle */}
-      <div className="px-2 py-4 border-t">
+      {/* Chat toggle + sign out */}
+      <div className="px-2 py-4 border-t space-y-1">
         <Button
           variant={chatOpen ? "default" : "outline"}
           size="sm"
@@ -85,6 +86,17 @@ export function Sidebar() {
         >
           <MessageSquare className="h-4 w-4" />
           AI Assistant
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2 text-muted-foreground"
+          onClick={() =>
+            getKeycloak().logout({ redirectUri: window.location.origin })
+          }
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
         </Button>
       </div>
     </aside>

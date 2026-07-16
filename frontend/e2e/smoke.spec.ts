@@ -99,3 +99,25 @@ test("admin pages render for the admin role", async ({ page }) => {
   // fresh stack too — zero counts still produce the "all time" summary line).
   await expect(page.getByText(/discovery runs, all time/)).toBeVisible({ timeout: 15_000 })
 })
+
+test("sign out ends the session and returns to the login screen", async ({ page }) => {
+  // Exercises RP-initiated logout end-to-end: keycloak-init must have the
+  // frontend origin in post.logout.redirect.uris or Keycloak shows an
+  // "Invalid redirect uri" error page instead of the login form.
+  await page.goto("/")
+  await page.waitForURL(/openid-connect/)
+  await page.fill("#username", USER)
+  await page.fill("#password", PASSWORD)
+  await page.click("#kc-login")
+  await expect(
+    page.getByRole("heading", { name: "Job Applications" })
+  ).toBeVisible({ timeout: 20_000 })
+
+  await page.getByRole("button", { name: "Sign out" }).click()
+
+  // Landing back at the app origin, login-required kicks in → Keycloak login.
+  await page.waitForURL(/\/realms\/jobcopilot\/protocol\/openid-connect\//, {
+    timeout: 20_000,
+  })
+  await expect(page.locator("#username")).toBeVisible()
+})

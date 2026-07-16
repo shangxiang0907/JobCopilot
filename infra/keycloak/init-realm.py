@@ -89,11 +89,15 @@ def configure_user_profile(token: str) -> None:
 
 
 def ensure_redirect_uri(token: str) -> None:
-    """Ensure the frontend client trusts FRONTEND_URL as a redirect URI + web origin.
+    """Ensure the frontend client trusts FRONTEND_URL as a redirect URI + web origin,
+    and as a post-logout redirect URI (RP-initiated logout).
 
     Cloud deployments serve the SPA from a public domain that differs from the
     localhost defaults baked into the realm export. Without this, Keycloak rejects
     the OIDC redirect back to the app and blocks the browser token request (CORS).
+    Keycloak validates `post_logout_redirect_uri` against the separate
+    `post.logout.redirect.uris` client attribute (##-separated), so the Sign out
+    button breaks on any non-localhost domain unless it is maintained here too.
     Idempotent: only PUTs when something is missing.
     """
     clients_url = (
@@ -109,6 +113,8 @@ def ensure_redirect_uri(token: str) -> None:
     redirect = f"{FRONTEND_URL}/*"
     redirect_uris = client.get("redirectUris", [])
     web_origins = client.get("webOrigins", [])
+    attributes = client.get("attributes", {})
+    post_logout = [u for u in attributes.get("post.logout.redirect.uris", "").split("##") if u]
     changed = False
 
     if redirect not in redirect_uris:
@@ -117,6 +123,9 @@ def ensure_redirect_uri(token: str) -> None:
     if FRONTEND_URL not in web_origins:
         web_origins.append(FRONTEND_URL)
         changed = True
+    if redirect not in post_logout:
+        post_logout.append(redirect)
+        changed = True
 
     if not changed:
         print(f"==> redirect URI '{redirect}' already present — nothing to do")
@@ -124,10 +133,40 @@ def ensure_redirect_uri(token: str) -> None:
 
     client["redirectUris"] = redirect_uris
     client["webOrigins"] = web_origins
+    attributes["post.logout.redirect.uris"] = "##".join(post_logout)
+    client["attributes"] = attributes
     client_url = f"{KEYCLOAK_URL}/admin/realms/{REALM}/clients/{client['id']}"
     print(f"==> Adding redirect URI '{redirect}' + web origin to '{FRONTEND_CLIENT_ID}' ...")
     _http("PUT", client_url, data=json.dumps(client).encode(), token=token)
     print("==> frontend client redirect URI / web origin configured successfully")
+
+
+def ensure_password_policy(token: str) -> None:
+    """Enforce a minimal NIST-aligned password policy on the realm.
+
+    length(8) + notUsername (username == email under registrationEmailAsUsername).
+    Deliberately no complexity classes or expiry — NIST SP 800-63B recommends
+    length over composition rules and no forced rotation. Appends missing
+    policies rather than overwriting, so a stricter operator policy survives.
+    """
+    realm_url = f"{KEYCLOAK_URL}/admin/realms/{REALM}"
+    realm = _http("GET", realm_url, token=token)
+
+    current = realm.get("passwordPolicy") or ""
+    policies = [p.strip() for p in current.split(" and ") if p.strip()]
+    existing_names = {p.split("(")[0] for p in policies}
+
+    missing = [
+        p for p in ("length(8)", "notUsername(undefined)") if p.split("(")[0] not in existing_names
+    ]
+    if not missing:
+        print(f"==> password policy already enforced ('{current}') — nothing to do")
+        return
+
+    realm["passwordPolicy"] = " and ".join(policies + missing)
+    print(f"==> Setting realm password policy '{realm['passwordPolicy']}' ...")
+    _http("PUT", realm_url, data=json.dumps(realm).encode(), token=token)
+    print("==> password policy configured successfully")
 
 
 def ensure_self_registration(token: str) -> None:
@@ -311,6 +350,7 @@ def main() -> None:
     token = get_admin_token()
     configure_user_profile(token)
     ensure_redirect_uri(token)
+    ensure_password_policy(token)
     ensure_self_registration(token)
     ensure_google_idp(token)
     ensure_identity_provider_mapper(token)
