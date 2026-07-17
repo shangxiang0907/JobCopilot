@@ -29,6 +29,10 @@ class BaseServiceSettings(BaseSettings):
     #   byo      — each user saves their own key (self-hosted default; key UI shown)
     #   platform — dashscope_api_key serves every user (hosted site; key UI hidden)
     llm_key_mode: Literal["byo", "platform"] = "byo"
+    # Platform mode only: max AI actions (analyze/match/interview/chat message)
+    # per tenant per UTC day on the platform key; <= 0 disables the quota.
+    # BYO users burn their own key and are never quota-limited.
+    llm_daily_quota: int = 20
     dashscope_api_key: str = ""
     dashscope_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     llm_model: str = "qwen-max"

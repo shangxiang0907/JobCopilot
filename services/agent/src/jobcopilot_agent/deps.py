@@ -14,6 +14,7 @@ from jobcopilot_agent.services.llm import (
     fetch_user_llm_key,
     set_request_llm_key,
 )
+from jobcopilot_agent.services.quota import enforce_daily_quota
 
 _engine = build_engine(settings.database_url)
 _session_factory = build_session_factory(_engine)
@@ -43,13 +44,16 @@ CurrentUser = Annotated[dict[str, Any], Depends(get_current_user)]
 
 
 async def provision_llm_key(user: CurrentUser) -> None:
-    """byo mode (ADR-007): bind the caller's stored key to this request's LLM calls.
+    """Single chokepoint on every route that can trigger an LLM call (ADR-007).
 
-    Attached to every route that can trigger an LLM call; a user without a saved
-    key gets a 409 llm_key_not_configured before any graph runs. Platform mode
-    is a no-op — the env key is resolved inside services.llm.
+    byo mode: bind the caller's stored key to this request's LLM calls; a user
+    without a saved key gets a 409 llm_key_not_configured before any graph runs.
+    platform mode: the env key (resolved inside services.llm) serves everyone,
+    so each action counts against the tenant's daily quota — 429 quota_exceeded
+    once spent. BYO users burn their own key and are never quota-limited.
     """
     if settings.llm_key_mode != "byo":
+        await enforce_daily_quota(str(user["tenant_id"]))
         return
     key = await fetch_user_llm_key(str(user["user_id"]))
     if not key:

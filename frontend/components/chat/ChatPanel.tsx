@@ -42,7 +42,7 @@ export function ChatPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [attachments, setAttachments] = useState<FileList | undefined>(undefined)
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: "/api/chat",
     fetch: fetchWithAuth,
   })
@@ -84,7 +84,9 @@ export function ChatPanel() {
 
       {/* Messages */}
       <ScrollArea className="flex-1 px-4 py-4">
-        {messages.length === 0 ? (
+        {/* useChat rolls the optimistic user message back on request failure,
+            so an error can arrive with an empty message list — render it anyway. */}
+        {messages.length === 0 && !error ? (
           <div className="flex flex-col items-center justify-center h-32 gap-2 text-center">
             <Bot className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
@@ -151,6 +153,16 @@ export function ChatPanel() {
                 </div>
                 <div className="rounded-xl rounded-tl-sm bg-muted px-3.5 py-2.5 text-sm text-muted-foreground">
                   Thinking…
+                </div>
+              </div>
+            )}
+            {error && (
+              <div className="flex gap-2.5">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border bg-destructive/10 text-destructive">
+                  <Bot className="h-3.5 w-3.5" />
+                </div>
+                <div className="rounded-xl rounded-tl-sm bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
+                  {error.message || "Something went wrong. Please try again."}
                 </div>
               </div>
             )}

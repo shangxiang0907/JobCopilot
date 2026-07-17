@@ -47,6 +47,14 @@ class QuotaExceededError(JobCopilotError):
     error_code = "quota_exceeded"
 
 
+class QuotaUnavailableError(JobCopilotError):
+    """Quota accounting is down (Redis unreachable). The quota is a cost gate on
+    the operator's platform LLM key, so it fails CLOSED: no counting, no spend."""
+
+    status_code = HTTPStatus.SERVICE_UNAVAILABLE
+    error_code = "quota_unavailable"
+
+
 class LLMKeyNotConfiguredError(JobCopilotError):
     """BYO deployment mode (ADR-007): the user has not saved an LLM API key yet."""
 

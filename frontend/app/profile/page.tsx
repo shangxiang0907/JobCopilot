@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { isAxiosError } from "axios"
 import { Upload, Trash2, CheckCircle, User, Key, ExternalLink, KeyRound } from "lucide-react"
 import api, { type Profile, type Resume } from "@/lib/api"
 import { useAuth } from "@/components/auth/AuthProvider"
@@ -176,8 +177,18 @@ export default function ProfilePage() {
               disabled={saveCredentials.isPending || !llmApiKey.trim()}
               onClick={() => saveCredentials.mutate({ llm_api_key: llmApiKey })}
             >
-              Save Credentials
+              {saveCredentials.isPending ? "Verifying key…" : "Save Credentials"}
             </Button>
+            {saveCredentials.isError && (
+              <p className="text-sm text-destructive">
+                {(isAxiosError(saveCredentials.error) &&
+                  saveCredentials.error.response?.data?.error?.message) ||
+                  "Could not save the key. Please try again."}
+              </p>
+            )}
+            {saveCredentials.isSuccess && (
+              <p className="text-sm text-muted-foreground">Key verified and saved.</p>
+            )}
           </CardContent>
         </Card>
         )}

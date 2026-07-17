@@ -78,6 +78,7 @@ Key design constraints (violating any one blocks launch):
 ```bash
 # LLM
 LLM_KEY_MODE=byo            # ADR-007: byo = per-user saved keys (self-hosted default); platform = env key serves all users, key UI hidden (hosted site)
+LLM_DAILY_QUOTA=20          # platform mode only: per-tenant AI actions/day on the platform key (429 quota_exceeded past it; <=0 disables); byo users never quota-limited
 DASHSCOPE_API_KEY=sk-...
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LANGSMITH_API_KEY=ls__...

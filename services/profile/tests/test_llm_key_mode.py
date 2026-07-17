@@ -21,10 +21,16 @@ async def test_update_credentials_encryptor_round_trips(
     """Regression: the router passed the raw 2-arg encrypt() to the repo, which
     calls it with one arg — saving a key 500'd (TypeError) since launch."""
     monkeypatch.setattr(settings, "llm_key_mode", "byo")
-    with patch(
-        "jobcopilot_profile.repositories.profile_repo.ProfileRepository.update_credentials",
-        new_callable=AsyncMock,
-    ) as update:
+    with (
+        patch(
+            "jobcopilot_profile.repositories.profile_repo.ProfileRepository.update_credentials",
+            new_callable=AsyncMock,
+        ) as update,
+        patch(
+            "jobcopilot_profile.routers.profiles.validate_llm_key",
+            new_callable=AsyncMock,
+        ),
+    ):
         await update_credentials(
             CredentialsUpdate(llm_api_key="sk-round-trip"),
             session=AsyncMock(),

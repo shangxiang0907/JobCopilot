@@ -9,6 +9,7 @@ from jobcopilot_profile.config import settings
 from jobcopilot_profile.deps import SessionDep, TenantIdDep, UserIdDep
 from jobcopilot_profile.repositories.profile_repo import ProfileRepository
 from jobcopilot_profile.schemas.profile import CredentialsUpdate, ProfileResponse, ProfileUpsert
+from jobcopilot_profile.services.llm_key_check import validate_llm_key
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/v1/profiles", tags=["profiles"])
@@ -70,6 +71,10 @@ async def update_credentials(
         raise PermissionDeniedError(
             "API key configuration is disabled on this deployment; the platform provides LLM access"
         )
+    # Fail a bad key at save time, not on the first AI action. Clearing the key
+    # (empty string) needs no provider round-trip.
+    if body.llm_api_key:
+        await validate_llm_key(body.llm_api_key)
     repo = ProfileRepository(session)
     await repo.update_credentials(
         user_id, body, lambda value: encrypt(value, settings.encryption_key)

@@ -370,6 +370,8 @@ services:
       RABBITMQ_URL: amqp://guest:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
       # ADR-007: byo = per-user keys (self-hosted default); platform = env key serves all
       LLM_KEY_MODE: ${LLM_KEY_MODE:-byo}
+      # Platform mode: per-tenant daily AI-action cap on the platform key (<=0 disables)
+      LLM_DAILY_QUOTA: ${LLM_DAILY_QUOTA:-20}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       LLM_MODEL: ${LLM_MODEL:-qwen-max}

@@ -32,7 +32,16 @@ export async function POST(req: NextRequest) {
   })
 
   if (!backendRes.ok || !backendRes.body) {
-    return new Response("Backend error", { status: backendRes.status })
+    // Surface the backend's { error: { code, message } } (e.g. 429 quota_exceeded,
+    // 409 llm_key_not_configured) — useChat reads the body text into error.message.
+    let message = "The AI assistant is unavailable right now. Please try again."
+    try {
+      const err = await backendRes.json()
+      if (typeof err?.error?.message === "string") message = err.error.message
+    } catch {
+      // non-JSON body — keep the generic message
+    }
+    return new Response(message, { status: backendRes.status })
   }
 
   // Adapt the agent's SSE contract → Vercel AI SDK data stream (protocol v1).

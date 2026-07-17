@@ -91,10 +91,14 @@ async def test_provision_dependency_missing_key_raises(monkeypatch: pytest.Monke
 
 
 @pytest.mark.asyncio
-async def test_provision_dependency_noop_in_platform_mode(
+async def test_provision_dependency_skips_key_fetch_in_platform_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Platform mode never fetches a per-user key (quota check mocked — no live Redis)."""
     monkeypatch.setattr(settings, "llm_key_mode", "platform")
-    with patch("jobcopilot_agent.deps.fetch_user_llm_key", new_callable=AsyncMock) as fetch:
+    with (
+        patch("jobcopilot_agent.deps.fetch_user_llm_key", new_callable=AsyncMock) as fetch,
+        patch("jobcopilot_agent.deps.enforce_daily_quota", new_callable=AsyncMock),
+    ):
         await provision_llm_key({"user_id": "u1", "tenant_id": "t1"})
     fetch.assert_not_awaited()
