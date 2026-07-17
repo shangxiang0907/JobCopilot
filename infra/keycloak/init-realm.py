@@ -98,6 +98,10 @@ def ensure_redirect_uri(token: str) -> None:
     Keycloak validates `post_logout_redirect_uri` against the separate
     `post.logout.redirect.uris` client attribute (##-separated), so the Sign out
     button breaks on any non-localhost domain unless it is maintained here too.
+    `baseUrl` drives the "Back to Application" link on Keycloak info pages —
+    without it, a verify-email link opened outside the registering browser
+    session dead-ends on a static confirmation page (Keycloak 26.7 sets the
+    password only AFTER email verification, so users must find their way back).
     Idempotent: only PUTs when something is missing.
     """
     clients_url = (
@@ -125,6 +129,9 @@ def ensure_redirect_uri(token: str) -> None:
         changed = True
     if redirect not in post_logout:
         post_logout.append(redirect)
+        changed = True
+    if client.get("baseUrl") != FRONTEND_URL:
+        client["baseUrl"] = FRONTEND_URL
         changed = True
 
     if not changed:

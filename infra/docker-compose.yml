@@ -547,6 +547,17 @@ services:
       KEYCLOAK_ADMIN_API_SECRET: ${KEYCLOAK_ADMIN_API_SECRET:-dev-admin-api-secret}
     restart: "no"
 
+  # Dev-only SMTP catcher (profile-gated, never started in prod). Setting
+  # SMTP_HOST=mailpit in the local .env turns on Keycloak verifyEmail, which
+  # makes the full registration → verify-link → set-password flow testable
+  # locally without sending real mail. Web UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.30.4@sha256:5a49a77c5bdbe7c5474450b4f46348d09949df3695257729c93a30369382d4f6
+    profiles: ["dev"]
+    ports:
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped
+
 # ── Volumes ─────────────────────────────────────────────────────────────────
 
 volumes:

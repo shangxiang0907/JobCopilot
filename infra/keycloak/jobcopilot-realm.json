@@ -584,6 +584,7 @@
     "clientId" : "frontend",
     "name" : "JobCopilot Frontend",
     "description" : "Public PKCE client for the Next.js SPA",
+    "baseUrl" : "http://localhost:3000",
     "surrogateAuthRequired" : false,
     "enabled" : true,
     "alwaysDisplayInConsole" : false,
