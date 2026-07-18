@@ -352,12 +352,30 @@ def ensure_admin_api_client(token: str) -> None:
         print("==> admin-api service account roles already granted")
 
 
+def ensure_login_theme(token: str) -> None:
+    """Point the realm at the custom 'jobcopilot' login theme (extends
+    keycloak.v2; overrides login-verify-email.ftl so the verify-email waiting
+    page is not a dead end when the link is opened on another device)."""
+    realm_url = f"{KEYCLOAK_URL}/admin/realms/{REALM}"
+    realm = _http("GET", realm_url, token=token)
+
+    if realm.get("loginTheme") == "jobcopilot":
+        print("==> login theme already 'jobcopilot' — nothing to do")
+        return
+
+    realm["loginTheme"] = "jobcopilot"
+    print("==> Setting realm login theme to 'jobcopilot' ...")
+    _http("PUT", realm_url, data=json.dumps(realm).encode(), token=token)
+    print("==> login theme configured successfully")
+
+
 def main() -> None:
     print("==> Fetching admin token ...")
     token = get_admin_token()
     configure_user_profile(token)
     ensure_redirect_uri(token)
     ensure_password_policy(token)
+    ensure_login_theme(token)
     ensure_self_registration(token)
     ensure_google_idp(token)
     ensure_identity_provider_mapper(token)

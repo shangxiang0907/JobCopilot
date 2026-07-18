@@ -2,6 +2,7 @@
   "id" : "e3bd6f27-a947-4c09-94a5-1ea8767fee03",
   "realm" : "jobcopilot",
   "displayName" : "JobCopilot",
+  "loginTheme" : "jobcopilot",
   "notBefore" : 0,
   "defaultSignatureAlgorithm" : "RS256",
   "revokeRefreshToken" : false,

@@ -169,6 +169,8 @@ services:
       KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
     volumes:
       - ./keycloak/jobcopilot-realm.json:/opt/keycloak/data/import/jobcopilot-realm.json:ro
+      # Directory mount (single-file mounts go stale on edit under WSL)
+      - ./keycloak/themes/jobcopilot:/opt/keycloak/themes/jobcopilot:ro
     ports:
       - "127.0.0.1:8080:8080"
     healthcheck:
