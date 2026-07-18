@@ -266,6 +266,11 @@
       },
       "HealthResponse": {
         "properties": {
+          "revision": {
+            "default": "dev",
+            "title": "Revision",
+            "type": "string"
+          },
           "service": {
             "title": "Service",
             "type": "string"

@@ -25,7 +25,7 @@ app.add_middleware(RequestContextMiddleware)
 instrument_app(app)
 add_exception_handlers(app)
 
-app.include_router(build_health_router(settings.service_name, settings.version))
+app.include_router(build_health_router(settings.service_name, settings.version, settings.git_sha))
 app.include_router(admin_router)
 app.include_router(profiles_router)
 app.include_router(resumes_router)

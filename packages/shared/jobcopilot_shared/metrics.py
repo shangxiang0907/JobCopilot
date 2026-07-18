@@ -9,10 +9,28 @@ encoding the service into the metric name.
 import os
 
 from fastapi import FastAPI, Response
-from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest, multiprocess
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Gauge,
+    generate_latest,
+    multiprocess,
+)
 from prometheus_fastapi_instrumentator import Instrumentator
 
 _NAMESPACE = "jobcopilot"
+
+# Constant-1 gauge labeled with the git revision baked into the image (ENV
+# GIT_SHA, set by the CD build-arg). Module-level so it registers exactly once
+# per process even when several service apps are imported by one test run. The
+# service is identified by the Prometheus scrape `job` label, per the
+# one-metric-name-many-labels convention above — never by a service label here.
+_BUILD_INFO = Gauge(
+    f"{_NAMESPACE}_build_info",
+    "Build metadata of the running process (value is always 1)",
+    ["revision"],
+    multiprocess_mode="max",
+)
 
 
 def instrument_app(app: FastAPI) -> None:
@@ -27,6 +45,10 @@ def instrument_app(app: FastAPI) -> None:
     mp_dir = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
     if mp_dir:
         os.makedirs(mp_dir, exist_ok=True)
+
+    # Labelled child is created here (after makedirs) — in multiprocess mode the
+    # value file lands in PROMETHEUS_MULTIPROC_DIR, which must already exist.
+    _BUILD_INFO.labels(revision=os.environ.get("GIT_SHA", "dev")).set(1)
 
     instrumentator = Instrumentator(
         excluded_handlers=["/metrics", "/healthz/.*"],

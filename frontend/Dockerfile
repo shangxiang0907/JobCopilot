@@ -23,6 +23,11 @@ COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 
+# Git revision baked in by CD (build-arg; also stamped as OCI label
+# org.opencontainers.image.revision). Used by deploy.sh post-deploy verification.
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
+
 USER node
 EXPOSE 3000
 ENV PORT=3000

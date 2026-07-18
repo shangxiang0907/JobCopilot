@@ -192,6 +192,35 @@ ssh_ "cd ${REMOTE_DIR}/infra && docker compose ${COMPOSE[*]} pull && docker comp
 echo "==> Reloading Caddy config ..."
 ssh_ "cd ${REMOTE_DIR}/infra && docker compose ${COMPOSE[*]} exec -T -w /etc/caddy caddy caddy reload --config /etc/caddy/Caddyfile"
 
+# 5c. Closed-loop verification: `up -d` only proves compose accepted the config,
+#     not that every container runs the new build (a partially failed pull leaves
+#     the previous generation running). Compare each running container's OCI
+#     revision label (stamped by CD) against the commit just deployed. Images
+#     built before revision-labeling existed carry no label — warn but don't
+#     fail, so rollbacks to old commits stay possible.
+echo "==> Verifying running containers carry revision ${TAG:0:12} ..."
+ssh_ "bash -s -- '${TAG}' '${REMOTE_DIR}'" <<'EOSH'
+set -u
+TAG="$1"; REMOTE_DIR="$2"
+cd "${REMOTE_DIR}/infra"
+fail=0
+for s in profile-service job-service discovery-service agent-service notification-service frontend; do
+  cid="$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q "$s")"
+  if [ -z "$cid" ]; then
+    echo "    ${s}: ERROR — no running container"; fail=1; continue
+  fi
+  rev="$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$cid")"
+  if [ -z "$rev" ]; then
+    echo "    ${s}: WARNING — image has no revision label (predates labeling)"
+  elif [ "$rev" != "$TAG" ]; then
+    echo "    ${s}: ERROR — running revision ${rev}, expected ${TAG}"; fail=1
+  else
+    echo "    ${s}: ${rev:0:12} ok"
+  fi
+done
+exit "$fail"
+EOSH
+
 # 6. Prune superseded images. Each digest-pinned deploy strands the previous
 #    generation (~3.7GB across the 6 app images) and nothing else ever deletes
 #    it — unbounded growth until the disk fills. Keep the last 72h of unused

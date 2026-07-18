@@ -12,6 +12,10 @@ class BaseServiceSettings(BaseSettings):
     service_name: str = "jobcopilot"
     environment: str = Field(default="development")
     version: str = "0.1.0"
+    # Git commit baked into the image at build time (CD build-arg -> ENV GIT_SHA);
+    # "dev" outside a built image. This is the DEPLOYMENT revision — deliberately
+    # separate from `version`, which is the API version shown in OpenAPI info.
+    git_sha: str = "dev"
 
     # Database (required; populated from DATABASE_URL env var at runtime)
     database_url: str = Field(default="")

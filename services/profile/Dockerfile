@@ -30,6 +30,12 @@ ENV VIRTUAL_ENV="/app/.venv"
 # separate process, so /metrics must aggregate via the multiprocess registry.
 ENV PROMETHEUS_MULTIPROC_DIR="/tmp/prometheus-metrics"
 
+# Git revision baked in by CD (build-arg; also stamped as OCI label
+# org.opencontainers.image.revision). Surfaced via /healthz `revision`, the
+# jobcopilot_build_info metric, and deploy.sh post-deploy verification.
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
+
 USER appuser
 EXPOSE 8000
 

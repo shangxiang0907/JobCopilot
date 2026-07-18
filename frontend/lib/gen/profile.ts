@@ -239,6 +239,11 @@ export interface components {
         };
         /** HealthResponse */
         HealthResponse: {
+            /**
+             * Revision
+             * @default dev
+             */
+            revision: string;
             /** Service */
             service: string;
             /** Status */

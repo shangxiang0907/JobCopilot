@@ -18,6 +18,8 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     version: str = "0.1.0"
+    # Git commit of the running build (ENV GIT_SHA, baked in by CD); "dev" locally.
+    revision: str = "dev"
 
 
 class PaginatedResponse(BaseModel, Generic[T]):

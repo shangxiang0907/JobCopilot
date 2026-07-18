@@ -36,6 +36,6 @@ app.add_middleware(RequestContextMiddleware)
 instrument_app(app)
 add_exception_handlers(app)
 
-app.include_router(build_health_router(settings.service_name, settings.version))
+app.include_router(build_health_router(settings.service_name, settings.version, settings.git_sha))
 app.include_router(notifications_router)
 app.include_router(internal_router)

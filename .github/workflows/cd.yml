@@ -67,7 +67,15 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service.name }}:${{ github.event.workflow_run.head_sha }}
             ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service.name }}:latest
-          build-args: ${{ matrix.service.build_args }}
+          # GIT_SHA is baked into every image (ENV) and mirrored as the standard
+          # OCI revision label — /healthz, jobcopilot_build_info, and deploy.sh's
+          # post-deploy verification all read the same value.
+          build-args: |
+            GIT_SHA=${{ github.event.workflow_run.head_sha }}
+            ${{ matrix.service.build_args }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

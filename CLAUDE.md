@@ -65,6 +65,7 @@ Key design constraints (violating any one blocks launch):
 - MQ: RabbitMQ via `aio-pika`; event payloads are shared Pydantic models in `jobcopilot_shared.events`.
 - LLM: DashScope OpenAI-compatible endpoint; default model `qwen-max`, switchable via `LLM_MODEL`.
 - Metrics: every service exposes `/metrics` via shared `jobcopilot_shared.metrics` — prefix `jobcopilot_`, identical names across services (distinguished by scrape `job` label); multi-worker services need `PROMETHEUS_MULTIPROC_DIR`.
+- Version traceability: CD bakes the git SHA into every image (build-arg `GIT_SHA` → ENV) and stamps the OCI `org.opencontainers.image.revision` label; `/healthz/*` returns it as `revision`, `/metrics` as `jobcopilot_build_info{revision=...}`; `deploy.sh` fails the deploy if any running container's label ≠ the deployed commit. To check what prod runs: `docker inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' <container>`.
 - Logs: Loki + **Grafana Alloy** (Promtail is deprecated by Grafana). Grafana datasources/dashboards provisioned as code in `infra/grafana/`.
 - Traces: Tempo + OpenTelemetry is **roadmap only**. LangSmith plumbing is wired (`LANGCHAIN_TRACING_V2` + `LANGSMITH_API_KEY` + `LANGCHAIN_PROJECT`) but INACTIVE until the owner supplies a key — see `docs/OBSERVABILITY.md`.
 - LangGraph Studio: `~/.local/bin/uv run langgraph dev` from the repo root (graphs registered in `langgraph.json`; dev-only).
