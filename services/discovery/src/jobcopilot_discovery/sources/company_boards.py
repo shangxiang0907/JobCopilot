@@ -9,6 +9,7 @@ is polled on every run. Both ATS vendors expose the full board as public JSON:
               → https://api.lever.co/v0/postings/{token}?mode=json
 """
 
+import html
 import re
 
 import httpx
@@ -64,7 +65,10 @@ async def _fetch_greenhouse(
     jobs: list[RawJob] = []
     for item in resp.json().get("jobs", []):
         title = item.get("title", "")
-        content = strip_html(item.get("content", ""))
+        # Greenhouse serves `content` as HTML-escaped HTML (&lt;p&gt;…); unescape
+        # first or strip_html sees no tags and the unescape inside it resurrects
+        # them into the stored text.
+        content = strip_html(html.unescape(item.get("content", "")))
         if not matches_keywords(criteria, title, content):
             continue
         jobs.append(

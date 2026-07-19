@@ -191,7 +191,12 @@ async def test_greenhouse_board_uses_meta_company_name() -> None:
                     "absolute_url": "https://stripe.com/jobs/1",
                     "title": "Python Engineer",
                     "location": {"name": "Remote"},
-                    "content": "Payments &amp; Python",
+                    # Greenhouse escapes the HTML itself, as observed live:
+                    # tags arrive as &lt;h2&gt;, entities double-escaped (&amp;amp;)
+                    "content": (
+                        "&lt;h2&gt;Who we are&lt;/h2&gt;\n"
+                        "&lt;p&gt;Payments &amp;amp; Python&lt;/p&gt;"
+                    ),
                     "updated_at": "2026-07-01",
                 }
             ]
@@ -205,7 +210,9 @@ async def test_greenhouse_board_uses_meta_company_name() -> None:
     assert len(jobs) == 1
     assert jobs[0].company_name == "Stripe"
     assert jobs[0].source == "greenhouse:stripe"
-    assert "&" in jobs[0].raw_text  # entities unescaped
+    assert "<" not in jobs[0].raw_text  # tags stripped, not resurrected by unescape
+    assert "Payments & Python" in jobs[0].raw_text  # entities unescaped
+    assert "Who we are\n" in jobs[0].raw_text  # block tags became line breaks
 
 
 async def test_lever_board_maps_and_titles_company_from_token() -> None:

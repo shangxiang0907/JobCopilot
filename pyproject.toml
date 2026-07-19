@@ -26,6 +26,9 @@ select = ["E", "F", "I", "N", "UP", "ASYNC", "S", "B", "TID251"]
 # The OpenAPI export script re-invokes its own interpreter with literal service
 # names (no untrusted input); S603 subprocess auditing is intentional here.
 "scripts/export_openapi.py" = ["S603"]
+# Alembic migrations interpolate only the module-constant schema name into SQL
+# (values always bound); S608 string-SQL auditing is intentional there.
+"services/*/alembic/versions/*.py" = ["S608"]
 # Claude Code hooks invoke a fixed local uv binary on harness-supplied file
 # paths (local dev tooling, no untrusted input); S603 auditing is intentional.
 ".claude/hooks/*.py" = ["S603"]
