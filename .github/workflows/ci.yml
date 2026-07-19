@@ -18,8 +18,8 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v8.3.2
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -32,7 +32,7 @@ jobs:
     name: Secret Scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v3
@@ -54,8 +54,8 @@ jobs:
           - services/agent
           - services/notification
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v8.3.2
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -71,8 +71,8 @@ jobs:
     env:
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -96,8 +96,8 @@ jobs:
       DASHSCOPE_API_KEY: test-key
       LANGCHAIN_TRACING_V2: "false"
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v8.3.2
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -116,8 +116,8 @@ jobs:
       DASHSCOPE_API_KEY: test-key
       LANGCHAIN_TRACING_V2: "false"
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v8.3.2
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -126,7 +126,7 @@ jobs:
       - run: uv run pytest tests/contracts -v
       # OpenAPI snapshots + generated frontend types must match the code.
       - run: uv run python scripts/export_openapi.py
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -186,8 +186,8 @@ jobs:
       DASHSCOPE_API_KEY: test-key
       LANGCHAIN_TRACING_V2: "false"
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v8.3.2
         with:
           enable-cache: true
       - run: uv sync --frozen
