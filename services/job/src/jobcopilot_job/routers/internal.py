@@ -72,6 +72,7 @@ async def internal_transition_application_by_job(
         app.application_id,
         ApplicationStatusUpdate(status=body.status, note=body.note),
     )
+    await session.commit()
     return ApplicationResponse.model_validate(app)
 
 
@@ -85,6 +86,9 @@ async def internal_create_job(
     Callers rely on job_id in the response to key their own records."""
     repo = JobRepository(session)
     job = await repo.create_internal(body)
+    # Callers key their records off the returned job_id — it must be committed
+    # (visible) before they act on it.
+    await session.commit()
     return JobResponse.model_validate(job)
 
 
@@ -106,6 +110,7 @@ async def internal_update_job(
 ) -> JobResponse:
     repo = JobRepository(session)
     job = await repo.update_internal(job_id, body)
+    await session.commit()
     return JobResponse.model_validate(job)
 
 
@@ -117,4 +122,5 @@ async def internal_update_application_analysis(
 ) -> ApplicationResponse:
     repo = ApplicationRepository(session)
     app = await repo.update_analysis(application_id, body)
+    await session.commit()
     return ApplicationResponse.model_validate(app)

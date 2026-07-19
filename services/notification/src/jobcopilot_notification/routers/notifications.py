@@ -44,6 +44,7 @@ async def mark_read(
     n = await repo.mark_read(notification_id, user_id)
     if n is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    await session.commit()
     return NotificationOut.model_validate(n)
 
 
@@ -57,6 +58,7 @@ async def delete_notification(
     deleted = await repo.delete(notification_id, user_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    await session.commit()
 
 
 @router.get("/preferences", response_model=PreferenceOut)
@@ -68,7 +70,10 @@ async def get_preferences(
     repo = NotificationRepository(session)
     pref = await repo.get_preference(user_id)
     if pref is None:
+        # Lazily creates the default row — a write inside a GET, so it needs
+        # its own commit.
         pref = await repo.upsert_preference(tenant_id=tenant_id, user_id=user_id)
+        await session.commit()
     return PreferenceOut.model_validate(pref)
 
 
@@ -89,4 +94,5 @@ async def update_preferences(
 
     repo = NotificationRepository(session)
     pref = await repo.upsert_preference(tenant_id=tenant_id, user_id=user_id, **updates)
+    await session.commit()
     return PreferenceOut.model_validate(pref)

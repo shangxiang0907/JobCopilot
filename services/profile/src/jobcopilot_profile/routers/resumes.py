@@ -46,6 +46,7 @@ async def upload_resume(
     # Resolve the key now (needs the request's DB session); the background task
     # must not touch the session after the response is sent.
     embedding_api_key = await embedding.resolve_embedding_api_key(session, user_id)
+    await session.commit()
     background_tasks.add_task(
         embedding.embed_and_upsert,
         resume.resume_id,
@@ -84,6 +85,7 @@ async def activate_resume(
     else:
         resume = await repo.get(user_id, resume_id)
         resume.is_active = False
+    await session.commit()
     return ResumeResponse.model_validate(resume)
 
 
@@ -97,6 +99,7 @@ async def delete_resume(
 ) -> None:
     repo = ResumeRepository(session)
     file_url = await repo.delete(user_id, resume_id)
+    await session.commit()
     background_tasks.add_task(file_storage.delete_resume, file_url)
     background_tasks.add_task(embedding.delete_embedding, resume_id)
     logger.info("resume_deleted", user_id=str(user_id), resume_id=str(resume_id))

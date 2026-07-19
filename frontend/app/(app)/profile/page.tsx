@@ -253,6 +253,7 @@ export default function ProfilePage() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label={`Delete ${r.file_name}`}
                         onClick={() => deleteResume.mutate(r.resume_id)}
                       >
                         <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />

@@ -14,9 +14,13 @@ _session_factory = build_session_factory(_engine)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    # No transaction wrapper: FastAPI runs this teardown AFTER the response is
+    # sent, so a teardown commit loses read-after-write races against clients
+    # that refetch immediately (e.g. resume upload → list). Mutating endpoints
+    # own their unit of work and commit() before returning; uncommitted work
+    # is rolled back when the session closes.
     async with _session_factory() as session:
-        async with session.begin():
-            yield session
+        yield session
 
 
 async def get_tenant_id(claims: TokenClaimsDep) -> uuid.UUID:

@@ -38,6 +38,7 @@ async def create_job(
 ) -> JobResponse:
     repo = JobRepository(session)
     job = await repo.create(tenant_id, body)
+    await session.commit()
     return JobResponse.model_validate(job)
 
 
@@ -61,6 +62,7 @@ async def update_job(
 ) -> JobResponse:
     repo = JobRepository(session)
     job = await repo.update(tenant_id, job_id, body)
+    await session.commit()
     return JobResponse.model_validate(job)
 
 
@@ -72,3 +74,4 @@ async def delete_job(
 ) -> None:
     repo = JobRepository(session)
     await repo.delete(tenant_id, job_id)
+    await session.commit()

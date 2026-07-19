@@ -24,4 +24,5 @@ async def internal_notify(
         channels=payload.channels,
         metadata=payload.metadata,
     )
+    await session.commit()
     return {"dispatched": len(notifications)}

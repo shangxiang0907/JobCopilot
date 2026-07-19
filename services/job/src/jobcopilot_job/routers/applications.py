@@ -52,6 +52,7 @@ async def create_application(
 ) -> ApplicationResponse:
     repo = ApplicationRepository(session)
     app = await repo.create(user_id, body)
+    await session.commit()
     return ApplicationResponse.model_validate(app)
 
 
@@ -77,6 +78,7 @@ async def transition_application_status(
 ) -> ApplicationResponse:
     repo = ApplicationRepository(session)
     app = await repo.transition_status(user_id, application_id, body)
+    await session.commit()
     return ApplicationResponse.model_validate(app)
 
 
@@ -90,6 +92,7 @@ async def update_application(
 ) -> ApplicationResponse:
     repo = ApplicationRepository(session)
     app = await repo.update_notes(user_id, application_id, body)
+    await session.commit()
     return ApplicationResponse.model_validate(app)
 
 
@@ -102,6 +105,7 @@ async def delete_application(
 ) -> None:
     repo = ApplicationRepository(session)
     await repo.delete(user_id, application_id)
+    await session.commit()
 
 
 @router.get("/{application_id}/events", response_model=list[ApplicationEventResponse])

@@ -35,6 +35,7 @@ async def create_config(
 ) -> DiscoveryConfigResponse:
     repo = ConfigRepository(session)
     config = await repo.create(user_id, body)
+    await session.commit()
     return DiscoveryConfigResponse.model_validate(config)
 
 
@@ -58,6 +59,7 @@ async def update_config(
 ) -> DiscoveryConfigResponse:
     repo = ConfigRepository(session)
     config = await repo.update(user_id, config_id, body)
+    await session.commit()
     return DiscoveryConfigResponse.model_validate(config)
 
 
@@ -69,3 +71,4 @@ async def delete_config(
 ) -> None:
     repo = ConfigRepository(session)
     await repo.delete(user_id, config_id)
+    await session.commit()

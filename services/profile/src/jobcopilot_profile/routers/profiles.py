@@ -55,6 +55,7 @@ async def upsert_my_profile(
 ) -> ProfileResponse:
     repo = ProfileRepository(session)
     profile = await repo.upsert(user_id, body)
+    await session.commit()
     return ProfileResponse.from_orm_model(profile)
 
 
@@ -79,4 +80,5 @@ async def update_credentials(
     await repo.update_credentials(
         user_id, body, lambda value: encrypt(value, settings.encryption_key)
     )
+    await session.commit()
     logger.info("credentials_updated", user_id=str(user_id))

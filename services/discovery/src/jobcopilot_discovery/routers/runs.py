@@ -26,6 +26,9 @@ async def trigger_run(
 
     run_repo = RunRepository(session)
     run = await run_repo.create(user_id=user_id, config_id=config.config_id)
+    # Workflow activities read this row by run_id — it must be committed before
+    # the workflow starts, or the worker can race an uncommitted row.
+    await session.commit()
 
     temporal_client = await Client.connect(
         settings.temporal_host, namespace=settings.temporal_namespace
@@ -52,7 +55,7 @@ async def trigger_run(
 
     run = await run_repo.update_status(run.run_id, status="pending")
     run.temporal_run_id = handle.result_run_id
-    await session.flush()
+    await session.commit()
 
     return DiscoveryRunResponse.model_validate(run)
 

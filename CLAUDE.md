@@ -164,6 +164,7 @@ docker compose build profile-service job-service discovery-service agent-service
 - `SELECT *` is forbidden; always list columns explicitly
 - Parameterized queries only; no string-interpolated SQL
 - SQLAlchemy async sessions **autobegin** on the first statement — never call `session.begin()` after a query on the same session (raises `InvalidRequestError`; this 500'd `/v1/agent/match` + `/interview` in prod). Service-layer functions own their unit of work: query → mutate → `commit()`.
+- **Every mutating endpoint must `await session.commit()` before returning** (all services, since 2026-07-20). FastAPI runs the session dependency's teardown AFTER the response is sent, so a teardown commit loses read-after-write races — the frontend's invalidate-refetch after a mutation read the pre-mutation state (resume upload needed a manual refresh to appear; E2E regression: the resume upload test in `smoke.spec.ts`). Never re-wrap `get_session` in `session.begin()`. Also applies to writes hiding inside GETs (lazy default-row upserts), and rows must be committed before anything outside the transaction can see them (Temporal workflow start, MQ publish, background tasks).
 
 ### LLM / AI
 

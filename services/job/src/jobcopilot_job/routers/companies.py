@@ -33,6 +33,7 @@ async def create_company(
 ) -> CompanyResponse:
     repo = CompanyRepository(session)
     company = await repo.create(tenant_id, body)
+    await session.commit()
     return CompanyResponse.model_validate(company)
 
 
@@ -56,6 +57,7 @@ async def update_company(
 ) -> CompanyResponse:
     repo = CompanyRepository(session)
     company = await repo.update(tenant_id, company_id, body)
+    await session.commit()
     return CompanyResponse.model_validate(company)
 
 
@@ -67,3 +69,4 @@ async def delete_company(
 ) -> None:
     repo = CompanyRepository(session)
     await repo.delete(tenant_id, company_id)
+    await session.commit()

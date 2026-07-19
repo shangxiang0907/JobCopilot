@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs"
+import path from "node:path"
+
 import { expect, test, type Page } from "@playwright/test"
 
 /**
@@ -83,6 +86,41 @@ test("core pages render behind auth", async ({ page }) => {
   // needs a real LLM key).
   await page.getByRole("button", { name: "AI Assistant" }).click()
   await expect(page.getByPlaceholder("Ask anything…")).toBeVisible()
+})
+
+test("uploaded resume appears immediately, without a reload", async ({ page }) => {
+  // Regression net for the read-after-write race (fixed 2026-07-20): services
+  // used to commit in the session dependency's teardown, AFTER the response was
+  // sent, so the refetch triggered by the upload could read the pre-upload list
+  // and the new resume only appeared after a manual refresh. Mutating endpoints
+  // now commit before returning — the invalidate-refetch alone MUST surface the
+  // row. No page.reload() may ever be added to this test.
+  await loginViaLanding(page)
+  await sidebarNav(page).getByRole("link", { name: "Profile" }).click()
+  await expect(page.getByRole("heading", { name: "Profile Settings" })).toBeVisible({
+    timeout: 15_000,
+  })
+
+  // Unique name per run so a leftover row from an aborted earlier run can never
+  // satisfy the visibility assertion.
+  const fileName = `e2e-resume-${Date.now()}.pdf`
+  // Await the 201 explicitly so a failure here separates "upload broke" from
+  // "refetch broke" — the two halves of the read-after-write contract.
+  const uploadResponse = page.waitForResponse(
+    (r) => r.url().includes("/v1/resumes") && r.request().method() === "POST"
+  )
+  await page.setInputFiles('input[type="file"]', {
+    name: fileName,
+    mimeType: "application/pdf",
+    buffer: readFileSync(path.join(__dirname, "fixtures", "resume.pdf")),
+  })
+  expect((await uploadResponse).status()).toBe(201)
+  await expect(page.getByText(fileName)).toBeVisible({ timeout: 15_000 })
+
+  // Delete it again — cleans up AND exercises the delete path's commit the same
+  // way: the row must disappear from the refetched list without a reload.
+  await page.getByRole("button", { name: `Delete ${fileName}` }).click()
+  await expect(page.getByText(fileName)).toBeHidden({ timeout: 15_000 })
 })
 
 test("admin pages render for the admin role", async ({ page }) => {
