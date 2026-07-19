@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
 
-This file is **English-only** for context efficiency (owner decision, 2026-07-11). All other documentation in this repo (docs/, README) is **bilingual (English / Chinese)** in a single-file sectioned format — see "Docs Convention" below.
+This file is **English-only** for context efficiency (owner decision, 2026-07-11). Documentation under docs/ is **bilingual (English / Chinese)** in a single-file sectioned format; the README is split into `README.md` (English) + `README.zh-CN.md` (Chinese), cross-linked, kept in sync (owner decision, 2026-07-20) — see "Docs Convention" below.
 
 ---
 
@@ -61,7 +61,7 @@ Key design constraints (violating any one blocks launch):
 
 ### Stack conventions that matter when coding
 
-(Full stack tables: `README.md` §3 and `docs/SAD.md`.)
+(Full stack tables: `README.md` "Tech Stack" and `docs/SAD.md`.)
 
 - ORM: SQLAlchemy 2.x async + asyncpg; migrations via Alembic only.
 - MQ: RabbitMQ via `aio-pika`; event payloads are shared Pydantic models in `jobcopilot_shared.events`.
@@ -311,7 +311,7 @@ Detailed English description of what changed and why.
 
 ## Docs Convention
 
-All documentation files under `docs/` and the `README.md` use **bilingual single-file format**:
+All documentation files under `docs/` use **bilingual single-file format**:
 
 ```markdown
 ## N. English Title / 中文标题
@@ -321,6 +321,8 @@ All documentation files under `docs/` and the `README.md` use **bilingual single
 **中文：** 中文内容...
 ```
 
-`CLAUDE.md` is exempt: English-only (owner decision, 2026-07-11).
+The README is **split-file bilingual** (owner decision, 2026-07-20): `README.md` is English-only, `README.zh-CN.md` is Chinese-only, cross-linked from the hero section of each. **Any content change to one README must be mirrored in the other in the same commit.** Screenshots referenced by both live in `docs/images/`.
+
+`CLAUDE.md` is exempt from all bilingual rules: English-only (owner decision, 2026-07-11).
 
 Mermaid diagram labels use English (universal for technical diagrams).
