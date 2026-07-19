@@ -523,6 +523,26 @@ services:
       - "127.0.0.1:3001:3000"
     restart: unless-stopped
 
+  # Hourly purge of never-verified users past a TTL: with email-as-username an
+  # unverified registration squats the address (the real owner cannot register);
+  # the records also hold PII of people who never completed sign-up. Uses the
+  # least-privilege admin-api service account, never master admin credentials.
+  keycloak-cleanup:
+    image: python:3.14-alpine@sha256:26730869004e2b9c4b9ad09cab8625e81d256d1ce97e72df5520e806b1709f92
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    volumes:
+      - ./keycloak/cleanup-unverified.py:/cleanup-unverified.py:ro
+    command: ["python3", "/cleanup-unverified.py"]
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: jobcopilot
+      KEYCLOAK_ADMIN_API_SECRET: ${KEYCLOAK_ADMIN_API_SECRET:-dev-admin-api-secret}
+      UNVERIFIED_USER_TTL_HOURS: ${UNVERIFIED_USER_TTL_HOURS:-24}
+      CLEANUP_INTERVAL_SECONDS: ${CLEANUP_INTERVAL_SECONDS:-3600}
+    restart: unless-stopped
+
   keycloak-init:
     image: python:3.14-alpine@sha256:26730869004e2b9c4b9ad09cab8625e81d256d1ce97e72df5520e806b1709f92
     depends_on:

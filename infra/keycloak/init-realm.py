@@ -369,6 +369,25 @@ def ensure_login_theme(token: str) -> None:
     print("==> login theme configured successfully")
 
 
+def ensure_action_token_lifespan(token: str) -> None:
+    """Raise the user-initiated action token lifespan (email-verification /
+    password-reset links) from Keycloak's 5-minute default to 30 minutes.
+    Real users do not necessarily read their mailbox within 5 minutes; an
+    expired link dead-ends on "Action expired" and forces a resend."""
+    desired = 1800
+    realm_url = f"{KEYCLOAK_URL}/admin/realms/{REALM}"
+    realm = _http("GET", realm_url, token=token)
+
+    if realm.get("actionTokenGeneratedByUserLifespan") == desired:
+        print(f"==> action token lifespan already {desired}s — nothing to do")
+        return
+
+    realm["actionTokenGeneratedByUserLifespan"] = desired
+    print(f"==> Setting user action token lifespan to {desired}s ...")
+    _http("PUT", realm_url, data=json.dumps(realm).encode(), token=token)
+    print("==> action token lifespan configured successfully")
+
+
 def main() -> None:
     print("==> Fetching admin token ...")
     token = get_admin_token()
@@ -376,6 +395,7 @@ def main() -> None:
     ensure_redirect_uri(token)
     ensure_password_policy(token)
     ensure_login_theme(token)
+    ensure_action_token_lifespan(token)
     ensure_self_registration(token)
     ensure_google_idp(token)
     ensure_identity_provider_mapper(token)
