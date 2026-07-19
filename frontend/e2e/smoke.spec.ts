@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test"
+import { expect, test, type Page } from "@playwright/test"
 
 /**
  * Smoke journey through the deployed stack: Keycloak OIDC login and every
@@ -13,6 +13,13 @@ import { expect, test } from "@playwright/test"
 
 const USER = process.env.E2E_USER ?? "testuser@example.com"
 const PASSWORD = process.env.E2E_PASSWORD ?? "Test1234!"
+
+// All sidebar navigation goes through the named landmark. Page content may
+// contain identically-named inline links (the dashboard onboarding empty state
+// links to "discovery"), and Playwright's accessible-name matching is
+// case-insensitive — an unscoped getByRole("link") is a strict-mode violation
+// waiting on a data race (this exact flake failed the 2026-07-19 CD run).
+const sidebarNav = (page: Page) => page.getByRole("navigation", { name: "Primary" })
 
 test.describe.configure({ mode: "serial" })
 
@@ -50,17 +57,17 @@ test("core pages render behind auth", async ({ page }) => {
     page.getByRole("heading", { name: "Job Applications" })
   ).toBeVisible({ timeout: 20_000 })
 
-  await page.getByRole("link", { name: "Jobs" }).click()
+  await sidebarNav(page).getByRole("link", { name: "Jobs" }).click()
   await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible({
     timeout: 15_000,
   })
 
-  await page.getByRole("link", { name: "Discovery" }).click()
+  await sidebarNav(page).getByRole("link", { name: "Discovery" }).click()
   await expect(page.getByRole("heading", { name: "Discovery" })).toBeVisible({
     timeout: 15_000,
   })
 
-  await page.getByRole("link", { name: "Profile" }).click()
+  await sidebarNav(page).getByRole("link", { name: "Profile" }).click()
   await expect(page.getByRole("heading", { name: "Profile Settings" })).toBeVisible({
     timeout: 15_000,
   })
@@ -84,14 +91,14 @@ test("admin pages render for the admin role", async ({ page }) => {
     page.getByRole("heading", { name: "Job Applications" })
   ).toBeVisible({ timeout: 20_000 })
 
-  await page.getByRole("link", { name: "Users" }).click()
+  await sidebarNav(page).getByRole("link", { name: "Users" }).click()
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible({
     timeout: 15_000,
   })
   // Real data, not just the page shell: the test user itself must be listed.
   await expect(page.getByText(USER).first()).toBeVisible({ timeout: 15_000 })
 
-  await page.getByRole("link", { name: "Usage" }).click()
+  await sidebarNav(page).getByRole("link", { name: "Usage" }).click()
   await expect(page.getByRole("heading", { name: "Usage", exact: true })).toBeVisible({
     timeout: 15_000,
   })

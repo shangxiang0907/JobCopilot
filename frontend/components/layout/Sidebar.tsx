@@ -58,7 +58,10 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-4 space-y-1">
+      {/* Named landmark: a11y + lets tests target sidebar links unambiguously
+          (page content may contain identically-named inline links, e.g. the
+          dashboard empty state's "discovery" link). */}
+      <nav aria-label="Primary" className="flex-1 px-2 py-4 space-y-1">
         {items.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href}>
             <span
