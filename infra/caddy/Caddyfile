@@ -45,6 +45,8 @@ auth.{$SERVER_HOST} {
 		# Keycloak manages its own CSP/frame headers (login pages may be framed
 		# by its own flows) — only add what it does not set itself.
 		Strict-Transport-Security "max-age=31536000"
+		# Login/registration pages must never appear in search results.
+		X-Robots-Tag "noindex, nofollow"
 		-Server
 	}
 

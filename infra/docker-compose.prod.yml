@@ -113,6 +113,8 @@ services:
 
   frontend:
     image: ghcr.io/shangxiang0907/jobcopilot-frontend@${FRONTEND_IMAGE_DIGEST:?FRONTEND_IMAGE_DIGEST unset — deploy via infra/scripts/deploy.sh}
+    environment:
+      SITE_URL: https://${SERVER_HOST:?SERVER_HOST unset — apex domain, e.g. jobcopilot.arnoldshang.com}
     ports: !override
       - "127.0.0.1:3000:3000"
 

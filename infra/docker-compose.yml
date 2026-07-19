@@ -461,6 +461,8 @@ services:
       KEYCLOAK_CLIENT_ID: frontend
       # ADR-007: platform mode hides the BYO key UI (served via /env.js)
       LLM_KEY_MODE: ${LLM_KEY_MODE:-byo}
+      # Canonical public origin — SEO metadata (canonical/OG URLs, robots, sitemap)
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
     ports:
       - "127.0.0.1:3000:3000"
     restart: unless-stopped
