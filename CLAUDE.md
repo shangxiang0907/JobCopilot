@@ -291,6 +291,7 @@ gitleaks detect --no-git
 6. **Secret Scan**: `gitleaks detect`
 7. **Image Scan**: Trivy — Critical CVE blocks the pipeline
 8. **E2E Smoke** (CD, gates deploy): Playwright journey (Keycloak login → dashboard → jobs/discovery/profile → chat panel) against the stack running the exact images just pushed to GHCR (`frontend/e2e/`, `infra/docker-compose.e2e.yml`, `infra/scripts/create-test-user.sh`). Run locally with `cd frontend && npm run test:e2e` against a running compose stack.
+   - **Playwright locator rule (2026-07-19 CD flake):** accessible-name matching is case-insensitive substring — an unscoped `getByRole("link", { name: ... })` can collide with identically-named page-content links and only fail when a data race lets both render (the dashboard empty state's inline "discovery" link vs the sidebar's "Discovery"). Always scope navigation clicks to a named landmark (the sidebar `<nav>` carries `aria-label="Primary"`; use the `sidebarNav()` helper in `smoke.spec.ts`), and give any new recurring UI region its own landmark/label instead of relying on globally-unique text.
 
 ---
 
