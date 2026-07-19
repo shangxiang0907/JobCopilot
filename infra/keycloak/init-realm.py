@@ -238,6 +238,11 @@ def ensure_google_idp(token: str) -> None:
             "clientId": client_id,
             "clientSecret": client_secret,
             "syncMode": "IMPORT",
+            # Always show Google's account chooser. Without it Google silently
+            # reuses the browser's only signed-in account — with multiple Google
+            # accounts (or a test account left signed in) the user has no way to
+            # pick a different one.
+            "prompt": "select_account",
         },
     }
     try:
