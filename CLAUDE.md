@@ -20,7 +20,7 @@ All application code is implemented, verified end-to-end, and **live in producti
 5. ~~Production deploy of 4a–4e~~ ✅ done 2026-07-16/17 (incl. domain migration to `jobcopilot.arnoldshang.com` + Resend SMTP): prod runs `f77f908`; Resend delivery owner-verified
 6. ~~Deploy per-tenant daily AI quota + BYO key validation (`b7c712a`)~~ ✅ deployed 2026-07-19 (via `599d309`): prod agent verified `LLM_KEY_MODE=platform` + `LLM_DAILY_QUOTA=20`; quota-429/key-validation behavior E2E-verified locally only (exercising it on prod would burn real LLM calls)
 7. ~~Version traceability~~ ✅ done + deployed 2026-07-19 @ `6b20a9f`: CD stamps `GIT_SHA` build-arg + OCI `org.opencontainers.image.revision` label into all 6 images; `/healthz/*` returns `revision`, `/metrics` exposes `jobcopilot_build_info`; `deploy.sh` step 5c fails the deploy on label↔commit mismatch (first live run: 6/6 ok)
-8. **Owner human tests (blocking public launch):** fresh registration email round-trip + Google login round-trip on prod
+8. ~~Owner human tests~~ ✅ both passed 2026-07-19: fresh registration round-trip (incl. cross-device verify — drove the login-theme fix, 30-min links, unverified-account cleanup, and Google account chooser, all deployed same day) + Google login round-trip with IdP badge on /profile
 - Other open items: offsite backup enablement (awaiting S3 credentials), production test-account cleanup before public launch, bulk re-embed backfill job (embeddings are only created on upload; required before any post-launch Qdrant storage migration)
 
 **Local test account:** `testuser@example.com` / `Test1234!` (Keycloak realm: `jobcopilot`; production uses a separate strong-password account — see session memory, never commit it here)
