@@ -38,6 +38,10 @@ jobs:
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pin the scanner explicitly: unset, the action falls back to a version
+          # hard-coded in its own dist/, so a tag bump would silently swap the
+          # rule set. Keep in sync with the local binary (CLAUDE.md, pre-push #6).
+          GITLEAKS_VERSION: "8.30.1"
 
   # ── 3. Type Check (per-service matrix) ──────────────────────────────────────
   typecheck:

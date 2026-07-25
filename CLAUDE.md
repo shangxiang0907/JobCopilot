@@ -272,9 +272,21 @@ Run these checks locally **before every `git push`**. CI runs the same steps —
 (cd frontend && npm run gen:api-types)
 git diff --exit-code -- openapi frontend/lib/gen
 
-# 6. Secret scan — must produce zero findings
-gitleaks detect --no-git
+# 6. Secret scan — must produce zero findings. Scans exactly the commits you are
+#    about to push, which is what CI scans too (the action passes
+#    --log-opts=<base>^..<head>, NOT full history).
+gitleaks git --log-opts="origin/main..HEAD" .
 ```
+
+**gitleaks version parity (2026-07-25):** local and CI must run the **same** version — `GITLEAKS_VERSION` in `.github/workflows/ci.yml` and the binary in `~/.local/bin/gitleaks` are pinned together (currently **8.30.1**). Dependabot tracks the `uses:` action tag but NOT the version string, so upgrading gitleaks is a manual PR that changes both places. Install/upgrade the local binary from the upstream release with a checksum check (Ubuntu's `apt` package is 8.16.0 — three years stale, and its rule set would silently disagree with CI):
+
+```bash
+curl -sSLO https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_checksums.txt | sha256sum -c --ignore-missing
+tar xzf gitleaks_8.30.1_linux_x64.tar.gz gitleaks && install -m 0755 gitleaks ~/.local/bin/gitleaks
+```
+
+Never scan with `gitleaks dir .` — it walks gitignored local artifacts (`infra/.env`, `frontend/.next/`), which legitimately hold real secrets and produce dozens of permanent false positives. A gate that is always red is a gate nobody reads.
 
 **Ruff per-file-ignores policy:**
 - New lint suppressions must go in `[tool.ruff.lint.per-file-ignores]` in `pyproject.toml`, not inline `# noqa` comments — this keeps suppression rationale in one place.
@@ -289,7 +301,7 @@ gitleaks detect --no-git
 3. **Unit Tests**: `pytest` (no real DB/queue)
 4. **Contract Checks**: `pytest tests/contracts` (consumer call sites vs provider OpenAPI) + OpenAPI/TS-type freshness (`scripts/export_openapi.py` → `npm run gen:api-types` → `git diff --exit-code -- openapi frontend/lib/gen`). Entity types in `frontend/lib/api.ts` are re-exports of generated types — NEVER hand-write them.
 5. **Integration Tests**: `pytest` against real PostgreSQL + Redis + RabbitMQ, then `alembic check` per service (model↔migration drift fails CI)
-6. **Secret Scan**: `gitleaks detect`
+6. **Secret Scan**: `gitleaks/gitleaks-action@v3`, version pinned via `GITLEAKS_VERSION` (unpinned it silently inherits a hard-coded default baked into the action's `dist/`, so bumping the action tag would change the scanner underneath you). Scans only the commits in the push, not full history.
 7. **Image Scan**: Trivy — Critical CVE blocks the pipeline
 8. **E2E Smoke** (CD, gates deploy): Playwright journey (Keycloak login → dashboard → jobs/discovery/profile → chat panel) against the stack running the exact images just pushed to GHCR (`frontend/e2e/`, `infra/docker-compose.e2e.yml`, `infra/scripts/create-test-user.sh`). Run locally with `cd frontend && npm run test:e2e` against a running compose stack.
    - **Playwright locator rule (2026-07-19 CD flake):** accessible-name matching is case-insensitive substring — an unscoped `getByRole("link", { name: ... })` can collide with identically-named page-content links and only fail when a data race lets both render (the dashboard empty state's inline "discovery" link vs the sidebar's "Discovery"). Always scope navigation clicks to a named landmark (the sidebar `<nav>` carries `aria-label="Primary"`; use the `sidebarNav()` helper in `smoke.spec.ts`), and give any new recurring UI region its own landmark/label instead of relying on globally-unique text.
