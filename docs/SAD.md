@@ -1,8 +1,10 @@
 # JobCopilot — Software Architecture Design / 软件架构设计
 
-Version / 版本：v0.2  
+Version / 版本：v0.3  
 Status / 状态：Active / 生效  
-Last Updated / 最后更新：2026-07-11
+Last Updated / 最后更新：2026-07-26
+
+> **v0.3 change summary / 变更摘要：** Aligned with PRD v0.3 layering correction. New **ADR-008** makes "AI is an augmentation layer over a self-sufficient non-AI core" an architectural constraint with a one-way dependency rule enforced by `import-linter`, and new **ADR-009** fixes the design constraints for browser-extension job ingestion (recorded, not scheduled). Data model changes: `applications.resume_id` records which resume was used per application (plain UUID — `applications` and `resumes` live in different schemas and cross-schema JOINs are forbidden); `resumes.is_active` → `is_default` with default-resume semantics, plus `label` / `notes`; `companies` gains a per-tenant unique index on the normalized name so jobs can be auto-linked by company name. / 与 PRD v0.3 分层修正对齐。新增 **ADR-008**：将"AI 是自足的非 AI 基础层之上的叠加层"确立为架构约束，层间单向依赖由 `import-linter` 强制；新增 **ADR-009**：固化浏览器插件式岗位录入的设计约束（入档，不排期）。数据模型变更：`applications.resume_id` 记录每次投递所用简历（普通 UUID——`applications` 与 `resumes` 分属不同 Schema，禁止跨 Schema JOIN）；`resumes.is_active` 改为 `is_default` 并采用默认简历语义，另加 `label` / `notes`；`companies` 增加按租户的规范化名称唯一索引，使岗位可按公司名自动挂接。
 
 > **v0.2 change summary / 变更摘要：** Aligned with PRD v0.2 re-scope: credential-free public-source discovery replaces LinkedIn cookie crawling (ADR-004 superseded by ADR-006); notifications converge to email; tool signatures and messaging contracts corrected to match the verified implementation (in-process tool delegation, no `job.analyze.priority` queue, no WebSocket push); Keycloak 26; Grafana Alloy replaces Promtail; deployment section reflects the actual single-node Docker Compose production with Kubernetes as the scaling path. / 与 PRD v0.2 重构对齐：无凭证公开源爬取取代 LinkedIn Cookie 爬取（ADR-004 被 ADR-006 取代）；通知收敛为邮件；工具签名与消息契约修正为与已验证实现一致（工具进程内委托、不存在 `job.analyze.priority` 队列与 WebSocket 推送）；Keycloak 26；Grafana Alloy 取代 Promtail；部署章节反映真实的单节点 Docker Compose 生产形态，Kubernetes 为扩容路径。
 
@@ -401,6 +403,18 @@ All tables include `tenant_id` where applicable. Every query against tenant-scop
 **中文：**  
 所有表在适用时均含 `tenant_id`。针对租户范围表的每条查询**必须**包含 `WHERE tenant_id = :tenant_id`。禁止跨 Schema JOIN，服务间数据交换通过内部 API 进行。每个用户即一个租户。`profiles.llm_api_key_enc` 仅自部署形态使用（AES-256-GCM）。
 
+**v0.3 model notes / v0.3 模型说明**
+
+**EN:**
+- **`applications.resume_id` is a plain UUID with no foreign key, by design.** `applications` lives in `job_schema` and `resumes` in `profile_schema`; cross-schema JOINs and FKs are forbidden (service independence). The Job Service therefore stores the id opaquely and never resolves it; any display of resume label/file name is resolved by the caller — the frontend, or an internal Profile Service call. Nullable, because applications created before v0.3 have no recorded resume: **`NULL` means "not recorded", not "the default resume"** — the two must never be conflated (see the no-silent-degradation rule in CLAUDE.md).
+- **`resumes.is_default` replaces `is_active`** (rename + migration, not a semantic overload). Exactly one resume per user may be default; it pre-fills new applications and AI actions. A per-application `resume_id` always wins over the default, and changing the default never rewrites existing applications — history stays immutable. The first resume uploaded becomes the default automatically.
+- **`companies` gets a unique index on `(tenant_id, lower(trim(name)))`** so that resolving a job's company by name is an idempotent upsert rather than a duplicate factory. Resolution happens inside the Job Service (same schema, so no cross-service call), on job create/update and on discovery import. `jobs.company_name` is kept as the raw string as it appeared at the source; `jobs.company_id` is the resolved link.
+
+**中文：**
+- **`applications.resume_id` 有意设计为无外键的普通 UUID。** `applications` 属于 `job_schema`，`resumes` 属于 `profile_schema`；禁止跨 Schema JOIN 与外键（服务独立性）。因此 Job Service 只做不透明存储、从不解析该 id；简历标签/文件名的展示由调用方解析——前端，或一次 Profile Service 内部调用。该列可空，因为 v0.3 之前创建的投递没有记录简历：**`NULL` 表示"未记录"，而不是"默认简历"**——两者绝不可混为一谈（见 CLAUDE.md 的禁止静默降级规则）。
+- **`resumes.is_default` 取代 `is_active`**（重命名 + 迁移，而非给旧字段叠加新语义）。每用户至多一份默认简历，用于预填新投递与 AI 操作。按投递记录的 `resume_id` 始终优先于默认；更改默认简历绝不回写既有投递——历史保持不可变。用户上传的第一份简历自动成为默认。
+- **`companies` 增加 `(tenant_id, lower(trim(name)))` 唯一索引**，使"按公司名解析岗位所属公司"成为幂等 upsert，而不是重复记录制造机。解析在 Job Service 内部完成（同 Schema，无跨服务调用），发生在岗位创建/更新与发现导入时。`jobs.company_name` 保留来源站点上的原始字符串，`jobs.company_id` 是解析后的关联。
+
 ```mermaid
 erDiagram
     TENANTS {
@@ -432,11 +446,13 @@ erDiagram
         uuid resume_id PK
         uuid user_id FK
         string file_name
+        string label
+        text notes
         string file_url
         jsonb parsed_data
         vector embedding
         int version
-        boolean is_active
+        boolean is_default
         timestamp created_at
     }
 
@@ -481,6 +497,7 @@ erDiagram
         uuid application_id PK
         uuid user_id FK
         uuid job_id FK
+        uuid resume_id
         string status
         float match_score
         jsonb resume_suggestions
@@ -827,3 +844,57 @@ Every application service must provide / 每个应用服务须提供：
 **EN:** The project is open source and defines two deployment modes, switched by configuration: **self-hosted** (users/operator configure their own OpenAI-compatible API key, encrypted at rest) and **hosted site** (platform-provided key only; the BYO-key UI is hidden). The mode flag controls both the key source used by the Agent Service and whether the credentials UI exposes API-key configuration. Per-user quota enforcement on the hosted site is a deferred prerequisite for large-scale open registration (PRD §6).
 
 **中文：** 项目开源，按配置切换两种部署形态：**自部署**（用户/部署者自配 OpenAI 兼容 Key，加密存储）与**托管站**（只用平台 Key，隐藏自带 Key 界面）。形态开关同时控制 Agent Service 的 Key 来源与设置页是否展示 API Key 配置。托管站按用户配额强制为暂缓项，是大规模开放注册的前提（PRD §6）。
+
+### ADR-008: AI as an Augmentation Layer, Never Load-Bearing
+
+**Status:** Accepted (2026-07-26)
+
+**EN:**
+**Context.** v0.2 shipped with the AI layer holding up basic functionality. Adding a job posting — a plain write operation — was only reachable through the LangGraph ReAct chat agent, and `analyze` / `match` / `interview` had REST endpoints that no UI called. Three consequences were observed in production: (a) exhausting the platform-mode daily quota disabled *data entry*, not just AI; (b) a silently degrading LLM path (the profile-404 defect, fixed 2026-07-26) broke matching for every hosted user while producing fluent, plausible output and no error logs; (c) testing a basic feature required spending tokens, in direct conflict with the project's token-frugality rule.
+
+**Decision.** The system is two layers with a one-way dependency. The **Core layer** (Profile/Job/Discovery/Notification services and their UI: resume library, job library, company library, application pipeline) must be complete and usable with the Agent Service stopped. The **AI layer** (Agent Service: graphs, prompts, ReAct tools, chat SSE) may depend on the Core layer through internal APIs, and only ever adds a faster route to an operation that already has a manual one. Concretely:
+1. Core services must not import from or HTTP-call the Agent Service. Enforced as an `import-linter` contract alongside the existing service-independence contracts, so a violation fails CI rather than review.
+2. No capability that writes data may exist only as an agent tool. Each tool must bind to an endpoint that a form also uses.
+3. AI-produced values carry provenance (`source: ai | manual`, model, generated timestamp) and are hand-overwritable; AI must never silently replace user-entered data.
+4. A "no-AI mode" E2E test is the executable definition of this ADR: with the AI layer disabled, the Core journeys must pass.
+
+**Consequences.** The chat agent stops being a data-entry channel and becomes what it should be — an accelerator. The AI layer can be refactored, rate-limited, or switched off without taking the product down, which also makes it safe for the owner to evolve `services/agent/` by hand. Cost: some capabilities need two entry points (a form and a tool), and the tool must not fork its own logic — both call the same service layer, as the tool contract in CLAUDE.md already requires.
+
+**中文：**
+**背景。** v0.2 上线后由 AI 层支撑着基础功能：添加岗位——一个普通写操作——只能通过 LangGraph ReAct 聊天 Agent 完成，而 `analyze` / `match` / `interview` 的 REST 端点没有任何界面调用。生产中已观测到三个后果：(a) 托管模式每日配额耗尽会禁掉**数据录入**，而不只是 AI；(b) 一条静默降级的 LLM 路径（2026-07-26 修复的 profile-404 缺陷）使所有托管用户的匹配失效，却产出流畅可信的回答且无任何错误日志；(c) 测试基础功能必须消耗 token，与项目的 token 节俭规则直接冲突。
+
+**决策。** 系统分两层，层间单向依赖。**基础层**（Profile/Job/Discovery/Notification 服务及其界面：简历库、岗位库、公司库、投递流程）在 Agent Service 停止运行时必须完整可用。**AI 层**（Agent Service：图、提示词、ReAct 工具、聊天 SSE）可通过内部 API 依赖基础层，且永远只是为"已有手动路径的操作"提供更快的通道。具体要求：
+1. 基础层服务不得 import 或 HTTP 调用 Agent Service。与现有服务独立性契约一并由 `import-linter` 强制，使违规在 CI 失败而不是靠评审发现。
+2. 任何写数据的能力都不得仅以 agent 工具形式存在。每个工具必须绑定到某个同样被表单使用的端点。
+3. AI 产出的值携带来源信息（`source: ai | manual`、模型、生成时间）且可手动覆写；AI 绝不静默替换用户录入的数据。
+4. "无 AI 模式" E2E 测试是本 ADR 的可执行定义：AI 层禁用时，基础层用户旅程必须通过。
+
+**结果。** 聊天 Agent 不再是数据录入通道，回归其应有角色——加速器。AI 层可以被重构、限流或直接关停而不影响产品可用性，这也使 owner 手工演进 `services/agent/` 变得安全。代价：部分能力需要两个入口（表单与工具），且工具不得另建一套逻辑——两者调用同一服务层，这已是 CLAUDE.md 中工具契约的既有要求。
+
+### ADR-009: Browser-Extension Job Ingestion (Recorded, Not Scheduled)
+
+**Status:** Proposed / 提议 (2026-07-26) — design fixed, implementation deliberately unscheduled
+
+**EN:**
+**Context.** Some sites (LinkedIn and similar) defend aggressively against server-side crawling, and ADR-006 forbids using user account credentials to get past a login wall. Today the supported route for such a posting is the manual plain form (PRD §3.1 path 0). A browser extension could remove the copy-paste step by reading the posting the user is *already viewing in their own authenticated session*.
+
+**Decision.** Not implemented now. If implemented, these constraints are binding:
+1. **No server-side proxy fetching, ever.** The extension only reads the page currently open in the user's browser; the backend never fetches a login-walled URL on the user's behalf. This keeps ADR-006 intact — no credential is collected, stored, or replayed by us.
+2. **No credential or cookie leaves the browser.** The extension transmits extracted page text and the canonical URL only, authenticated with the user's normal OAuth access token.
+3. **Explicit user action per posting.** Capture happens on a user gesture with `activeTab` permission; no broad host permissions, no background scraping loop. Bulk auto-harvesting is out of scope — it would recreate the crawler the ADR-006 decision rejected, just relocated into the user's browser.
+4. **Thin extension, server-side parsing.** Parsing and structuring live in the backend so store-review cycles never gate a parser fix. Ingestion reuses the existing idempotent upsert-by-URL semantics (`POST /internal/jobs`) with URL normalization for dedup.
+5. **Separate release artifact.** Its own repo directory, version, privacy disclosure and store listing; it must never become a prerequisite for any Core feature (ADR-008).
+
+**Consequences.** Deferring costs little: the manual form already covers these sites, just with more typing. Implementing costs an independent distribution channel (store review + privacy policy), an ongoing site-markup compatibility burden, and exposure to platform ToS changes — which is why this is recorded rather than scheduled.
+
+**中文：**
+**背景。** 部分站点（LinkedIn 及类似站点）对服务端爬取防御严格，而 ADR-006 禁止使用用户账号凭证突破登录墙。目前此类岗位受支持的录入路径是手动普通表单（PRD §3.1 路径 0）。浏览器插件可以省去复制粘贴这一步——读取用户**已在自己已登录会话中浏览**的岗位页面。
+
+**决策。** 现在不实现。若将来实现，以下约束具有强制力：
+1. **绝不做服务端代理抓取。** 插件只读取用户浏览器当前打开的页面；后端绝不代替用户去抓取登录墙 URL。这使 ADR-006 保持完整——我们不收集、不存储、不重放任何凭证。
+2. **凭证与 Cookie 绝不离开浏览器。** 插件只传输抽取到的页面文本与规范化 URL，并使用用户正常的 OAuth 访问令牌鉴权。
+3. **每条岗位都需用户显式操作。** 采集由用户手势触发并使用 `activeTab` 权限；不申请宽泛的 host 权限，不存在后台抓取循环。批量自动采集不在范围内——那等于把 ADR-006 已否决的爬虫搬进用户浏览器重建一遍。
+4. **插件保持轻量，解析在服务端。** 解析与结构化放在后端，使修复解析器不必等待商店审核。录入复用既有的按 URL 幂等 upsert 语义（`POST /internal/jobs`），并以 URL 规范化去重。
+5. **独立发布物。** 拥有独立的仓库目录、版本、隐私声明与商店条目；且绝不能成为任何基础层功能的前置依赖（ADR-008）。
+
+**结果。** 暂缓的代价很小：手动表单已能覆盖这些站点，只是多打些字。实现的代价是一条独立发布渠道（商店审核 + 隐私政策）、长期的站点结构兼容性负担，以及平台服务条款变动的风险——这正是它只入档、不排期的原因。

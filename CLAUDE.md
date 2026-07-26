@@ -21,7 +21,19 @@ All application code is implemented, verified end-to-end, and **live in producti
 6. ~~Deploy per-tenant daily AI quota + BYO key validation (`b7c712a`)~~ ✅ deployed 2026-07-19 (via `599d309`): prod agent verified `LLM_KEY_MODE=platform` + `LLM_DAILY_QUOTA=20`; quota-429/key-validation behavior E2E-verified locally only (exercising it on prod would burn real LLM calls)
 7. ~~Version traceability~~ ✅ done + deployed 2026-07-19 @ `6b20a9f`: CD stamps `GIT_SHA` build-arg + OCI `org.opencontainers.image.revision` label into all 6 images; `/healthz/*` returns `revision`, `/metrics` exposes `jobcopilot_build_info`; `deploy.sh` step 5c fails the deploy on label↔commit mismatch (first live run: 6/6 ok)
 8. ~~Owner human tests~~ ✅ both passed 2026-07-19: fresh registration round-trip (incl. cross-device verify — drove the login-theme fix, 30-min links, unverified-account cleanup, and Google account chooser, all deployed same day) + Google login round-trip with IdP badge on /profile
-- Other open items: offsite backup enablement (awaiting S3 credentials), production test-account cleanup before public launch, bulk re-embed backfill job (embeddings are only created on upload; required before any post-launch Qdrant storage migration)
+- Other open items: offsite backup enablement (awaiting S3 credentials), bulk re-embed backfill job (embeddings are only created on upload; required before any post-launch Qdrant storage migration). Production test-account cleanup ✅ done 2026-07-26.
+
+**v0.3 re-scope (decided 2026-07-26, PRD v0.3 + SAD ADR-008/009) — NOT STARTED.** Fixes a layering inversion, not the feature set: v0.2 shipped with AI load-bearing (adding a job was only possible through the chat agent; `analyze`/`match`/`interview` had no non-AI entry point), while the manual CRUD the v0.2 page inventory already specified (`/companies`, `/kanban`, manual job create/edit) was never built. **The backend REST layer for jobs/companies/applications already exists and runs in production — this is predominantly frontend work plus three small schema changes.** Owner decisions: `resumes.is_active` → `is_default` (default-resume semantics, per-application choice wins); companies stay per-tenant private; **v0.3 is strictly non-AI** (AI features frozen at current state); browser extension = ADR-009 recorded, deliberately not scheduled.
+
+**v0.3 work queue (agreed order):**
+1. Schema + API: `applications.resume_id` (plain UUID, no cross-schema FK; `NULL` = "not recorded", never "the default"), `resumes.is_default` rename + `label`/`notes`, `companies` unique index on `(tenant_id, lower(trim(name)))` + name-resolution upsert on job create/update/import
+2. Frontend Core layer: `/companies` list + detail + create/edit/delete, manual job create/edit/delete, per-application resume selection, resume label/notes editing
+3. `import-linter` contract enforcing ADR-008's one-way dependency (Core services must not import or HTTP-call the Agent Service)
+4. **No-AI mode E2E test** — the executable definition of ADR-008: with the AI layer disabled, all Core journeys pass
+5. Repo-wide silent-fallback audit (see "Error Handling — No Silent Degradation"), ordered by blast radius: service-to-service contract boundaries → value paths feeding LLM input → MQ consumers swallowing exceptions → frontend display coercions
+6. Replace the fake `deploy` job in `.github/workflows/cd.yml` (option A: run `deploy.sh` over SSH behind a GitHub Environment with a required reviewer + forced `command=` on the key). Needs owner-supplied repo secrets
+
+**AI layer ownership (owner statement, 2026-07-26):** the owner maintains `services/agent/` **by hand, without LLM assistance**. Code there is optimized for a human reader: small single-purpose typed functions, docstrings explaining *why*, obvious graph topology, one node = one responsibility, prompts as files with their Pydantic output schema changed in the same commit, and a test per tool pinning its endpoint binding. Prefer the structure that is easiest to re-derive later over the one with the fewest lines.
 
 **Local test account:** `testuser@example.com` / `Test1234!` (Keycloak realm: `jobcopilot`; production uses a separate strong-password account — see session memory, never commit it here)
 
@@ -31,7 +43,9 @@ All application code is implemented, verified end-to-end, and **live in producti
 
 JobCopilot is a production-grade intelligent job-search management platform. It uses a multi-AI-agent architecture (LangGraph) to discover job listings from public job boards, analyze them against the user's resume, and manage the full application pipeline. Any posting can be added manually via URL, pasted JD text, or screenshot (v0.2). A global AI assistant (Vercel AI SDK + LangGraph ReAct Agent) lets users trigger any action through natural language. Open source, with two deployment modes: self-hosted (BYO LLM key) and the official hosted site (platform LLM key).
 
-Product requirements: `docs/PRD.md` (v0.2). Architecture decisions: `docs/SAD.md` (v0.2). Stack overview and repo layout: `README.md`.
+As of PRD v0.3 the product is explicitly **two layers**: a self-sufficient non-AI Core (resume / job / company libraries + application pipeline, all manual CRUD) with AI strictly as an augmentation layer on top — one-way dependency, no AI-only entry points, AI output always overwritable and provenance-stamped, and "works with AI disabled" as an acceptance criterion (SAD ADR-008).
+
+Product requirements: `docs/PRD.md` (v0.3). Architecture decisions: `docs/SAD.md` (v0.3). Stack overview and repo layout: `README.md`.
 
 ---
 
