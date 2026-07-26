@@ -157,6 +157,25 @@ docker compose build profile-service job-service discovery-service agent-service
 - Health probes: `GET /healthz/live` (liveness) and `GET /healthz/ready` (readiness)
 - Streaming (AI chat): Server-Sent Events (`text/event-stream`)
 
+### Error Handling — No Silent Degradation
+
+**Owner rule, 2026-07-26.** `absent`, `unavailable` and `empty` are three distinct states and must never collapse into one value. The rule is NOT "raise on every fallback" — blanket fail-fast turns graceful degradation into outages. The rule is: **never substitute a plausible-looking value for data that is missing or that failed to arrive.** Applies to every new endpoint, consumer, tool and UI value path.
+
+Forbidden (these are defects, fix on sight):
+- Mapping a provider's error or 404 onto a business-legal value: `if resp.status_code != 200: return ""` / `or {}` / `or 0` / `except Exception: pass`. Callers cannot tell "user has no resume" from "profile service is broken", and neither can the logs.
+- Feeding a coerced-empty value into an LLM. An empty resume or empty JD still produces a fluent, confident, entirely wrong answer — the single most expensive failure mode in this repo. Fail before the LLM call, never after.
+- Agent tools that "fail gracefully" by returning error JSON. The ReAct loop confabulates an answer on top of it and nothing looks broken (2026-07-08: 4 of 5 tools had been calling nonexistent endpoints since launch).
+
+Required when degradation genuinely is correct (optional side data, idempotent retry, non-critical path like notifications) — all three, no exceptions:
+1. A comment stating why continuing is correct here,
+2. a structured log line, and
+3. a `jobcopilot_*` metric or counter. **A degradation path with no metric is invisible in production**, which makes it indistinguishable from the forbidden cases above.
+
+Reference implementations:
+- `services/agent/.../services/matching.py::_fetch_resume_text` — transport failure raises `ExternalServiceError` (a transient outage must not be reported to the user as "no resume uploaded"); only genuine absence yields `""`.
+- `GET /internal/profiles/{user_id}` returns a **shell** (nullable `profile_id`) rather than 404: the profile row is optional side data, the resume is the payload. It 404'd until 2026-07-26, and because `LLM_KEY_MODE=platform` can never create that row, AI match was dead for every hosted user while the analyzer silently scored jobs against an empty resume — for weeks, with zero errors in any log. That bug is the reason this section exists.
+- Platform-mode quota with Redis down fails **closed** (503 `quota_unavailable`), never open.
+
 ### Database
 
 - Alembic for all schema changes — no manual `ALTER TABLE`
@@ -238,6 +257,7 @@ Concretely:
 - **When choosing among multiple _legitimate_ options, the recommendation MUST be driven by architectural correctness — NEVER by "smallest change / least effort / least risk / smallest diff." Never list minimal change as a pro of the recommended option. If unsure which option is the best practice, research it before recommending.**
 - **Never use production as a debug loop.** Reproduce and verify every fix locally (via `docker compose up`) or in staging BEFORE deploying. Deploy only changes already verified elsewhere — production must not be the test bed. When debugging a frontend↔backend integration, audit BOTH sides of the contract together (schemas + both endpoints) in one pass so all mismatches are caught at once; read-only code tracing alone is insufficient — run it end-to-end. Batch related fixes into a single deploy instead of one-commit-per-bug round-trips.
 - **Exercise error paths and service-to-service contracts end-to-end, not just happy paths.** "Contract" includes agent-tool ↔ internal-endpoint bindings and exception-handler paths, not only frontend↔backend. A tool that "fails gracefully" (returns error JSON) hides a missing endpoint — the LLM confabulates a fluent answer on top of it, so nothing looks broken (2026-07-08: 4 of 5 ReAct tools had called nonexistent endpoints since launch, and the shared logging bug turning handled errors into bare 500s was only caught by E2E-running an error path).
+- **Make wrong states loud.** Every new code path must be checked against "No Silent Degradation" above before it is written, not after a user reports the symptom: if this dependency is missing or broken, does the caller find out, or does it get a value that merely looks valid? A defect nobody can observe is worse than a crash.
 - Only proceed with a workaround if the user explicitly accepts it after understanding the trade-offs.
 - This applies to: Dockerfiles, Docker Compose, Alembic config, K8s manifests, CI pipelines, framework rendering models, and all architectural decisions.
 
