@@ -5,7 +5,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       actions:
         patterns: ["*"]
@@ -13,7 +13,7 @@ updates:
   - package-ecosystem: uv
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       python:
         patterns: ["*"]
@@ -21,7 +21,7 @@ updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       frontend:
         patterns: ["*"]
@@ -35,7 +35,7 @@ updates:
       - /services/agent
       - /services/notification
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       base-images:
         patterns: ["*"]
@@ -43,7 +43,7 @@ updates:
   - package-ecosystem: docker-compose
     directory: /infra
     schedule:
-      interval: weekly
+      interval: monthly
     # One PR per stateful component + temporal + stateless can exceed the
     # default limit of 5 concurrent PRs, which starves the queue (observed:
     # keycloak's PR never surfaced). 10 covers the full matrix.
