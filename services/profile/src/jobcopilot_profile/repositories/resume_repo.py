@@ -20,13 +20,18 @@ class ResumeRepository:
         parsed_data: dict[str, Any] | None = None,
     ) -> Resume:
         version = await self._next_version(user_id)
+        # Activate when the user has no active resume — a freshly uploaded first
+        # resume was previously inert, so every AI action still failed the
+        # no_active_resume check until the user found the Activate button.
+        # Later uploads stay inactive so an explicit choice is never overridden.
+        has_active = await self.get_active(user_id) is not None
         resume = Resume(
             user_id=user_id,
             file_name=file_name,
             file_url=file_url,
             parsed_data=parsed_data,
             version=version,
-            is_active=False,
+            is_active=not has_active,
         )
         self._session.add(resume)
         await self._session.flush()

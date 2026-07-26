@@ -117,7 +117,7 @@
         "type": "object"
       },
       "InternalProfileResponse": {
-        "description": "Full profile data for internal service calls \u2014 includes decrypted credentials.",
+        "description": "Full profile data for internal service calls \u2014 includes decrypted credentials.\n\nprofile_id is None when the user has no profile row yet: the row is optional\nside data (personal info / BYO key) and never exists under\nLLM_KEY_MODE=platform. Resume fields stay authoritative either way.",
         "properties": {
           "active_resume": {
             "anyOf": [
@@ -172,9 +172,16 @@
             "title": "Preferences"
           },
           "profile_id": {
-            "format": "uuid",
-            "title": "Profile Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
           },
           "user_id": {
             "format": "uuid",
@@ -183,7 +190,6 @@
           }
         },
         "required": [
-          "profile_id",
           "user_id",
           "personal_info",
           "preferences",
@@ -720,7 +726,7 @@
     },
     "/internal/profiles/{user_id}": {
       "get": {
-        "description": "Full profile including decrypted credentials \u2014 for Agent & Discovery Services.",
+        "description": "Full profile including decrypted credentials \u2014 for Agent & Discovery Services.\n\nA missing profile row is NOT a 404. The row only exists once a user saves\npersonal info or a BYO key, and under LLM_KEY_MODE=platform neither path is\nreachable (credentials are rejected server-side), so hosted deployments have\nno rows at all. 404-ing here made callers believe the user had no resume:\nmatching reported \"no active resume\" to users who had one, and the analyzer\nsilently scored jobs against an empty resume. The row is optional side data;\nthe resume is the payload. Mirrors GET /v1/profiles/me, which has always\nreturned an empty shell rather than 404.",
         "operationId": "internal_get_profile_internal_profiles__user_id__get",
         "parameters": [
           {

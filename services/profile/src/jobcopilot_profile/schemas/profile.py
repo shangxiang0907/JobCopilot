@@ -62,9 +62,14 @@ class ProfileResponse(BaseModel):
 
 
 class InternalProfileResponse(BaseModel):
-    """Full profile data for internal service calls — includes decrypted credentials."""
+    """Full profile data for internal service calls — includes decrypted credentials.
 
-    profile_id: uuid.UUID
+    profile_id is None when the user has no profile row yet: the row is optional
+    side data (personal info / BYO key) and never exists under
+    LLM_KEY_MODE=platform. Resume fields stay authoritative either way.
+    """
+
+    profile_id: uuid.UUID | None = None
     user_id: uuid.UUID
     personal_info: dict[str, Any] | None
     preferences: dict[str, Any] | None

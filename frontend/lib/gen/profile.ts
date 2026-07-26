@@ -48,6 +48,15 @@ export interface paths {
         /**
          * Internal Get Profile
          * @description Full profile including decrypted credentials — for Agent & Discovery Services.
+         *
+         *     A missing profile row is NOT a 404. The row only exists once a user saves
+         *     personal info or a BYO key, and under LLM_KEY_MODE=platform neither path is
+         *     reachable (credentials are rejected server-side), so hosted deployments have
+         *     no rows at all. 404-ing here made callers believe the user had no resume:
+         *     matching reported "no active resume" to users who had one, and the analyzer
+         *     silently scored jobs against an empty resume. The row is optional side data;
+         *     the resume is the payload. Mirrors GET /v1/profiles/me, which has always
+         *     returned an empty shell rather than 404.
          */
         get: operations["internal_get_profile_internal_profiles__user_id__get"];
         put?: never;
@@ -257,6 +266,10 @@ export interface components {
         /**
          * InternalProfileResponse
          * @description Full profile data for internal service calls — includes decrypted credentials.
+         *
+         *     profile_id is None when the user has no profile row yet: the row is optional
+         *     side data (personal info / BYO key) and never exists under
+         *     LLM_KEY_MODE=platform. Resume fields stay authoritative either way.
          */
         InternalProfileResponse: {
             /** Active Resume */
@@ -278,11 +291,8 @@ export interface components {
             preferences: {
                 [key: string]: unknown;
             } | null;
-            /**
-             * Profile Id
-             * Format: uuid
-             */
-            profile_id: string;
+            /** Profile Id */
+            profile_id?: string | null;
             /**
              * User Id
              * Format: uuid

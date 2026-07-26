@@ -4,7 +4,6 @@ import uuid
 
 from fastapi import APIRouter
 from jobcopilot_shared.crypto import decrypt
-from jobcopilot_shared.exceptions import NotFoundError
 from jobcopilot_shared.logging import get_logger
 
 from jobcopilot_profile.config import settings
@@ -23,14 +22,21 @@ async def internal_get_profile(
     user_id: uuid.UUID,
     session: SessionDep,
 ) -> InternalProfileResponse:
-    """Full profile including decrypted credentials — for Agent & Discovery Services."""
+    """Full profile including decrypted credentials — for Agent & Discovery Services.
+
+    A missing profile row is NOT a 404. The row only exists once a user saves
+    personal info or a BYO key, and under LLM_KEY_MODE=platform neither path is
+    reachable (credentials are rejected server-side), so hosted deployments have
+    no rows at all. 404-ing here made callers believe the user had no resume:
+    matching reported "no active resume" to users who had one, and the analyzer
+    silently scored jobs against an empty resume. The row is optional side data;
+    the resume is the payload. Mirrors GET /v1/profiles/me, which has always
+    returned an empty shell rather than 404.
+    """
     profile_repo = ProfileRepository(session)
     resume_repo = ResumeRepository(session)
 
-    try:
-        profile = await profile_repo.get_by_user(user_id)
-    except NotFoundError:
-        raise
+    profile = await profile_repo.get_by_user_or_none(user_id)
 
     active_resume = await resume_repo.get_active(user_id)
     active_resume_data = (
@@ -41,11 +47,11 @@ async def internal_get_profile(
         active_resume_text = str(active_resume.parsed_data.get("raw_text") or "")
 
     return InternalProfileResponse(
-        profile_id=profile.profile_id,
-        user_id=profile.user_id,
-        personal_info=profile.personal_info,
-        preferences=profile.preferences,
-        llm_api_key=_safe_decrypt(profile.llm_api_key_enc),
+        profile_id=profile.profile_id if profile else None,
+        user_id=user_id,
+        personal_info=profile.personal_info if profile else None,
+        preferences=profile.preferences if profile else None,
+        llm_api_key=_safe_decrypt(profile.llm_api_key_enc) if profile else None,
         active_resume=active_resume_data,
         active_resume_text=active_resume_text,
     )
