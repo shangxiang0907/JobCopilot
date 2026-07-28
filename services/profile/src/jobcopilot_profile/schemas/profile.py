@@ -74,9 +74,9 @@ class InternalProfileResponse(BaseModel):
     personal_info: dict[str, Any] | None
     preferences: dict[str, Any] | None
     llm_api_key: str | None
-    active_resume: dict[str, Any] | None
+    default_resume: dict[str, Any] | None
     # Flat convenience field consumed by the Agent Service — kept in sync with
-    # active_resume.parsed_data.raw_text so callers never dig into parser internals.
-    active_resume_text: str = ""
+    # default_resume.parsed_data.raw_text so callers never dig into parser internals.
+    default_resume_text: str = ""
 
     model_config = {"from_attributes": True}

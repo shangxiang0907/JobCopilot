@@ -1,8 +1,8 @@
-"""A user's first resume must be active on upload.
+"""A user's first resume must become their default on upload.
 
-Every AI action fail-fasts on no_active_resume, and uploads were created with
-is_active=False, so a new user who had just uploaded a resume still could not
-use any AI feature until they found the Activate button.
+Every AI action fail-fasts when no resume is in effect, and uploads were created
+with the flag off, so a new user who had just uploaded a resume still could not
+use any AI feature until they found the button.
 """
 
 import uuid
@@ -21,7 +21,7 @@ async def _create(existing_active: Resume | None) -> Resume:
     repo = ResumeRepository(session)
     with (
         patch.object(
-            ResumeRepository, "get_active", new_callable=AsyncMock, return_value=existing_active
+            ResumeRepository, "get_default", new_callable=AsyncMock, return_value=existing_active
         ),
         patch.object(ResumeRepository, "_next_version", new_callable=AsyncMock, return_value=1),
     ):
@@ -31,11 +31,11 @@ async def _create(existing_active: Resume | None) -> Resume:
 @pytest.mark.asyncio
 async def test_first_resume_is_activated_on_upload() -> None:
     resume = await _create(existing_active=None)
-    assert resume.is_active is True
+    assert resume.is_default is True
 
 
 @pytest.mark.asyncio
 async def test_later_upload_does_not_steal_active_flag() -> None:
     """An explicit choice of active resume survives subsequent uploads."""
     resume = await _create(existing_active=Resume(resume_id=uuid.uuid4(), user_id=_USER))
-    assert resume.is_active is False
+    assert resume.is_default is False

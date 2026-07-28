@@ -27,13 +27,13 @@ def _resume(raw_text: str) -> Resume:
         file_url="/data/resumes/cv.pdf",
         parsed_data={"raw_text": raw_text},
         version=1,
-        is_active=True,
+        is_default=True,
         created_at=datetime.now(UTC),
     )
 
 
 @pytest.mark.asyncio
-async def test_missing_profile_row_still_returns_active_resume() -> None:
+async def test_missing_profile_row_still_returns_default_resume() -> None:
     with (
         patch(
             "jobcopilot_profile.repositories.profile_repo.ProfileRepository.get_by_user_or_none",
@@ -41,7 +41,7 @@ async def test_missing_profile_row_still_returns_active_resume() -> None:
             return_value=None,
         ),
         patch(
-            "jobcopilot_profile.repositories.resume_repo.ResumeRepository.get_active",
+            "jobcopilot_profile.repositories.resume_repo.ResumeRepository.get_default",
             new_callable=AsyncMock,
             return_value=_resume("Senior Python engineer, 8 years"),
         ),
@@ -52,8 +52,8 @@ async def test_missing_profile_row_still_returns_active_resume() -> None:
     assert response.user_id == _USER
     assert response.personal_info is None
     assert response.llm_api_key is None
-    assert response.active_resume is not None
-    assert response.active_resume_text == "Senior Python engineer, 8 years"
+    assert response.default_resume is not None
+    assert response.default_resume_text == "Senior Python engineer, 8 years"
 
 
 @pytest.mark.asyncio
@@ -65,12 +65,12 @@ async def test_missing_profile_and_no_resume_reports_empty_not_error() -> None:
             return_value=None,
         ),
         patch(
-            "jobcopilot_profile.repositories.resume_repo.ResumeRepository.get_active",
+            "jobcopilot_profile.repositories.resume_repo.ResumeRepository.get_default",
             new_callable=AsyncMock,
             return_value=None,
         ),
     ):
         response = await internal_get_profile(_USER, session=AsyncMock())
 
-    assert response.active_resume is None
-    assert response.active_resume_text == ""
+    assert response.default_resume is None
+    assert response.default_resume_text == ""

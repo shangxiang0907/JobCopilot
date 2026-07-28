@@ -38,13 +38,13 @@ async def internal_get_profile(
 
     profile = await profile_repo.get_by_user_or_none(user_id)
 
-    active_resume = await resume_repo.get_active(user_id)
-    active_resume_data = (
-        ResumeResponse.model_validate(active_resume).model_dump() if active_resume else None
+    default_resume = await resume_repo.get_default(user_id)
+    default_resume_data = (
+        ResumeResponse.model_validate(default_resume).model_dump() if default_resume else None
     )
-    active_resume_text = ""
-    if active_resume is not None and active_resume.parsed_data:
-        active_resume_text = str(active_resume.parsed_data.get("raw_text") or "")
+    default_resume_text = ""
+    if default_resume is not None and default_resume.parsed_data:
+        default_resume_text = str(default_resume.parsed_data.get("raw_text") or "")
 
     return InternalProfileResponse(
         profile_id=profile.profile_id if profile else None,
@@ -52,8 +52,8 @@ async def internal_get_profile(
         personal_info=profile.personal_info if profile else None,
         preferences=profile.preferences if profile else None,
         llm_api_key=_safe_decrypt(profile.llm_api_key_enc) if profile else None,
-        active_resume=active_resume_data,
-        active_resume_text=active_resume_text,
+        default_resume=default_resume_data,
+        default_resume_text=default_resume_text,
     )
 
 

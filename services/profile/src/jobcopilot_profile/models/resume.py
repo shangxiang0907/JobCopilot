@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 
 from jobcopilot_shared.models.base import Base
-from sqlalchemy import Boolean, DateTime, Index, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,7 +16,7 @@ class Resume(Base):
     # Names must match migration 0001 / the live DB exactly (alembic check).
     __table_args__ = (
         Index("ix_resumes_user_id", "user_id"),
-        Index("ix_resumes_user_active", "user_id", "is_active"),
+        Index("ix_resumes_user_default", "user_id", "is_default"),
         {"schema": _SCHEMA},
     )
 
@@ -29,5 +29,11 @@ class Resume(Base):
     # Extracted text + basic section structure; embedding lives in Qdrant
     parsed_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # User-supplied label ("backend-focused") and notes — how a user tells
+    # several versions apart without reading file names.
+    label: Mapped[str | None] = mapped_column(String(100))
+    notes: Mapped[str | None] = mapped_column(Text)
+    # "Use this one unless something more specific is chosen." A per-application
+    # resume_id always wins over it (PRD v0.3).
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(_TS, server_default=func.now(), nullable=False)

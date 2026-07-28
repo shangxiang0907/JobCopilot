@@ -19,7 +19,9 @@ class JobAnalysisOutcome:
     analysis_id: uuid.UUID
     jd_structured: dict[str, Any]
     skills_required: list[str]
-    match_score: float
+    # None = not scored (no resume, or the scoring call failed). Never 0.0,
+    # which is a real score meaning "terrible fit".
+    match_score: float | None
     status: str
 
 
@@ -46,9 +48,10 @@ async def run_job_analysis(
         "location": location,
         "raw_text": raw_text,
         "resume_text": "",
+        "resume_status": "unavailable",
         "jd_structured": {},
         "skills_required": [],
-        "match_score": 0.0,
+        "match_score": None,
         "error": None,
     }
     result = await analyzer_graph.ainvoke(state)
@@ -69,6 +72,6 @@ async def run_job_analysis(
         analysis_id=analysis.id,
         jd_structured=result.get("jd_structured", {}),
         skills_required=result.get("skills_required", []),
-        match_score=result.get("match_score", 0.0),
+        match_score=result.get("match_score"),
         status=analysis.status,
     )

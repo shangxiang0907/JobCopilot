@@ -6,12 +6,34 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from jobcopilot_job.models.job import Job
+from jobcopilot_job.repositories.company_repo import CompanyRepository
 from jobcopilot_job.schemas.job import InternalJobCreate, InternalJobUpdate, JobCreate, JobUpdate
 
 
 class JobRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+        self._companies = CompanyRepository(session)
+
+    async def _resolve_company_id(
+        self,
+        tenant_id: uuid.UUID,
+        company_name: str,
+        explicit_company_id: uuid.UUID | None,
+    ) -> uuid.UUID | None:
+        """Link a job to its company row, creating that row on first sight.
+
+        Jobs arrive with a company_name string from every path (manual entry,
+        JD import, discovery), so without this the companies library would only
+        ever contain rows the user typed in by hand and /companies would look
+        broken. An explicit company_id always wins — the caller picked a
+        specific row and re-deriving it from the name could silently move the
+        job to a different company.
+        """
+        if explicit_company_id is not None:
+            return explicit_company_id
+        company = await self._companies.resolve_by_name(tenant_id, company_name)
+        return company.company_id if company else None
 
     async def create(self, tenant_id: uuid.UUID, data: JobCreate) -> Job:
         url = str(data.url)
@@ -20,7 +42,9 @@ class JobRepository:
             raise ConflictError(f"Job with URL already exists: {url}")
         job = Job(
             tenant_id=tenant_id,
-            company_id=data.company_id,
+            company_id=await self._resolve_company_id(
+                tenant_id, data.company_name, data.company_id
+            ),
             title=data.title,
             company_name=data.company_name,
             url=url,
@@ -54,7 +78,9 @@ class JobRepository:
             return existing
         job = Job(
             tenant_id=data.tenant_id,
-            company_id=data.company_id,
+            company_id=await self._resolve_company_id(
+                data.tenant_id, data.company_name, data.company_id
+            ),
             title=data.title,
             company_name=data.company_name,
             url=data.url,
@@ -136,8 +162,14 @@ class JobRepository:
 
     async def update(self, tenant_id: uuid.UUID, job_id: uuid.UUID, data: JobUpdate) -> Job:
         job = await self.get(tenant_id, job_id)
-        for field, value in data.model_dump(exclude_none=True).items():
+        patch = data.model_dump(exclude_none=True)
+        for field, value in patch.items():
             setattr(job, field, value)
+        # Re-resolve when the user renames the company, otherwise company_id
+        # keeps pointing at the row the job used to belong to and the two
+        # fields disagree about which company this is.
+        if "company_name" in patch and "company_id" not in patch:
+            job.company_id = await self._resolve_company_id(tenant_id, job.company_name, None)
         await self._session.flush()
         await self._session.refresh(job)
         return job

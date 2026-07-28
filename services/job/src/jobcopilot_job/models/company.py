@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from jobcopilot_shared.models.base import Base
-from sqlalchemy import Boolean, DateTime, Index, String, Text, func
+from sqlalchemy import Boolean, DateTime, Index, String, Text, column, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -15,6 +15,16 @@ class Company(Base):
     # Names must match migration 0001 / the live DB exactly (alembic check).
     __table_args__ = (
         Index("ix_companies_tenant_id", "tenant_id"),
+        # Makes company-name resolution on job create/import an idempotent
+        # upsert instead of a duplicate factory. Normalised so "Acme ", "acme"
+        # and "Acme" are one company, while the stored name keeps the user's
+        # capitalisation (migration 0004).
+        Index(
+            "uq_companies_tenant_name",
+            "tenant_id",
+            func.lower(func.btrim(column("name"))),
+            unique=True,
+        ),
         {"schema": _SCHEMA},
     )
 

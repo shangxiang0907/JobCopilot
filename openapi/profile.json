@@ -119,7 +119,7 @@
       "InternalProfileResponse": {
         "description": "Full profile data for internal service calls \u2014 includes decrypted credentials.\n\nprofile_id is None when the user has no profile row yet: the row is optional\nside data (personal info / BYO key) and never exists under\nLLM_KEY_MODE=platform. Resume fields stay authoritative either way.",
         "properties": {
-          "active_resume": {
+          "default_resume": {
             "anyOf": [
               {
                 "additionalProperties": true,
@@ -129,11 +129,11 @@
                 "type": "null"
               }
             ],
-            "title": "Active Resume"
+            "title": "Default Resume"
           },
-          "active_resume_text": {
+          "default_resume_text": {
             "default": "",
-            "title": "Active Resume Text",
+            "title": "Default Resume Text",
             "type": "string"
           },
           "llm_api_key": {
@@ -194,7 +194,7 @@
           "personal_info",
           "preferences",
           "llm_api_key",
-          "active_resume"
+          "default_resume"
         ],
         "title": "InternalProfileResponse",
         "type": "object"
@@ -542,19 +542,6 @@
         "title": "ProfileUpsert",
         "type": "object"
       },
-      "ResumeActivate": {
-        "properties": {
-          "is_active": {
-            "title": "Is Active",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "is_active"
-        ],
-        "title": "ResumeActivate",
-        "type": "object"
-      },
       "ResumeResponse": {
         "properties": {
           "created_at": {
@@ -570,9 +557,31 @@
             "title": "File Url",
             "type": "string"
           },
-          "is_active": {
-            "title": "Is Active",
+          "is_default": {
+            "title": "Is Default",
             "type": "boolean"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
           },
           "parsed_data": {
             "anyOf": [
@@ -608,10 +617,55 @@
           "file_url",
           "parsed_data",
           "version",
-          "is_active",
+          "label",
+          "notes",
+          "is_default",
           "created_at"
         ],
         "title": "ResumeResponse",
+        "type": "object"
+      },
+      "ResumeSetDefault": {
+        "properties": {
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_default"
+        ],
+        "title": "ResumeSetDefault",
+        "type": "object"
+      },
+      "ResumeUpdate": {
+        "description": "Label/notes edit. Both fields are optional and independently clearable.\n\n`None` means \"leave unchanged\" \u2014 clearing a field is an explicit empty\nstring, so a partial update can never blank out the other field by omission.",
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "title": "ResumeUpdate",
         "type": "object"
       },
       "UserEnabledUpdate": {
@@ -1143,11 +1197,10 @@
         "tags": [
           "resumes"
         ]
-      }
-    },
-    "/v1/resumes/{resume_id}/activate": {
+      },
       "patch": {
-        "operationId": "activate_resume_v1_resumes__resume_id__activate_patch",
+        "description": "Edit the user-supplied label/notes. The file itself is immutable.",
+        "operationId": "update_resume_v1_resumes__resume_id__patch",
         "parameters": [
           {
             "in": "path",
@@ -1164,7 +1217,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ResumeActivate"
+                "$ref": "#/components/schemas/ResumeUpdate"
               }
             }
           },
@@ -1197,7 +1250,66 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Activate Resume",
+        "summary": "Update Resume",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/v1/resumes/{resume_id}/default": {
+      "patch": {
+        "description": "Choose the resume used when nothing more specific is given (PRD v0.3).\n\nChanging the default never rewrites existing applications: each one records\nits own resume_id at the time it was created.",
+        "operationId": "set_default_resume_v1_resumes__resume_id__default_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resume_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resume Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeSetDefault"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Default Resume",
         "tags": [
           "resumes"
         ]

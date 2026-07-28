@@ -57,8 +57,8 @@ export default function ProfilePage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resumes"] }),
   })
 
-  const activateResume = useMutation({
-    mutationFn: (id: string) => api.patch(`/v1/resumes/${id}/activate`, { is_active: true }),
+  const setDefaultResume = useMutation({
+    mutationFn: (id: string) => api.patch(`/v1/resumes/${id}/default`, { is_default: true }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resumes"] }),
   })
 
@@ -230,7 +230,7 @@ export default function ProfilePage() {
                     className="flex items-center justify-between p-3 rounded-md border"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      {r.is_active && (
+                      {r.is_default && (
                         <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                       )}
                       <div className="min-w-0">
@@ -241,13 +241,13 @@ export default function ProfilePage() {
                       </div>
                     </div>
                     <div className="flex gap-2 shrink-0">
-                      {!r.is_active && (
+                      {!r.is_default && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => activateResume.mutate(r.resume_id)}
+                          onClick={() => setDefaultResume.mutate(r.resume_id)}
                         >
-                          Set Active
+                          Set Default
                         </Button>
                       )}
                       <Button

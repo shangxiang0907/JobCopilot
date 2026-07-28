@@ -37,7 +37,9 @@ class JobEntryOutcome:
     job_id: str = ""
     title: str = ""
     company_name: str = ""
-    match_score: float = 0.0
+    # None = not scored. Defaulting to 0.0 would report a job the analyzer
+    # never managed to score as a job it scored at the bottom.
+    match_score: float | None = None
     skills_required: list[str] | None = None
     error: str = ""
 

@@ -12,6 +12,7 @@ from fastapi import FastAPI, Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
+    Counter,
     Gauge,
     generate_latest,
     multiprocess,
@@ -31,6 +32,28 @@ _BUILD_INFO = Gauge(
     ["revision"],
     multiprocess_mode="max",
 )
+
+
+_DEGRADATIONS = Counter(
+    f"{_NAMESPACE}_degraded_operations_total",
+    "Operations that continued with a reduced result instead of failing",
+    ["operation", "reason"],
+)
+
+
+def record_degradation(operation: str, reason: str) -> None:
+    """Count a path that deliberately continued without complete data.
+
+    CLAUDE.md requires every legitimate degradation to carry a comment, a
+    structured log line AND a metric — a degradation nobody can measure is
+    indistinguishable in production from the silent-fallback defects the rule
+    exists to forbid. This is the metric half; call it next to the log line.
+
+    One metric name with `operation`/`reason` labels, per the
+    one-metric-name-many-labels convention above. Keep both labels low
+    cardinality: they are constants at the call site, never user data.
+    """
+    _DEGRADATIONS.labels(operation=operation, reason=reason).inc()
 
 
 def instrument_app(app: FastAPI) -> None:

@@ -20,18 +20,18 @@ class ResumeRepository:
         parsed_data: dict[str, Any] | None = None,
     ) -> Resume:
         version = await self._next_version(user_id)
-        # Activate when the user has no active resume — a freshly uploaded first
+        # Become the default when the user has none — a freshly uploaded first
         # resume was previously inert, so every AI action still failed the
-        # no_active_resume check until the user found the Activate button.
-        # Later uploads stay inactive so an explicit choice is never overridden.
-        has_active = await self.get_active(user_id) is not None
+        # no-resume-in-effect check until the user found the button. Later uploads
+        # never steal the flag, so an explicit choice is never overridden.
+        has_default = await self.get_default(user_id) is not None
         resume = Resume(
             user_id=user_id,
             file_name=file_name,
             file_url=file_url,
             parsed_data=parsed_data,
             version=version,
-            is_active=not has_active,
+            is_default=not has_default,
         )
         self._session.add(resume)
         await self._session.flush()
@@ -54,22 +54,38 @@ class ResumeRepository:
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_active(self, user_id: uuid.UUID) -> Resume | None:
+    async def get_default(self, user_id: uuid.UUID) -> Resume | None:
         stmt = select(Resume).where(
             Resume.user_id == user_id,
-            Resume.is_active.is_(True),
+            Resume.is_default.is_(True),
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def set_active(self, user_id: uuid.UUID, resume_id: uuid.UUID) -> Resume:
-        # Deactivate all resumes for this user first
-        deactivate_stmt = update(Resume).where(Resume.user_id == user_id).values(is_active=False)
-        await self._session.execute(deactivate_stmt)
+    async def set_default(self, user_id: uuid.UUID, resume_id: uuid.UUID) -> Resume:
+        # Clear the flag across the user's resumes first — at most one default.
+        clear_stmt = update(Resume).where(Resume.user_id == user_id).values(is_default=False)
+        await self._session.execute(clear_stmt)
 
-        # Activate the target resume
         resume = await self.get(user_id, resume_id)
-        resume.is_active = True
+        resume.is_default = True
+        await self._session.flush()
+        await self._session.refresh(resume)
+        return resume
+
+    async def update_metadata(
+        self,
+        user_id: uuid.UUID,
+        resume_id: uuid.UUID,
+        label: str | None,
+        notes: str | None,
+    ) -> Resume:
+        """Edit label/notes. `None` leaves a field unchanged (see ResumeUpdate)."""
+        resume = await self.get(user_id, resume_id)
+        if label is not None:
+            resume.label = label or None
+        if notes is not None:
+            resume.notes = notes or None
         await self._session.flush()
         await self._session.refresh(resume)
         return resume

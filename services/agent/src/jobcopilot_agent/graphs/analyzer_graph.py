@@ -11,6 +11,7 @@ import logging
 from typing import Any, TypedDict
 
 import httpx
+from jobcopilot_shared.metrics import record_degradation
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 
@@ -42,30 +43,63 @@ class AnalyzerState(TypedDict):
     raw_text: str
     # Intermediate
     resume_text: str
+    # Why the resume text is what it is: "ok" | "absent" | "unavailable".
+    # compute_match reads this instead of guessing from an empty string, which
+    # cannot tell "user has no resume" apart from "profile service is down".
+    resume_status: str
     # Outputs
     jd_structured: dict[str, Any]
     skills_required: list[str]
-    match_score: float
+    # None means "not scored". 0.0 is a real score meaning "terrible fit", so
+    # the two must never share a value.
+    match_score: float | None
     error: str | None
 
 
 async def _fetch_resume_node(state: AnalyzerState) -> dict[str, Any]:
-    """Fetch the user's active resume from Profile Service."""
+    """Fetch the user's default resume text and record WHY it is what it is.
+
+    Every outcome used to collapse into resume_text="": a transient profile
+    outage, a user with no resume, and a successful empty read were the same
+    value. compute_match then scored the job against nothing and reported the
+    result as a real number.
+
+    Degrading rather than raising is deliberate — the structured JD extraction
+    downstream is this graph's payload and needs no resume, so a profile outage
+    should cost the match score, not the whole analysis.
+    """
     if not state.get("raw_text"):
-        return {"error": "No raw_text provided", "resume_text": ""}
+        return {
+            "error": "No raw_text provided",
+            "resume_text": "",
+            "resume_status": "unavailable",
+        }
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
                 f"{settings.profile_service_url}/internal/profiles/{state['user_id']}"
             )
-        if resp.status_code == 200:
-            data = resp.json()
-            return {"resume_text": data.get("active_resume_text") or ""}
-    except Exception as exc:
+    except httpx.HTTPError as exc:
         log.warning("resume_fetch_failed", extra={"error": str(exc), "user_id": state["user_id"]})
+        record_degradation(operation="job_analysis", reason="profile_service_unreachable")
+        return {"resume_text": "", "resume_status": "unavailable"}
 
-    return {"resume_text": ""}
+    if resp.status_code != 200:
+        log.warning(
+            "resume_fetch_failed",
+            extra={"status_code": resp.status_code, "user_id": state["user_id"]},
+        )
+        record_degradation(operation="job_analysis", reason="profile_service_error")
+        return {"resume_text": "", "resume_status": "unavailable"}
+
+    resume_text = str(resp.json().get("default_resume_text") or "")
+    if not resume_text.strip():
+        # A successful read of a user who genuinely has no default resume. Not
+        # an error, but still no basis for a score.
+        record_degradation(operation="job_analysis", reason="no_default_resume")
+        return {"resume_text": "", "resume_status": "absent"}
+    return {"resume_text": resume_text, "resume_status": "ok"}
 
 
 async def _extract_structure_node(state: AnalyzerState) -> dict[str, Any]:
@@ -99,10 +133,15 @@ async def _extract_structure_node(state: AnalyzerState) -> dict[str, Any]:
 
 
 async def _compute_match_node(state: AnalyzerState) -> dict[str, Any]:
-    """Compute quick match score comparing JD skills against resume."""
-    resume_text = state.get("resume_text", "")
-    if not resume_text or not state.get("jd_structured"):
-        return {"match_score": 0.0}
+    """Score the JD against the resume, or report that it was not scored.
+
+    Returns None whenever a score was not actually computed. The previous 0.0
+    told the user "this job is a terrible fit" when the truth was "we never
+    looked" — and a user discards a job over that.
+    """
+    if state.get("resume_status") != "ok" or not state.get("jd_structured"):
+        return {"match_score": None}
+    resume_text = state["resume_text"]
 
     llm = get_llm().bind(**_JSON_MODE)
     messages = [
@@ -119,8 +158,11 @@ async def _compute_match_node(state: AnalyzerState) -> dict[str, Any]:
         result = MatchScoreOutput.model_validate_json(response_text(response))
         return {"match_score": result.match_score}
     except Exception as exc:
+        # The JD structure is still worth keeping, so the graph continues — but
+        # an unscored job must not be presented as a zero-scoring one.
         log.warning("compute_match_failed", extra={"error": str(exc)})
-        return {"match_score": 0.0}
+        record_degradation(operation="job_analysis", reason="match_score_llm_failed")
+        return {"match_score": None}
 
 
 def _build_graph() -> StateGraph[AnalyzerState]:

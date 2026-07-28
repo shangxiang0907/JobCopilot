@@ -26,6 +26,8 @@ class ApplicationRepository:
             job_id=data.job_id,
             notes=data.notes,
             status="discovered",
+            resume_id=data.resume_id,
+            resume_snapshot=data.resume_snapshot.model_dump() if data.resume_snapshot else None,
         )
         self._session.add(app)
         await self._session.flush()
@@ -59,6 +61,7 @@ class ApplicationRepository:
         size: int = 20,
         status: str | None = None,
         job_id: uuid.UUID | None = None,
+        resume_id: uuid.UUID | None = None,
     ) -> tuple[list[tuple[Application, Job | None]], int]:
         from sqlalchemy import func as sqlfunc
 
@@ -67,6 +70,8 @@ class ApplicationRepository:
             filters.append(Application.status == status)
         if job_id:
             filters.append(Application.job_id == job_id)
+        if resume_id:
+            filters.append(Application.resume_id == resume_id)
 
         total_stmt = select(sqlfunc.count()).select_from(
             select(Application.application_id).where(*filters).subquery()
@@ -116,15 +121,24 @@ class ApplicationRepository:
         await self._session.refresh(app)
         return app
 
-    async def update_notes(
+    async def update_details(
         self,
         user_id: uuid.UUID,
         application_id: uuid.UUID,
         data: ApplicationUpdate,
     ) -> Application:
+        """Edit notes and/or which resume this application was submitted with.
+
+        `None` means "leave unchanged" throughout. Re-pointing an application at
+        a different resume rewrites its snapshot too, so the pair never drifts
+        apart; the schema guarantees both arrive together.
+        """
         app = await self.get(user_id, application_id)
         if data.notes is not None:
             app.notes = data.notes
+        if data.resume_id is not None and data.resume_snapshot is not None:
+            app.resume_id = data.resume_id
+            app.resume_snapshot = data.resume_snapshot.model_dump()
         await self._session.flush()
         await self._session.refresh(app)
         return app

@@ -267,7 +267,7 @@ export interface components {
              */
             job_id: string;
             /** Match Score */
-            match_score: number;
+            match_score: number | null;
             /** Skills Required */
             skills_required: string[];
             /** Status */

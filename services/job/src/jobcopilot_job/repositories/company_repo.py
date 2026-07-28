@@ -28,6 +28,36 @@ class CompanyRepository:
         await self._session.refresh(company)
         return company
 
+    async def resolve_by_name(self, tenant_id: uuid.UUID, name: str) -> Company | None:
+        """Find-or-create the tenant's company row for a free-text name.
+
+        Job creation, editing and import all carry a company_name string rather
+        than an id. Matching is case- and whitespace-insensitive to agree with
+        the uq_companies_tenant_name index, so repeated imports of "Acme ",
+        "acme" and "Acme" converge on one row instead of three.
+
+        Returns None for a blank name — a job with no company is a legitimate
+        state, and inventing a company row named "" would be worse than leaving
+        company_id NULL.
+        """
+        normalised = name.strip()
+        if not normalised:
+            return None
+
+        stmt = select(Company).where(
+            Company.tenant_id == tenant_id,
+            sqlfunc.lower(sqlfunc.btrim(Company.name)) == normalised.lower(),
+        )
+        existing = (await self._session.execute(stmt)).scalar_one_or_none()
+        if existing is not None:
+            return existing
+
+        company = Company(tenant_id=tenant_id, name=normalised)
+        self._session.add(company)
+        await self._session.flush()
+        await self._session.refresh(company)
+        return company
+
     async def get(self, tenant_id: uuid.UUID, company_id: uuid.UUID) -> Company:
         stmt = select(Company).where(
             Company.company_id == company_id,

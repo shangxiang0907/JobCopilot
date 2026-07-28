@@ -27,10 +27,19 @@ async def list_applications(
     size: int = 20,
     status_filter: str | None = Query(default=None, alias="status"),
     job_id: Annotated[uuid.UUID | None, Query()] = None,
+    # Answers "what would I lose by deleting this resume?" — the /profile delete
+    # dialog counts references before the user confirms.
+    resume_id: Annotated[uuid.UUID | None, Query()] = None,
 ) -> PaginatedResponse[ApplicationResponse]:
     repo = ApplicationRepository(session)
     rows, total = await repo.get_all(
-        user_id, tenant_id, page=page, size=size, status=status_filter, job_id=job_id
+        user_id,
+        tenant_id,
+        page=page,
+        size=size,
+        status=status_filter,
+        job_id=job_id,
+        resume_id=resume_id,
     )
     items = []
     for app, job in rows:
@@ -91,7 +100,7 @@ async def update_application(
     user_id: UserIdDep,
 ) -> ApplicationResponse:
     repo = ApplicationRepository(session)
-    app = await repo.update_notes(user_id, application_id, body)
+    app = await repo.update_details(user_id, application_id, body)
     await session.commit()
     return ApplicationResponse.model_validate(app)
 

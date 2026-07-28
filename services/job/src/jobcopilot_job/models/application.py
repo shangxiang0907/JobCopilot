@@ -30,6 +30,7 @@ class Application(Base):
         Index("ix_applications_user_id", "user_id"),
         Index("ix_applications_job_id", "job_id"),
         Index("ix_applications_user_job", "user_id", "job_id", unique=True),
+        Index("ix_applications_resume_id", "resume_id"),
         {"schema": _SCHEMA},
     )
 
@@ -39,6 +40,13 @@ class Application(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="discovered")
+    # Opaque reference into profile_schema.resumes — no FK, never dereferenced
+    # here (cross-schema JOINs are forbidden). NULL = "not recorded", never
+    # "the default resume".
+    resume_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # {file_name, version, label} captured when the resume was attached, so a
+    # later deletion leaves the record readable instead of blank.
+    resume_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     match_score: Mapped[float | None] = mapped_column(Float)
     resume_suggestions: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     notes: Mapped[str | None] = mapped_column(Text)

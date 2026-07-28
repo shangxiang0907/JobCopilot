@@ -67,3 +67,16 @@ class NoActiveResumeError(JobCopilotError):
 
     status_code = HTTPStatus.CONFLICT
     error_code = "no_active_resume"
+
+
+class ResumeParseError(JobCopilotError):
+    """Text extraction failed on an uploaded resume.
+
+    Distinct from a resume that parsed fine but carries no text layer (a scanned
+    image). Storing an unreadable file silently would leave the user with a
+    resume that looks uploaded, becomes their default, and makes every AI action
+    fail somewhere far away from the upload that caused it.
+    """
+
+    status_code = HTTPStatus.UNPROCESSABLE_ENTITY
+    error_code = "resume_parse_failed"

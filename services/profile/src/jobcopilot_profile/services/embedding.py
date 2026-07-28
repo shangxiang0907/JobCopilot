@@ -5,6 +5,7 @@ import uuid
 from jobcopilot_shared.crypto import decrypt
 from jobcopilot_shared.exceptions import NotFoundError
 from jobcopilot_shared.logging import get_logger
+from jobcopilot_shared.metrics import record_degradation
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from jobcopilot_profile.config import settings
@@ -39,12 +40,21 @@ async def resolve_embedding_api_key(session: AsyncSession, user_id: uuid.UUID) -
 async def embed_and_upsert(
     resume_id: uuid.UUID, user_id: uuid.UUID, text: str, api_key: str | None
 ) -> bool:
-    """Compute embedding and upsert to Qdrant. Returns False if skipped (no API key)."""
+    """Compute embedding and upsert to Qdrant. Returns False if skipped.
+
+    Embeddings are optional side data: a resume without a vector still uploads,
+    still matches (matching reads the resume text, not the vector) and can be
+    backfilled later. Continuing is therefore correct — but every skip is
+    counted, because "nobody's resumes have been embedded for a month" is
+    otherwise completely invisible in production.
+    """
     if not api_key:
         logger.info("embedding_skipped", reason="no API key for current llm_key_mode")
+        record_degradation(operation="resume_embedding", reason="no_api_key")
         return False
     if not text.strip():
         logger.info("embedding_skipped", reason="empty text")
+        record_degradation(operation="resume_embedding", reason="empty_text")
         return False
 
     vector = await _get_embedding(text, api_key)
@@ -66,7 +76,11 @@ async def delete_embedding(resume_id: uuid.UUID) -> None:
             points_selector=[str(resume_id)],
         )
     except Exception as exc:
+        # Leaves an orphan vector for a resume that no longer exists. Tolerated
+        # because the row is already gone and the point is unreachable without
+        # it, but counted so a persistent Qdrant outage is not silent.
         logger.warning("qdrant_delete_failed", resume_id=str(resume_id), error=str(exc))
+        record_degradation(operation="resume_embedding", reason="qdrant_delete_failed")
 
 
 async def _get_embedding(text: str, api_key: str) -> list[float] | None:
@@ -86,7 +100,11 @@ async def _get_embedding(text: str, api_key: str) -> list[float] | None:
         )
         return response.data[0].embedding
     except Exception as exc:
+        # Swallowed on purpose: this runs in a background task after the upload
+        # has already been committed and returned 201, so raising would only
+        # crash a detached task. The resume is intact and re-embeddable.
         logger.error("embedding_failed", error=str(exc))
+        record_degradation(operation="resume_embedding", reason="provider_error")
         return None
 
 
@@ -121,4 +139,7 @@ async def _upsert_to_qdrant(resume_id: uuid.UUID, user_id: uuid.UUID, vector: li
         )
         logger.info("qdrant_upserted", resume_id=str(resume_id))
     except Exception as exc:
+        # Same reasoning as _get_embedding: detached background task, already-
+        # committed resume. The vector is derived state and rebuildable.
         logger.error("qdrant_upsert_failed", resume_id=str(resume_id), error=str(exc))
+        record_degradation(operation="resume_embedding", reason="qdrant_upsert_failed")

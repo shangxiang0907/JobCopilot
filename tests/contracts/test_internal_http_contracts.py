@@ -161,9 +161,9 @@ def test_job_discovered_consumer_upsert_contract(job_spec: Spec) -> None:
 # ── Agent Service → Profile Service (resume text for AnalyzerGraph/matching) ─
 
 
-def test_agent_reads_active_resume_text(profile_spec: Spec) -> None:
+def test_agent_reads_default_resume_text(profile_spec: Spec) -> None:
     props = _response_properties(profile_spec, "get", "/internal/profiles/{user_id}")
-    assert "active_resume_text" in props
+    assert "default_resume_text" in props
 
 
 # ── /v1 collection endpoints must be PaginatedResponse (CLAUDE.md rule) ──────

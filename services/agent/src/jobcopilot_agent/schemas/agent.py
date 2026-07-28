@@ -57,7 +57,10 @@ class AnalyzeJobResponse(BaseModel):
     job_id: uuid.UUID
     jd_structured: JdStructured
     skills_required: list[str]
-    match_score: float
+    # None = not scored: the user has no default resume, the profile service was
+    # unreachable, or the scoring call failed. Distinct from 0.0 ("terrible
+    # fit"), so the UI can say "not scored" instead of showing a damning zero.
+    match_score: float | None
     status: str
 
 

@@ -18,6 +18,28 @@
               }
             ],
             "title": "Notes"
+          },
+          "resume_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Id"
+          },
+          "resume_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResumeSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -189,6 +211,28 @@
             ],
             "title": "Notes"
           },
+          "resume_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Id"
+          },
+          "resume_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResumeSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "resume_suggestions": {
             "anyOf": [
               {
@@ -229,6 +273,8 @@
           "user_id",
           "job_id",
           "status",
+          "resume_id",
+          "resume_snapshot",
           "match_score",
           "resume_suggestions",
           "notes",
@@ -283,6 +329,28 @@
               }
             ],
             "title": "Notes"
+          },
+          "resume_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Id"
+          },
+          "resume_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResumeSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "title": "ApplicationUpdate",
@@ -1220,6 +1288,39 @@
         "title": "PaginatedResponse[JobResponse]",
         "type": "object"
       },
+      "ResumeSnapshot": {
+        "description": "How the attached resume identified itself when it was attached.\n\nThe Job Service cannot look this up: resumes live in profile_schema and\ncross-schema JOINs are forbidden, so the caller supplies it. Typed rather\nthan free-form JSON so the stored shape stays predictable for the UI.",
+        "properties": {
+          "file_name": {
+            "maxLength": 255,
+            "title": "File Name",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "file_name",
+          "version"
+        ],
+        "title": "ResumeSnapshot",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1767,6 +1868,23 @@
                 }
               ],
               "title": "Job Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resume_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resume Id"
             }
           }
         ],

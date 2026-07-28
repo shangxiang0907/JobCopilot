@@ -51,7 +51,7 @@ async def test_analyzer_graph_extracts_structure() -> None:
 
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.json.return_value = {"active_resume_text": "Experienced Python developer"}
+        mock_resp.json.return_value = {"default_resume_text": "Experienced Python developer"}
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
@@ -68,6 +68,7 @@ async def test_analyzer_graph_extracts_structure() -> None:
             "location": "Remote",
             "raw_text": "We are looking for a Senior Python Engineer...",
             "resume_text": "",
+            "resume_status": "unavailable",
             "jd_structured": {},
             "skills_required": [],
             "match_score": 0.0,
@@ -122,15 +123,20 @@ async def test_analyzer_graph_handles_missing_resume() -> None:
             "location": "",
             "raw_text": "Job desc",
             "resume_text": "",
+            "resume_status": "unavailable",
             "jd_structured": {},
             "skills_required": [],
-            "match_score": 0.0,
+            "match_score": None,
             "error": None,
         }
         result = await analyzer_graph.ainvoke(state)
 
-    # No resume → match_score stays 0
-    assert result["match_score"] == 0.0
+    # A profile-service non-200 must NOT be reported as a zero-scoring job: the
+    # score was never computed, and 0.0 would tell the user this posting is a
+    # terrible fit for them.
+    assert result["match_score"] is None
+    assert result["resume_status"] == "unavailable"
+    # The JD structure is the payload here and survives the degradation.
     assert result["jd_structured"]["title"] == "Engineer"
 
 
@@ -262,7 +268,7 @@ async def test_analyzer_graph_rejects_wrong_shaped_llm_output() -> None:
 
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.json.return_value = {"active_resume_text": "Python developer"}
+        mock_resp.json.return_value = {"default_resume_text": "Python developer"}
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
@@ -279,9 +285,10 @@ async def test_analyzer_graph_rejects_wrong_shaped_llm_output() -> None:
             "location": "Remote",
             "raw_text": "Job text...",
             "resume_text": "",
+            "resume_status": "unavailable",
             "jd_structured": {},
             "skills_required": [],
-            "match_score": 0.0,
+            "match_score": None,
             "error": None,
         }
         result = await analyzer_graph.ainvoke(state)
@@ -289,7 +296,9 @@ async def test_analyzer_graph_rejects_wrong_shaped_llm_output() -> None:
     assert result["jd_structured"] == {}
     assert result["skills_required"] == []
     assert result["error"] is not None
-    assert result["match_score"] == 0.0
+    # An LLM that returned the wrong shape produced no score at all. Reporting
+    # 0.0 here would dress a parsing failure up as a verdict on the job.
+    assert result["match_score"] is None
 
 
 @pytest.mark.asyncio

@@ -184,8 +184,15 @@
             "type": "string"
           },
           "match_score": {
-            "title": "Match Score",
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Score"
           },
           "skills_required": {
             "items": {

@@ -172,10 +172,14 @@ export interface paths {
         delete: operations["delete_resume_v1_resumes__resume_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Resume
+         * @description Edit the user-supplied label/notes. The file itself is immutable.
+         */
+        patch: operations["update_resume_v1_resumes__resume_id__patch"];
         trace?: never;
     };
-    "/v1/resumes/{resume_id}/activate": {
+    "/v1/resumes/{resume_id}/default": {
         parameters: {
             query?: never;
             header?: never;
@@ -188,8 +192,14 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Activate Resume */
-        patch: operations["activate_resume_v1_resumes__resume_id__activate_patch"];
+        /**
+         * Set Default Resume
+         * @description Choose the resume used when nothing more specific is given (PRD v0.3).
+         *
+         *     Changing the default never rewrites existing applications: each one records
+         *     its own resume_id at the time it was created.
+         */
+        patch: operations["set_default_resume_v1_resumes__resume_id__default_patch"];
         trace?: never;
     };
 }
@@ -272,15 +282,15 @@ export interface components {
          *     LLM_KEY_MODE=platform. Resume fields stay authoritative either way.
          */
         InternalProfileResponse: {
-            /** Active Resume */
-            active_resume: {
+            /** Default Resume */
+            default_resume: {
                 [key: string]: unknown;
             } | null;
             /**
-             * Active Resume Text
+             * Default Resume Text
              * @default
              */
-            active_resume_text: string;
+            default_resume_text: string;
             /** Llm Api Key */
             llm_api_key: string | null;
             /** Personal Info */
@@ -418,11 +428,6 @@ export interface components {
             personal_info?: components["schemas"]["PersonalInfo"] | null;
             preferences?: components["schemas"]["Preferences"] | null;
         };
-        /** ResumeActivate */
-        ResumeActivate: {
-            /** Is Active */
-            is_active: boolean;
-        };
         /** ResumeResponse */
         ResumeResponse: {
             /**
@@ -434,8 +439,12 @@ export interface components {
             file_name: string;
             /** File Url */
             file_url: string;
-            /** Is Active */
-            is_active: boolean;
+            /** Is Default */
+            is_default: boolean;
+            /** Label */
+            label: string | null;
+            /** Notes */
+            notes: string | null;
             /** Parsed Data */
             parsed_data: {
                 [key: string]: unknown;
@@ -452,6 +461,24 @@ export interface components {
             user_id: string;
             /** Version */
             version: number;
+        };
+        /** ResumeSetDefault */
+        ResumeSetDefault: {
+            /** Is Default */
+            is_default: boolean;
+        };
+        /**
+         * ResumeUpdate
+         * @description Label/notes edit. Both fields are optional and independently clearable.
+         *
+         *     `None` means "leave unchanged" — clearing a field is an explicit empty
+         *     string, so a partial update can never blank out the other field by omission.
+         */
+        ResumeUpdate: {
+            /** Label */
+            label?: string | null;
+            /** Notes */
+            notes?: string | null;
         };
         /** UserEnabledUpdate */
         UserEnabledUpdate: {
@@ -813,7 +840,7 @@ export interface operations {
             };
         };
     };
-    activate_resume_v1_resumes__resume_id__activate_patch: {
+    update_resume_v1_resumes__resume_id__patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -824,7 +851,42 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ResumeActivate"];
+                "application/json": components["schemas"]["ResumeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_default_resume_v1_resumes__resume_id__default_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResumeSetDefault"];
             };
         };
         responses: {

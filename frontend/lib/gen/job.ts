@@ -297,6 +297,9 @@ export interface components {
             job_id: string;
             /** Notes */
             notes?: string | null;
+            /** Resume Id */
+            resume_id?: string | null;
+            resume_snapshot?: components["schemas"]["ResumeSnapshot"] | null;
         };
         /** ApplicationEventResponse */
         ApplicationEventResponse: {
@@ -367,6 +370,9 @@ export interface components {
             match_score: number | null;
             /** Notes */
             notes: string | null;
+            /** Resume Id */
+            resume_id: string | null;
+            resume_snapshot: components["schemas"]["ResumeSnapshot"] | null;
             /** Resume Suggestions */
             resume_suggestions: {
                 [key: string]: unknown;
@@ -401,6 +407,9 @@ export interface components {
         ApplicationUpdate: {
             /** Notes */
             notes?: string | null;
+            /** Resume Id */
+            resume_id?: string | null;
+            resume_snapshot?: components["schemas"]["ResumeSnapshot"] | null;
         };
         /** CompanyCreate */
         CompanyCreate: {
@@ -711,6 +720,22 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * ResumeSnapshot
+         * @description How the attached resume identified itself when it was attached.
+         *
+         *     The Job Service cannot look this up: resumes live in profile_schema and
+         *     cross-schema JOINs are forbidden, so the caller supplies it. Typed rather
+         *     than free-form JSON so the stored shape stays predictable for the UI.
+         */
+        ResumeSnapshot: {
+            /** File Name */
+            file_name: string;
+            /** Label */
+            label?: string | null;
+            /** Version */
+            version: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -1016,6 +1041,7 @@ export interface operations {
                 size?: number;
                 status?: string | null;
                 job_id?: string | null;
+                resume_id?: string | null;
             };
             header?: never;
             path?: never;

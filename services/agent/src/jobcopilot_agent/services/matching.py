@@ -42,7 +42,7 @@ async def _fetch_resume_text(user_id: uuid.UUID) -> str:
         log.warning("profile_fetch_failed", extra={"error": str(exc)})
         raise ExternalServiceError("Profile service is unavailable") from exc
     if resp.status_code == 200:
-        return str(resp.json().get("active_resume_text") or "")
+        return str(resp.json().get("default_resume_text") or "")
     if resp.status_code == 404:
         return ""
     log.warning("profile_fetch_failed", extra={"status_code": resp.status_code})
