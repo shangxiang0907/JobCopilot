@@ -69,6 +69,25 @@ forbidden_modules = [
     "jobcopilot_notification",
 ]
 
+# SAD ADR-008: AI is an augmentation layer over a self-sufficient non-AI Core,
+# with a ONE-WAY dependency — the Agent Service may call the Core layer, never
+# the reverse. The independence contract above already forbids every cross-
+# service import, but it is symmetric and packaging-motivated; this one names
+# the direction that is an architectural invariant, so relaxing independence can
+# never silently take ADR-008 with it. The HTTP and container halves of the same
+# rule live in tests/contracts/test_layering_adr_008.py — imports are only one
+# way to reach another service.
+[[tool.importlinter.contracts]]
+name = "Core services never depend on the AI layer (ADR-008)"
+type = "forbidden"
+source_modules = [
+    "jobcopilot_profile",
+    "jobcopilot_job",
+    "jobcopilot_discovery",
+    "jobcopilot_notification",
+]
+forbidden_modules = ["jobcopilot_agent"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true
@@ -89,5 +108,7 @@ dev = [
     "mypy>=1.10.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
+    # Reads infra/docker-compose.yml in the ADR-008 layering contract test.
+    "pyyaml>=6.0.3",
     "ruff>=0.15.16",
 ]

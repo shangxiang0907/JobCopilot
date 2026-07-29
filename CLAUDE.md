@@ -28,7 +28,7 @@ All application code is implemented, verified end-to-end, and **live in producti
 **v0.3 work queue (agreed order):**
 1. Schema + API: `applications.resume_id` (plain UUID, no cross-schema FK; `NULL` = "not recorded", never "the default"), `resumes.is_default` rename + `label`/`notes`, `companies` unique index on `(tenant_id, lower(trim(name)))` + name-resolution upsert on job create/update/import
 2. Frontend Core layer: `/companies` list + detail + create/edit/delete, manual job create/edit/delete, per-application resume selection, resume label/notes editing
-3. `import-linter` contract enforcing ADR-008's one-way dependency (Core services must not import or HTTP-call the Agent Service)
+3. ~~`import-linter` contract enforcing ADR-008's one-way dependency~~ ✅ done: a named `forbidden` contract in `pyproject.toml` for the import direction, plus `tests/contracts/test_layering_adr_008.py` for what `import-linter` structurally cannot see — an agent base URL in a Core settings class, agent hostname/API paths in Core sources, `depends_on: agent-service` on a Core container. Every check was verified to FAIL on an injected violation, not just pass on clean code
 4. **No-AI mode E2E test** — the executable definition of ADR-008: with the AI layer disabled, all Core journeys pass
 5. Repo-wide silent-fallback audit (see "Error Handling — No Silent Degradation"), ordered by blast radius: service-to-service contract boundaries → value paths feeding LLM input → MQ consumers swallowing exceptions → frontend display coercions
 6. Replace the fake `deploy` job in `.github/workflows/cd.yml` (option A: run `deploy.sh` over SSH behind a GitHub Environment with a required reviewer + forced `command=` on the key). Needs owner-supplied repo secrets
@@ -333,7 +333,7 @@ Never scan with `gitleaks dir .` — it walks gitignored local artifacts (`infra
 1. **Lint**: `ruff check .` + `ruff format --check .` + `lint-imports` (service independence contracts)
 2. **Type Check**: `mypy` per service
 3. **Unit Tests**: `pytest` (no real DB/queue)
-4. **Contract Checks**: `pytest tests/contracts` (consumer call sites vs provider OpenAPI) + OpenAPI/TS-type freshness (`scripts/export_openapi.py` → `npm run gen:api-types` → `git diff --exit-code -- openapi frontend/lib/gen`). Entity types in `frontend/lib/api.ts` are re-exports of generated types — NEVER hand-write them.
+4. **Contract Checks**: `pytest tests/contracts` (consumer call sites vs provider OpenAPI, plus the ADR-008 layering contract — Core layer must not reach the Agent Service by URL, path or `depends_on`) + OpenAPI/TS-type freshness (`scripts/export_openapi.py` → `npm run gen:api-types` → `git diff --exit-code -- openapi frontend/lib/gen`). Entity types in `frontend/lib/api.ts` are re-exports of generated types — NEVER hand-write them.
 5. **Integration Tests**: `pytest` against real PostgreSQL + Redis + RabbitMQ, then `alembic check` per service (model↔migration drift fails CI)
 6. **Secret Scan**: `gitleaks/gitleaks-action@v3`, version pinned via `GITLEAKS_VERSION` (unpinned it silently inherits a hard-coded default baked into the action's `dist/`, so bumping the action tag would change the scanner underneath you). Scans only the commits in the push, not full history.
 7. **Image Scan**: Trivy — Critical CVE blocks the pipeline
