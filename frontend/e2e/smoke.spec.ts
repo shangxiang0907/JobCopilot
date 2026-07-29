@@ -104,6 +104,9 @@ test("uploaded resume appears immediately, without a reload", async ({ page }) =
   // Unique name per run so a leftover row from an aborted earlier run can never
   // satisfy the visibility assertion.
   const fileName = `e2e-resume-${Date.now()}.pdf`
+  // Scoped to the library's landmark: the delete dialog repeats the file name in
+  // its title, so an unscoped getByText matches two elements while it is open.
+  const library = page.getByRole("region", { name: "Resume library" })
   // Await the 201 explicitly so a failure here separates "upload broke" from
   // "refetch broke" — the two halves of the read-after-write contract.
   const uploadResponse = page.waitForResponse(
@@ -115,12 +118,17 @@ test("uploaded resume appears immediately, without a reload", async ({ page }) =
     buffer: readFileSync(path.join(__dirname, "fixtures", "resume.pdf")),
   })
   expect((await uploadResponse).status()).toBe(201)
-  await expect(page.getByText(fileName)).toBeVisible({ timeout: 15_000 })
+  await expect(library.getByText(fileName)).toBeVisible({ timeout: 15_000 })
 
   // Delete it again — cleans up AND exercises the delete path's commit the same
   // way: the row must disappear from the refetched list without a reload.
-  await page.getByRole("button", { name: `Delete ${fileName}` }).click()
-  await expect(page.getByText(fileName)).toBeHidden({ timeout: 15_000 })
+  // Deleting is a two-step flow (PRD v0.3): the trash icon opens a dialog
+  // spelling out the consequences, and only confirming there issues the DELETE.
+  await library.getByRole("button", { name: `Delete ${fileName}` }).click()
+  const deleteDialog = page.getByRole("dialog")
+  await expect(deleteDialog.getByRole("heading", { name: `Delete ${fileName}` })).toBeVisible()
+  await deleteDialog.getByRole("button", { name: "Delete resume" }).click()
+  await expect(library.getByText(fileName)).toBeHidden({ timeout: 15_000 })
 })
 
 test("admin pages render for the admin role", async ({ page }) => {

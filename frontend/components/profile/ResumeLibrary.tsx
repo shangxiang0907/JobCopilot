@@ -83,7 +83,9 @@ export function ResumeLibrary() {
 
   return (
     <>
-      <Card>
+      {/* A named landmark, so a row can be addressed without colliding with the
+          same file name rendered inside an open dialog (E2E locator rule). */}
+      <Card role="region" aria-label="Resume library">
         <CardHeader>
           <CardTitle className="text-base">Resume Library</CardTitle>
           <CardDescription>
