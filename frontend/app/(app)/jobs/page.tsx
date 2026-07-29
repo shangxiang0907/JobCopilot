@@ -3,21 +3,25 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useQuery, keepPreviousData } from "@tanstack/react-query"
-import { Building2, MapPin, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react"
+import {
+  Building2,
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Plus,
+  Search,
+} from "lucide-react"
 import api, { type Job, type Paginated } from "@/lib/api"
+import { JOB_TYPE_OPTIONS, JobFormDialog } from "@/components/jobs/JobFormDialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 
-const JOB_TYPES = ["full_time", "part_time", "contract", "internship", "remote"] as const
-
-const JOB_TYPE_LABELS: Record<string, string> = {
-  full_time: "Full-time",
-  part_time: "Part-time",
-  contract: "Contract",
-  internship: "Internship",
-  remote: "Remote",
-}
+const JOB_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  JOB_TYPE_OPTIONS.map((o) => [o.value, o.label])
+)
 
 const PAGE_SIZE = 20
 
@@ -40,13 +44,20 @@ function formatSalary(min?: number | null, max?: number | null) {
 export default function JobsPage() {
   const [page, setPage] = useState(1)
   const [jobType, setJobType] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+  const [creating, setCreating] = useState(false)
 
   const { data, isLoading, error } = useQuery<Paginated<Job>>({
-    queryKey: ["jobs", page, jobType],
+    queryKey: ["jobs", page, jobType, search],
     queryFn: () =>
       api
         .get("/v1/jobs", {
-          params: { page, size: PAGE_SIZE, ...(jobType ? { job_type: jobType } : {}) },
+          params: {
+            page,
+            size: PAGE_SIZE,
+            ...(jobType ? { job_type: jobType } : {}),
+            ...(search.trim() ? { q: search.trim() } : {}),
+          },
         })
         .then((r) => r.data),
     placeholderData: keepPreviousData,
@@ -63,16 +74,34 @@ export default function JobsPage() {
 
   return (
     <div className="flex flex-col h-full overflow-auto">
-      <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
+      <div className="flex items-center justify-between gap-4 px-6 py-4 border-b shrink-0">
         <div>
           <h1 className="text-2xl font-semibold">Jobs</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {total > 0 ? `${total} discovered job${total === 1 ? "" : "s"}` : "Discovered jobs"}
+            {total > 0 ? `${total} job${total === 1 ? "" : "s"} in your library` : "Your job library"}
           </p>
         </div>
+        <Button size="sm" onClick={() => setCreating(true)}>
+          <Plus className="h-3.5 w-3.5 mr-1.5" />
+          Add job
+        </Button>
       </div>
 
       <div className="flex-1 p-6 space-y-4 max-w-4xl w-full">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Search by title, company or location"
+            aria-label="Search jobs"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+          />
+        </div>
+
         {/* Job type filter */}
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -82,14 +111,14 @@ export default function JobsPage() {
           >
             All
           </Button>
-          {JOB_TYPES.map((t) => (
+          {JOB_TYPE_OPTIONS.map((t) => (
             <Button
-              key={t}
+              key={t.value}
               size="sm"
-              variant={jobType === t ? "default" : "outline"}
-              onClick={() => selectJobType(t)}
+              variant={jobType === t.value ? "default" : "outline"}
+              onClick={() => selectJobType(t.value)}
             >
-              {JOB_TYPE_LABELS[t]}
+              {t.label}
             </Button>
           ))}
         </div>
@@ -99,18 +128,24 @@ export default function JobsPage() {
         ) : error ? (
           <p className="text-sm text-destructive">Failed to load jobs.</p>
         ) : jobs.length === 0 ? (
-          <div className="py-12 text-center space-y-2">
+          <div className="py-12 text-center space-y-3">
             <p className="text-sm text-muted-foreground">
-              {jobType ? "No jobs match this filter." : "No jobs discovered yet."}
+              {jobType || search ? "No jobs match this filter." : "No jobs in your library yet."}
             </p>
-            {!jobType && (
-              <p className="text-sm text-muted-foreground">
-                Run a{" "}
-                <Link href="/discovery" className="underline underline-offset-2">
-                  discovery
-                </Link>{" "}
-                to start finding jobs, or ask the AI assistant.
-              </p>
+            {!jobType && !search && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Add a posting by hand, or run a{" "}
+                  <Link href="/discovery" className="underline underline-offset-2">
+                    discovery
+                  </Link>{" "}
+                  to find them automatically.
+                </p>
+                <Button size="sm" onClick={() => setCreating(true)}>
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Add job
+                </Button>
+              </>
             )}
           </div>
         ) : (
@@ -193,6 +228,8 @@ export default function JobsPage() {
           </div>
         )}
       </div>
+
+      <JobFormDialog open={creating} onOpenChange={setCreating} />
     </div>
   )
 }

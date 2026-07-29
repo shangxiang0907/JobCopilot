@@ -375,6 +375,7 @@
             "type": "boolean"
           },
           "name": {
+            "minLength": 1,
             "title": "Name",
             "type": "string"
           },
@@ -512,6 +513,7 @@
         "type": "object"
       },
       "CompanyUpdate": {
+        "description": "Partial update where an omitted field and an explicit `null` differ.\n\nOmitted = leave unchanged; `null` = clear the value. `exclude_none` would\nmake every optional field write-once: the user deletes the industry in the\nedit form, saves, and the old value comes back with nothing logged.",
         "properties": {
           "industry": {
             "anyOf": [
@@ -538,6 +540,7 @@
           "name": {
             "anyOf": [
               {
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -862,6 +865,7 @@
             "title": "Company Id"
           },
           "company_name": {
+            "minLength": 1,
             "title": "Company Name",
             "type": "string"
           },
@@ -926,6 +930,7 @@
             "type": "string"
           },
           "title": {
+            "minLength": 1,
             "title": "Title",
             "type": "string"
           },
@@ -1097,6 +1102,7 @@
         "type": "object"
       },
       "JobUpdate": {
+        "description": "Partial update where an omitted field and an explicit `null` differ.\n\nOmitted = leave unchanged; `null` = clear the value. Collapsing the two (as\n`exclude_none` did) makes optional fields unclearable: the user empties the\nsalary in the edit form, saves, and watches the old number come back, with\nnothing in any log to explain it. `company_id: null` is how the user\nunlinks a job from its company (PRD \u00a73.4).",
         "properties": {
           "company_id": {
             "anyOf": [
@@ -1113,6 +1119,7 @@
           "company_name": {
             "anyOf": [
               {
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -1143,6 +1150,17 @@
             ],
             "title": "Location"
           },
+          "raw_jd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Jd"
+          },
           "salary_max": {
             "anyOf": [
               {
@@ -1168,6 +1186,7 @@
           "title": {
             "anyOf": [
               {
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -1175,6 +1194,20 @@
               }
             ],
             "title": "Title"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "format": "uri",
+                "maxLength": 2083,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           }
         },
         "title": "JobUpdate",
@@ -2241,6 +2274,24 @@
               "title": "Size",
               "type": "integer"
             }
+          },
+          {
+            "description": "Substring match on company name",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Substring match on company name",
+              "title": "Q"
+            }
           }
         ],
         "responses": {
@@ -2533,6 +2584,41 @@
                 }
               ],
               "title": "Job Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "company_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company Id"
+            }
+          },
+          {
+            "description": "Matches title, company or location",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Matches title, company or location",
+              "title": "Q"
             }
           }
         ],

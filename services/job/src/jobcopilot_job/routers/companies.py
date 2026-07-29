@@ -1,6 +1,7 @@
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 from jobcopilot_shared.schemas.common import PaginatedResponse
 
 from jobcopilot_job.deps import SessionDep, TenantIdDep
@@ -16,9 +17,10 @@ async def list_companies(
     tenant_id: TenantIdDep,
     page: int = 1,
     size: int = 20,
+    q: Annotated[str | None, Query(description="Substring match on company name")] = None,
 ) -> PaginatedResponse[CompanyResponse]:
     repo = CompanyRepository(session)
-    companies, total = await repo.get_all(tenant_id, page=page, size=size)
+    companies, total = await repo.get_all(tenant_id, page=page, size=size, search=q)
     items = [CompanyResponse.model_validate(c) for c in companies]
     return PaginatedResponse(
         items=items, total=total, page=page, size=size, has_next=(page * size < total)

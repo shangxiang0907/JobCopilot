@@ -1,4 +1,4 @@
-import axios from "axios"
+import axios, { isAxiosError } from "axios"
 import { getKeycloak } from "@/lib/keycloak"
 
 const api = axios.create({
@@ -31,9 +31,11 @@ import type { components as JobComponents } from "./gen/job"
 import type { components as ProfileComponents } from "./gen/profile"
 
 export type Job = JobComponents["schemas"]["JobResponse"]
+export type Company = JobComponents["schemas"]["CompanyResponse"]
 export type Application = JobComponents["schemas"]["ApplicationResponse"]
 export type ApplicationJobSummary = JobComponents["schemas"]["ApplicationJobSummary"]
 export type ApplicationStatus = Application["status"]
+export type ResumeSnapshot = JobComponents["schemas"]["ResumeSnapshot"]
 
 export type Profile = ProfileComponents["schemas"]["ProfileResponse"]
 export type Resume = ProfileComponents["schemas"]["ResumeResponse"]
@@ -50,4 +52,24 @@ export interface Paginated<T> {
   page: number
   size: number
   has_next: boolean
+}
+
+/**
+ * Surface the backend's own error message rather than a generic one.
+ *
+ * Every service answers with `{ error: { code, message } }`, and those messages
+ * are the difference between "Save failed" and "A company named 'Acme' already
+ * exists". Falling back to a generic string when one IS present would hide the
+ * only information the user can act on.
+ */
+export function apiErrorMessage(error: unknown, fallback: string): string {
+  if (isAxiosError(error)) {
+    const message = (error.response?.data as ApiErrorBody | undefined)?.error?.message
+    if (message) return message
+  }
+  return fallback
+}
+
+interface ApiErrorBody {
+  error?: { code?: string; message?: string }
 }

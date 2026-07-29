@@ -1,18 +1,38 @@
 "use client"
 
+import { useState } from "react"
+import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, ExternalLink, Star, Building2, MapPin, Briefcase } from "lucide-react"
+import {
+  ArrowLeft,
+  ExternalLink,
+  Star,
+  Building2,
+  MapPin,
+  Briefcase,
+  Pencil,
+  Trash2,
+} from "lucide-react"
 import api, {
+  apiErrorMessage,
   type Job,
   type Application,
   type JobAnalysis,
   type ApplicationStatus,
   type Paginated,
+  type Resume,
 } from "@/lib/api"
+import {
+  ApplicationResumeCard,
+  snapshotOf,
+  useResumes,
+} from "@/components/jobs/ApplicationResumeCard"
+import { JobFormDialog } from "@/components/jobs/JobFormDialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Separator } from "@/components/ui/separator"
 import { useUIStore } from "@/lib/store"
 
@@ -48,6 +68,9 @@ export default function JobDetailPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const openChat = useUIStore((s) => s.openChat)
+  const [editing, setEditing] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const { data: resumes = [] } = useResumes()
 
   const { data: job, isLoading: jobLoading } = useQuery<Job>({
     queryKey: ["job", id],
@@ -78,8 +101,19 @@ export default function JobDetailPage() {
     queryClient.invalidateQueries({ queryKey: ["application-for-job", id] })
   }
 
+  const defaultResume: Resume | undefined = resumes.find((r) => r.is_default)
+
   const trackJob = useMutation({
-    mutationFn: () => api.post("/v1/applications", { job_id: id }),
+    // Pre-bind the default resume so "which resume did I apply with?" is
+    // answered by default (PRD §3.4). With no default the binding is left
+    // genuinely absent rather than guessed at — NULL means "not recorded".
+    mutationFn: () =>
+      api.post("/v1/applications", {
+        job_id: id,
+        ...(defaultResume
+          ? { resume_id: defaultResume.resume_id, resume_snapshot: snapshotOf(defaultResume) }
+          : {}),
+      }),
     onSuccess: invalidate,
   })
 
@@ -87,6 +121,15 @@ export default function JobDetailPage() {
     mutationFn: (status: ApplicationStatus) =>
       api.patch(`/v1/applications/${application!.application_id}/status`, { status }),
     onSuccess: invalidate,
+  })
+
+  const deleteJob = useMutation({
+    mutationFn: () => api.delete(`/v1/jobs/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobs"] })
+      queryClient.invalidateQueries({ queryKey: ["applications"] })
+      router.push("/jobs")
+    },
   })
 
   if (jobLoading) {
@@ -124,6 +167,14 @@ export default function JobDetailPage() {
             View Posting
           </a>
         </Button>
+        <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+          <Pencil className="h-3.5 w-3.5 mr-1.5" />
+          Edit
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setConfirmingDelete(true)}>
+          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+          Delete
+        </Button>
       </div>
 
       <div className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -135,10 +186,22 @@ export default function JobDetailPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <Building2 className="h-3.5 w-3.5" />
-                  {job.company_name}
-                </span>
+                {/* Linked to a company record when one was resolved by name;
+                    plain text when the job carries a name but no link. */}
+                {job.company_id ? (
+                  <Link
+                    href={`/companies/${job.company_id}`}
+                    className="flex items-center gap-1.5 underline underline-offset-2 hover:text-foreground"
+                  >
+                    <Building2 className="h-3.5 w-3.5" />
+                    {job.company_name}
+                  </Link>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5" />
+                    {job.company_name}
+                  </span>
+                )}
                 {job.location && (
                   <span className="flex items-center gap-1.5">
                     <MapPin className="h-3.5 w-3.5" />
@@ -241,10 +304,17 @@ export default function JobDetailPage() {
                   >
                     Track this job
                   </Button>
+                  {trackJob.isError && (
+                    <p className="text-sm text-destructive">
+                      {apiErrorMessage(trackJob.error, "Could not track this job.")}
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>
           </Card>
+
+          {application && <ApplicationResumeCard application={application} />}
 
           <Card>
             <CardHeader>
@@ -258,6 +328,31 @@ export default function JobDetailPage() {
           </Card>
         </div>
       </div>
+
+      <JobFormDialog open={editing} onOpenChange={setEditing} job={job} />
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={`Delete “${job.title}”?`}
+        confirmLabel="Delete job"
+        pending={deleteJob.isPending}
+        errorMessage={
+          deleteJob.isError ? apiErrorMessage(deleteJob.error, "Could not delete the job.") : null
+        }
+        onConfirm={() => deleteJob.mutate()}
+        description={
+          <>
+            <p>This removes the job and its job description from your library.</p>
+            {application && (
+              <p>
+                Its application card (currently {STATUS_LABELS[application.status].toLowerCase()})
+                will lose the job it points at.
+              </p>
+            )}
+          </>
+        }
+      />
     </div>
   )
 }

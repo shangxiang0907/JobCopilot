@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
-import { FileUp, MessageSquare, Search } from "lucide-react"
+import { FileUp, MessageSquare, Plus, Search } from "lucide-react"
 import api, { type Application, type ApplicationStatus } from "@/lib/api"
 import { KanbanColumn } from "./KanbanColumn"
 import { Button } from "@/components/ui/button"
@@ -22,11 +22,26 @@ const COLUMNS: { status: ApplicationStatus; label: string; color: string }[] = [
 function GettingStarted() {
   const openChat = useUIStore((s) => s.openChat)
 
+  // Ordered so every step is reachable without the AI layer (SAD ADR-008). The
+  // assistant comes last and is explicitly optional: until v0.3 this empty
+  // state offered the chat agent as the ONLY way to add a posting, which made a
+  // plain write depend on an LLM key, the daily quota and the model behaving.
   const steps = [
     {
+      icon: Plus,
+      title: "1. Add a job",
+      description:
+        "Type or paste a posting into the form — title, company, URL and JD text. No AI needed.",
+      action: (
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/jobs">Go to Jobs</Link>
+        </Button>
+      ),
+    },
+    {
       icon: FileUp,
-      title: "1. Upload your resume",
-      description: "The active resume powers AI match scores and gap analysis.",
+      title: "2. Upload your resume",
+      description: "Your default resume pre-fills new applications and powers AI match scores.",
       action: (
         <Button variant="outline" size="sm" asChild>
           <Link href="/profile">Go to Profile</Link>
@@ -35,7 +50,7 @@ function GettingStarted() {
     },
     {
       icon: Search,
-      title: "2. Discover jobs",
+      title: "3. Or discover jobs automatically",
       description: "Run discovery to pull matching postings from public job boards.",
       action: (
         <Button variant="outline" size="sm" asChild>
@@ -45,9 +60,9 @@ function GettingStarted() {
     },
     {
       icon: MessageSquare,
-      title: "3. Or add a job yourself",
+      title: "Optional: ask the assistant",
       description:
-        "Ask the AI assistant to add a posting from a URL, pasted JD text, or a screenshot.",
+        "The AI assistant can add a posting from a URL, pasted JD text or a screenshot — it saves typing, it is never required.",
       action: (
         <Button variant="outline" size="sm" onClick={openChat}>
           Open Assistant
@@ -62,7 +77,7 @@ function GettingStarted() {
         <CardHeader>
           <CardTitle>Welcome to JobCopilot</CardTitle>
           <CardDescription>
-            Your board is empty — three steps to get your job search running.
+            Your board is empty — here is how to get your job search running.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">

@@ -1,4 +1,5 @@
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 from jobcopilot_shared.schemas.common import PaginatedResponse
@@ -19,10 +20,20 @@ async def list_jobs(
     source: str | None = Query(default=None),
     location: str | None = Query(default=None),
     job_type: str | None = Query(default=None),
+    # Drives the company detail page's "jobs at this company" list.
+    company_id: Annotated[uuid.UUID | None, Query()] = None,
+    q: Annotated[str | None, Query(description="Matches title, company or location")] = None,
 ) -> PaginatedResponse[JobResponse]:
     repo = JobRepository(session)
     jobs, total = await repo.get_all(
-        tenant_id, page=page, size=size, source=source, location=location, job_type=job_type
+        tenant_id,
+        page=page,
+        size=size,
+        source=source,
+        location=location,
+        job_type=job_type,
+        company_id=company_id,
+        search=q,
     )
     items = [JobResponse.model_validate(j) for j in jobs]
     return PaginatedResponse(

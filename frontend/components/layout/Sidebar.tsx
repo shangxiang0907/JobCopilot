@@ -9,6 +9,7 @@ import {
   User,
   MessageSquare,
   Briefcase,
+  Building2,
   Users,
   BarChart3,
 } from "lucide-react"
@@ -20,6 +21,7 @@ import { getKeycloak } from "@/lib/keycloak"
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/jobs", label: "Jobs", icon: Briefcase },
+  { href: "/companies", label: "Companies", icon: Building2 },
   { href: "/discovery", label: "Discovery", icon: Search },
   { href: "/profile", label: "Profile", icon: User },
 ]

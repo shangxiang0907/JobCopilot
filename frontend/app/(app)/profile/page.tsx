@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { isAxiosError } from "axios"
-import { Upload, Trash2, CheckCircle, User, Key, ExternalLink, KeyRound } from "lucide-react"
-import api, { type Profile, type Resume } from "@/lib/api"
+import { User, Key, ExternalLink, KeyRound } from "lucide-react"
+import api, { type Profile } from "@/lib/api"
 import { useAuth } from "@/components/auth/AuthProvider"
+import { ResumeLibrary } from "@/components/profile/ResumeLibrary"
 import { getKeycloak } from "@/lib/keycloak"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,11 +33,6 @@ export default function ProfilePage() {
   })
   const personalName = (profile?.personal_info as { name?: string } | null | undefined)?.name
 
-  const { data: resumes = [] } = useQuery<Resume[]>({
-    queryKey: ["resumes"],
-    queryFn: () => api.get("/v1/resumes").then((r) => r.data.items ?? []),
-  })
-
   const saveCredentials = useMutation({
     mutationFn: (payload: { llm_api_key?: string }) =>
       api.patch("/v1/profiles/me/credentials", payload),
@@ -45,33 +41,6 @@ export default function ProfilePage() {
       setLlmApiKey("")
     },
   })
-
-  const uploadResume = useMutation({
-    mutationFn: (file: File) => {
-      const form = new FormData()
-      form.append("file", file)
-      return api.post("/v1/resumes", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resumes"] }),
-  })
-
-  const setDefaultResume = useMutation({
-    mutationFn: (id: string) => api.patch(`/v1/resumes/${id}/default`, { is_default: true }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resumes"] }),
-  })
-
-  const deleteResume = useMutation({
-    mutationFn: (id: string) => api.delete(`/v1/resumes/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resumes"] }),
-  })
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) uploadResume.mutate(file)
-    e.target.value = ""
-  }
 
   if (isLoading) {
     return (
@@ -193,78 +162,7 @@ export default function ProfilePage() {
         </Card>
         )}
 
-        {/* Resumes */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Resume Library</CardTitle>
-            <CardDescription>Upload PDF or DOCX. The active resume is used for AI matching.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <label className="flex items-center gap-2 w-fit cursor-pointer">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={uploadResume.isPending}
-                asChild
-              >
-                <span>
-                  <Upload className="h-3.5 w-3.5 mr-1.5" />
-                  {uploadResume.isPending ? "Uploading…" : "Upload Resume"}
-                </span>
-              </Button>
-              <input
-                type="file"
-                accept=".pdf,.docx"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </label>
-
-            {resumes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No resumes uploaded yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {resumes.map((r) => (
-                  <div
-                    key={r.resume_id}
-                    className="flex items-center justify-between p-3 rounded-md border"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      {r.is_default && (
-                        <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{r.file_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          v{r.version} · {new Date(r.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      {!r.is_default && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setDefaultResume.mutate(r.resume_id)}
-                        >
-                          Set Default
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Delete ${r.file_name}`}
-                        onClick={() => deleteResume.mutate(r.resume_id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <ResumeLibrary />
 
         <Separator />
         <p className="text-xs text-muted-foreground pb-6">

@@ -464,7 +464,14 @@ export interface components {
             /** Website */
             website: string | null;
         };
-        /** CompanyUpdate */
+        /**
+         * CompanyUpdate
+         * @description Partial update where an omitted field and an explicit `null` differ.
+         *
+         *     Omitted = leave unchanged; `null` = clear the value. `exclude_none` would
+         *     make every optional field write-once: the user deletes the industry in the
+         *     edit form, saves, and the old value comes back with nothing logged.
+         */
         CompanyUpdate: {
             /** Industry */
             industry?: string | null;
@@ -664,7 +671,16 @@ export interface components {
             /** Url */
             url: string;
         };
-        /** JobUpdate */
+        /**
+         * JobUpdate
+         * @description Partial update where an omitted field and an explicit `null` differ.
+         *
+         *     Omitted = leave unchanged; `null` = clear the value. Collapsing the two (as
+         *     `exclude_none` did) makes optional fields unclearable: the user empties the
+         *     salary in the edit form, saves, and watches the old number come back, with
+         *     nothing in any log to explain it. `company_id: null` is how the user
+         *     unlinks a job from its company (PRD §3.4).
+         */
         JobUpdate: {
             /** Company Id */
             company_id?: string | null;
@@ -674,12 +690,16 @@ export interface components {
             job_type?: string | null;
             /** Location */
             location?: string | null;
+            /** Raw Jd */
+            raw_jd?: string | null;
             /** Salary Max */
             salary_max?: number | null;
             /** Salary Min */
             salary_min?: number | null;
             /** Title */
             title?: string | null;
+            /** Url */
+            url?: string | null;
         };
         /** PaginatedResponse[ApplicationResponse] */
         PaginatedResponse_ApplicationResponse_: {
@@ -1268,6 +1288,8 @@ export interface operations {
             query?: {
                 page?: number;
                 size?: number;
+                /** @description Substring match on company name */
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -1431,6 +1453,9 @@ export interface operations {
                 source?: string | null;
                 location?: string | null;
                 job_type?: string | null;
+                company_id?: string | null;
+                /** @description Matches title, company or location */
+                q?: string | null;
             };
             header?: never;
             path?: never;

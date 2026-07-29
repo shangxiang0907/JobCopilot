@@ -124,11 +124,14 @@ class JobRepository:
         location: str | None = None,
         job_type: str | None = None,
         search: str | None = None,
+        company_id: uuid.UUID | None = None,
     ) -> tuple[list[Job], int]:
         from sqlalchemy import func as sqlfunc
         from sqlalchemy import or_
 
         filters = [Job.tenant_id == tenant_id]
+        if company_id is not None:
+            filters.append(Job.company_id == company_id)
         if source:
             filters.append(Job.source == source)
         if location:
@@ -162,12 +165,21 @@ class JobRepository:
 
     async def update(self, tenant_id: uuid.UUID, job_id: uuid.UUID, data: JobUpdate) -> Job:
         job = await self.get(tenant_id, job_id)
-        patch = data.model_dump(exclude_none=True)
+        # exclude_unset, not exclude_none: an omitted field means "leave alone"
+        # and an explicit null means "clear this" (see JobUpdate's docstring).
+        patch = data.model_dump(exclude_unset=True)
+        if patch.get("url") is not None:
+            patch["url"] = str(patch["url"])
+            clash = await self._find_by_url(patch["url"])
+            if clash is not None and clash.job_id != job_id:
+                raise ConflictError(f"Job with URL already exists: {patch['url']}")
         for field, value in patch.items():
             setattr(job, field, value)
         # Re-resolve when the user renames the company, otherwise company_id
         # keeps pointing at the row the job used to belong to and the two
-        # fields disagree about which company this is.
+        # fields disagree about which company this is. An explicitly supplied
+        # company_id wins — including null, which is how the user unlinks a job
+        # from its company without renaming it.
         if "company_name" in patch and "company_id" not in patch:
             job.company_id = await self._resolve_company_id(tenant_id, job.company_name, None)
         await self._session.flush()
