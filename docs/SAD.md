@@ -856,7 +856,7 @@ Every application service must provide / 每个应用服务须提供：
 1. Core services must not import from or HTTP-call the Agent Service. The import direction is an `import-linter` contract alongside the existing service-independence contracts; the HTTP direction is invisible to `import-linter` (a base URL is a string, not an import), so `tests/contracts/test_layering_adr_008.py` additionally rejects an Agent Service address in a Core settings class, any reference to its hostname or API paths in Core sources, and `depends_on: agent-service` in a Core container. Both gates run in CI, so a violation fails the pipeline rather than review.
 2. No capability that writes data may exist only as an agent tool. Each tool must bind to an endpoint that a form also uses.
 3. AI-produced values carry provenance (`source: ai | manual`, model, generated timestamp) and are hand-overwritable; AI must never silently replace user-entered data.
-4. A "no-AI mode" E2E test is the executable definition of this ADR: with the AI layer disabled, the Core journeys must pass.
+4. A "no-AI mode" E2E test is the executable definition of this ADR: with the AI layer disabled, the Core journeys must pass. Implemented as `frontend/e2e/no-ai.spec.ts` (Playwright project `no-ai`), which CD runs against the released images with `agent-service` stopped; its first test fails if the Agent Service is still reachable, so the suite can never pass vacuously.
 
 **Consequences.** The chat agent stops being a data-entry channel and becomes what it should be — an accelerator. The AI layer can be refactored, rate-limited, or switched off without taking the product down, which also makes it safe for the owner to evolve `services/agent/` by hand. Cost: some capabilities need two entry points (a form and a tool), and the tool must not fork its own logic — both call the same service layer, as the tool contract in CLAUDE.md already requires.
 
@@ -867,7 +867,7 @@ Every application service must provide / 每个应用服务须提供：
 1. 基础层服务不得 import 或 HTTP 调用 Agent Service。import 方向与现有服务独立性契约一并由 `import-linter` 强制；HTTP 方向对 `import-linter` 不可见（base URL 是字符串，不是 import），因此另由 `tests/contracts/test_layering_adr_008.py` 拒绝以下三类情况：基础层配置类中出现 Agent Service 地址、基础层源码中出现其主机名或 API 路径、基础层容器中出现 `depends_on: agent-service`。两道闸门都在 CI 中运行，使违规导致流水线失败而不是靠评审发现。
 2. 任何写数据的能力都不得仅以 agent 工具形式存在。每个工具必须绑定到某个同样被表单使用的端点。
 3. AI 产出的值携带来源信息（`source: ai | manual`、模型、生成时间）且可手动覆写；AI 绝不静默替换用户录入的数据。
-4. "无 AI 模式" E2E 测试是本 ADR 的可执行定义：AI 层禁用时，基础层用户旅程必须通过。
+4. "无 AI 模式" E2E 测试是本 ADR 的可执行定义：AI 层禁用时，基础层用户旅程必须通过。已实现为 `frontend/e2e/no-ai.spec.ts`（Playwright 项目 `no-ai`），CD 在停止 `agent-service` 后针对已发布镜像运行；其第一个测试会在 Agent Service 仍可访问时失败，因此该套件不可能"空转通过"。
 
 **结果。** 聊天 Agent 不再是数据录入通道，回归其应有角色——加速器。AI 层可以被重构、限流或直接关停而不影响产品可用性，这也使 owner 手工演进 `services/agent/` 变得安全。代价：部分能力需要两个入口（表单与工具），且工具不得另建一套逻辑——两者调用同一服务层，这已是 CLAUDE.md 中工具契约的既有要求。
 

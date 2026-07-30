@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test } from "@playwright/test"
+
+import { loginViaLanding, sidebarNav, USER } from "./helpers"
 
 /**
  * Smoke journey through the deployed stack: public landing page, Keycloak OIDC
@@ -10,35 +12,11 @@ import { expect, test, type Page } from "@playwright/test"
  * drag-and-drop (flaky under WebKit/CI) — this is a "is the system wired
  * together" net, not a feature test suite.
  *
- * Requires the test user to exist in the Keycloak realm
- * (CI: infra/scripts/create-test-user.sh; local dev already has it).
+ * Runs with the whole stack up. The `no-ai` project covers the same stack with
+ * the AI layer stopped (see no-ai.spec.ts).
  */
 
-const USER = process.env.E2E_USER ?? "testuser@example.com"
-const PASSWORD = process.env.E2E_PASSWORD ?? "Test1234!"
-
-// All sidebar navigation goes through the named landmark. Page content may
-// contain identically-named inline links (the dashboard onboarding empty state
-// links to "discovery"), and Playwright's accessible-name matching is
-// case-insensitive — an unscoped getByRole("link") is a strict-mode violation
-// waiting on a data race (this exact flake failed the 2026-07-19 CD run).
-const sidebarNav = (page: Page) => page.getByRole("navigation", { name: "Primary" })
-
 test.describe.configure({ mode: "serial" })
-
-// Landing → Keycloak → dashboard. `.first()` disambiguates the hero "Sign in"
-// from the identical header CTA.
-async function loginViaLanding(page: Page) {
-  await page.goto("/")
-  await page.getByRole("button", { name: "Sign in" }).first().click()
-  await page.waitForURL(/openid-connect/)
-  await page.fill("#username", USER)
-  await page.fill("#password", PASSWORD)
-  await page.click("#kc-login")
-  await expect(
-    page.getByRole("heading", { name: "Job Applications" })
-  ).toBeVisible({ timeout: 30_000 })
-}
 
 test("landing page renders publicly without a redirect", async ({ page }) => {
   await page.goto("/")

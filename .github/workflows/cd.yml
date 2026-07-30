@@ -145,7 +145,18 @@ jobs:
         run: |
           npm ci
           npx playwright install --with-deps chromium
-          npx playwright test
+          npx playwright test --project=smoke
+
+      # SAD ADR-008: the Core layer must be complete with the AI layer stopped.
+      # This runs LAST because it leaves the stack degraded on purpose — the
+      # suite's own first test fails if the Agent Service is still answering.
+      - name: Stop the AI layer
+        working-directory: infra
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml stop agent-service
+
+      - name: Run Playwright no-AI suite
+        working-directory: frontend
+        run: npx playwright test --project=no-ai
 
       - name: Upload Playwright failure artifacts
         if: failure()

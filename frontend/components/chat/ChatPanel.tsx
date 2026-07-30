@@ -70,7 +70,10 @@ export function ChatPanel() {
   }, [messages])
 
   return (
-    <div className="flex flex-col h-full">
+    // Named landmark: the AI layer is one region among several on screen, and
+    // its status must be addressable without colliding with page content (the
+    // same rule the sidebar nav follows).
+    <div role="region" aria-label="AI Assistant" className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
         <div className="flex items-center gap-2">
@@ -161,7 +164,12 @@ export function ChatPanel() {
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border bg-destructive/10 text-destructive">
                   <Bot className="h-3.5 w-3.5" />
                 </div>
-                <div className="rounded-xl rounded-tl-sm bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
+                {/* role=alert: an AI outage must be announced, not just tinted
+                    red — and it gives the no-AI E2E suite something to assert. */}
+                <div
+                  role="alert"
+                  className="rounded-xl rounded-tl-sm bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive"
+                >
                   {error.message || "Something went wrong. Please try again."}
                 </div>
               </div>
