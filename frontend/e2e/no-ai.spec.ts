@@ -96,10 +96,18 @@ test("a job can be added, edited, tracked and deleted entirely by hand", async (
   await expect(page.getByText("Berlin")).toBeVisible({ timeout: 15_000 })
 
   // ── Track and advance the application ─────────────────────────────────────
+  // Asserted through the offered transitions rather than the status text: the
+  // badge and the "move to" button share the same words, and status words also
+  // occur in prose elsewhere on the card ("…which one you applied with", shown
+  // only to a tenant with no resume — which is exactly what CI is). Roles and
+  // legal moves are unambiguous; free text here is not.
   await page.getByRole("button", { name: "Track this job" }).click()
-  await expect(page.getByText("Discovered")).toBeVisible({ timeout: 15_000 })
-  await page.getByRole("button", { name: "Applied" }).click()
-  await expect(page.getByText("Applied")).toBeVisible({ timeout: 15_000 })
+  const moveToApplied = page.getByRole("button", { name: "Applied" })
+  await expect(moveToApplied).toBeVisible({ timeout: 15_000 })
+  await moveToApplied.click()
+  // Applied → its own legal successors, and no longer offered itself.
+  await expect(page.getByRole("button", { name: "Interviewing" })).toBeVisible({ timeout: 15_000 })
+  await expect(moveToApplied).toBeHidden()
 
   // It reaches the pipeline board — the Core layer's home screen.
   await sidebarNav(page).getByRole("link", { name: "Dashboard" }).click()
