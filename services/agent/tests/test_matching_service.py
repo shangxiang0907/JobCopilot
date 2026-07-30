@@ -74,6 +74,38 @@ async def test_missing_analysis_returns_none() -> None:
 
 
 @pytest.mark.asyncio
+async def test_failed_scoring_never_overwrites_a_stored_score() -> None:
+    """An LLM failure must not be written down as a 0% match.
+
+    The old code persisted the graph's 0.0 with status="done", so an outage
+    replaced a real score with "terrible fit" — the most expensive shape of
+    silent degradation in this repo, because the user acts on it by discarding
+    the job. Nothing is written now, and the caller gets a 502.
+    """
+    session = AsyncMock()
+    repo = _repo_with_analysis()
+
+    with (
+        patch(_REPO, return_value=repo),
+        patch(_FETCH, new_callable=AsyncMock, return_value="Experienced Python engineer"),
+        patch(_GRAPH) as mock_graph,
+    ):
+        mock_graph.ainvoke = AsyncMock(
+            return_value={
+                "match_score": None,
+                "gap_analysis": {},
+                "suggestions": [],
+                "error": "provider timeout",
+            }
+        )
+        with pytest.raises(ExternalServiceError):
+            await run_resume_match(session, _JOB_ID, _USER_ID, _TENANT_ID)
+
+    repo.update_analysis.assert_not_awaited()
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_match_runs_graph_and_persists() -> None:
     session = AsyncMock()
     repo = _repo_with_analysis()

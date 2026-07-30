@@ -79,14 +79,23 @@ async def run_resume_match(
         "tenant_id": str(tenant_id),
         "jd_structured": analysis.jd_structured,
         "resume_text": resume_text,
-        "match_score": 0.0,
+        "match_score": None,
         "gap_analysis": {},
         "suggestions": [],
         "error": None,
     }
     result = await resume_graph.ainvoke(state)
 
-    match_score = float(result.get("match_score", 0.0))
+    score = result.get("match_score")
+    if result.get("error") or score is None:
+        # A failed scoring call must not be written down as a real result. The
+        # old code persisted 0.0 with status="done", which OVERWROTE a good
+        # earlier score with "terrible fit" and left no trace that the LLM had
+        # failed at all. Leave the stored analysis untouched and tell the caller.
+        log.warning("resume_match_failed", extra={"error": result.get("error")})
+        raise ExternalServiceError("Could not score this resume against the job right now")
+
+    match_score = float(score)
     gap_analysis = result.get("gap_analysis", {})
     suggestions = result.get("suggestions", [])
     await repo.update_analysis(

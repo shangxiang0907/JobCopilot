@@ -25,7 +25,14 @@ export default function DiscoveryPage() {
   const [companyBoards, setCompanyBoards] = useState("")
   const [showForm, setShowForm] = useState(false)
 
-  const { data: configs = [], isLoading } = useQuery<DiscoveryConfig[]>({
+  // `isError` is read, not just `data`: defaulting a failed fetch to [] renders
+  // "No discovery configs yet" — a service outage shown to the user as their own
+  // empty library, which they would then act on by creating a duplicate.
+  const {
+    data: configs = [],
+    isLoading,
+    isError: configsFailed,
+  } = useQuery<DiscoveryConfig[]>({
     queryKey: ["discovery-configs"],
     queryFn: () => api.get("/v1/discovery/configs").then((r) => r.data.items ?? []),
   })
@@ -130,6 +137,11 @@ export default function DiscoveryPage() {
 
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading configs…</p>
+        ) : configsFailed ? (
+          <p className="text-sm text-destructive">
+            Could not load your discovery configs. This is a loading failure, not an empty list —
+            do not create a new one until it clears.
+          </p>
         ) : configs.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No discovery configs yet. Create one to start finding jobs.
@@ -194,8 +206,10 @@ export default function DiscoveryPage() {
                 <span className="text-muted-foreground font-mono text-xs truncate max-w-[8rem]">
                   {run.run_id.slice(0, 8)}…
                 </span>
+                {/* A running or failed run has no count yet. "0 jobs found"
+                    would report an outcome the run never reached. */}
                 <span>
-                  {run.jobs_discovered ?? 0} jobs found
+                  {run.jobs_discovered == null ? "—" : `${run.jobs_discovered} jobs found`}
                 </span>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[run.status] ?? STATUS_COLOR_FALLBACK}`}

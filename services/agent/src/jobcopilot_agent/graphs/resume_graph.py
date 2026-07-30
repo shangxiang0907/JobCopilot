@@ -30,7 +30,9 @@ class ResumeState(TypedDict):
     jd_structured: dict[str, Any]
     resume_text: str
     # Outputs
-    match_score: float
+    # None = not scored. 0.0 is a real score meaning "terrible fit", and a user
+    # discards a job over it — the two must never share a representation.
+    match_score: float | None
     gap_analysis: dict[str, Any]
     suggestions: list[dict[str, Any]]
     error: str | None
@@ -65,9 +67,12 @@ async def _gap_analysis_node(state: ResumeState) -> dict[str, Any]:
             "suggestions": [s.model_dump() for s in result.suggestions],
         }
     except Exception as exc:
+        # No score rather than a zero one: the caller refuses to persist an
+        # unscored match, so the previously stored analysis survives an LLM
+        # outage instead of being overwritten with "terrible fit".
         log.warning("gap_analysis_failed", extra={"error": str(exc)})
         return {
-            "match_score": 0.0,
+            "match_score": None,
             "gap_analysis": {},
             "suggestions": [],
             "error": str(exc),

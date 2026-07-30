@@ -37,10 +37,14 @@ class InterviewState(TypedDict):
     user_id: str
     tenant_id: str
     jd_structured: dict[str, Any]
-    # Outputs
+    # Outputs. One error field per node: the two LLM calls fail independently,
+    # and a single shared `error` could not say WHICH set is missing — an empty
+    # question list would then be indistinguishable from a model that returned
+    # nothing. Each node writes exactly one of these.
     behavioral_questions: list[dict[str, Any]]
     technical_questions: list[dict[str, Any]]
-    error: str | None
+    behavioral_error: str | None
+    technical_error: str | None
 
 
 def _jd_field(state: InterviewState, key: str, default: object = "") -> object:
@@ -70,7 +74,7 @@ async def _gen_behavioral_node(state: InterviewState) -> dict[str, Any]:
         return {"behavioral_questions": [q.model_dump() for q in result.questions]}
     except Exception as exc:
         log.warning("gen_behavioral_failed", extra={"error": str(exc)})
-        return {"behavioral_questions": [], "error": str(exc)}
+        return {"behavioral_questions": [], "behavioral_error": str(exc)}
 
 
 async def _gen_technical_node(state: InterviewState) -> dict[str, Any]:
@@ -97,7 +101,7 @@ async def _gen_technical_node(state: InterviewState) -> dict[str, Any]:
         return {"technical_questions": [q.model_dump() for q in result.questions]}
     except Exception as exc:
         log.warning("gen_technical_failed", extra={"error": str(exc)})
-        return {"technical_questions": [], "error": str(exc)}
+        return {"technical_questions": [], "technical_error": str(exc)}
 
 
 def _build_graph() -> StateGraph[InterviewState]:

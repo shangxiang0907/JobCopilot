@@ -8,6 +8,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from jobcopilot_shared.logging import tenant_id_ctx, trace_id_ctx, user_id_ctx
+from jobcopilot_shared.metrics import record_degradation
 
 logger = structlog.get_logger(__name__)
 
@@ -31,8 +32,15 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 payload = jose_jwt.get_unverified_claims(token)
                 user_id = payload.get("sub", "-")
                 tenant_id = payload.get("tenant_id", "-")
-            except Exception:  # noqa: BLE001,S110
-                pass
+            except Exception as exc:  # noqa: BLE001 — logging context, never a security gate
+                # Continuing is correct: this middleware only enriches log
+                # context, and route dependencies still verify the signature —
+                # an unreadable token gets rejected there, not here. But "-" as
+                # a tenant means the logs cannot attribute the request, so the
+                # cause is recorded rather than swallowed. The exception type
+                # only: the token itself must never reach the log.
+                logger.warning("request_context_token_unreadable", error_type=type(exc).__name__)
+                record_degradation(operation="request_context", reason="token_unreadable")
 
         trace_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
 

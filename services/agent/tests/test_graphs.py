@@ -240,7 +240,8 @@ async def test_interview_graph_generates_questions() -> None:
             },
             "behavioral_questions": [],
             "technical_questions": [],
-            "error": None,
+            "behavioral_error": None,
+            "technical_error": None,
         }
         result = await interview_graph.ainvoke(state)
 
@@ -326,14 +327,17 @@ async def test_resume_graph_rejects_out_of_range_score() -> None:
             "tenant_id": "tenant-1",
             "jd_structured": {"title": "Engineer"},
             "resume_text": "Python developer",
-            "match_score": 0.0,
+            "match_score": None,
             "gap_analysis": {},
             "suggestions": [],
             "error": None,
         }
         result = await resume_graph.ainvoke(state)
 
-    assert result["match_score"] == 0.0
+    # None, not 0.0: a rejected model response means "not scored". 0.0 is a
+    # real score meaning "terrible fit", and the caller refuses to persist an
+    # unscored match precisely so a good stored score survives an LLM failure.
+    assert result["match_score"] is None
     assert result["gap_analysis"] == {}
     assert result["error"] is not None
 
@@ -356,10 +360,14 @@ async def test_interview_graph_rejects_questions_without_text() -> None:
             "jd_structured": {"title": "Engineer", "skills_required": ["Python"]},
             "behavioral_questions": [],
             "technical_questions": [],
-            "error": None,
+            "behavioral_error": None,
+            "technical_error": None,
         }
         result = await interview_graph.ainvoke(state)
 
+    # Per-node errors: an empty list alone could not tell the caller whether
+    # the model returned nothing or was never reached.
     assert result["behavioral_questions"] == []
     assert result["technical_questions"] == []
-    assert result["error"] is not None
+    assert result["behavioral_error"] is not None
+    assert result["technical_error"] is not None

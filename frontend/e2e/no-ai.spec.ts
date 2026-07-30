@@ -88,6 +88,12 @@ test("a job can be added, edited, tracked and deleted entirely by hand", async (
   // The job is linked to the company record, so the name is a link, not text.
   await expect(page.getByRole("link", { name: company })).toBeVisible()
 
+  // The AI layer is down, and the page says so. It used to swallow every
+  // analysis error into `null` and render exactly as if the job had simply
+  // never been analyzed — the user would wait for a result nobody is computing.
+  // (react-query retries first, hence the longer wait.)
+  await expect(page.getByText(/Could not load the AI analysis/i)).toBeVisible({ timeout: 30_000 })
+
   await page.getByRole("button", { name: "Edit" }).click()
   const editForm = page.getByRole("dialog")
   await editForm.getByLabel("Location").fill("Berlin")

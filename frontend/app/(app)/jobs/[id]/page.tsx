@@ -14,6 +14,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react"
+import { isAxiosError } from "axios"
 import api, {
   apiErrorMessage,
   type Job,
@@ -86,13 +87,20 @@ export default function JobDetailPage() {
     enabled: !!id,
   })
 
-  const { data: analysis } = useQuery<JobAnalysis | null>({
+  const { data: analysis, isError: analysisUnavailable } = useQuery<JobAnalysis | null>({
     queryKey: ["analysis", id],
     queryFn: () =>
       api
         .get(`/v1/agent/analyses/${id}`)
         .then((r) => r.data)
-        .catch(() => null),
+        .catch((error: unknown) => {
+          // 404 is the only answer that means "this job has not been analyzed".
+          // Everything else means the AI layer failed, and swallowing it into
+          // `null` rendered the page exactly as if no analysis existed — the
+          // user would sit there waiting for an analysis nobody is running.
+          if (isAxiosError(error) && error.response?.status === 404) return null
+          throw error
+        }),
     enabled: !!id,
   })
 
@@ -226,6 +234,22 @@ export default function JobDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {analysisUnavailable && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">AI Analysis</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* Says which of the two it is. "Nothing here" would be a lie
+                    when the truth is "we could not ask". */}
+                <p className="text-sm text-muted-foreground">
+                  Could not load the AI analysis for this job. Everything else on this page is up
+                  to date — try again later.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {analysis && (
             <Card>
