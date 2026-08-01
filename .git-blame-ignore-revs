@@ -1,0 +1,9 @@
+# Revisions to skip in `git blame` — mechanical reformats only, never
+# behaviour changes. Enabled for this clone with:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# GitHub and GitLab read this file automatically.
+
+# style(frontend): apply Prettier to the existing sources
+c4f719827bddb1ef09152e753148bf594a1230a3
