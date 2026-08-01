@@ -83,6 +83,9 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      # eslint-config-next carries no formatting rules, so without this the
+      # frontend has no equivalent of the backend's `ruff format --check`.
+      - run: npm run format:check
       - run: npm run type-check
       # Catch build-only failures (SSG/standalone output) in CI instead of CD's
       # docker build, which only runs after the commit is already on main.

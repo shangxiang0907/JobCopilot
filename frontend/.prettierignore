@@ -1,0 +1,14 @@
+# Generated from the services' OpenAPI schemas by `npm run gen:api-types`.
+# CI regenerates these and fails on any diff, so formatting them would fight
+# the generator every time a schema changes.
+lib/gen/
+
+# Build output and dependencies.
+.next/
+node_modules/
+package-lock.json
+
+# Playwright artifacts. Gitignored, but Prettier does not read .gitignore, so
+# without this `format:check` fails locally after any E2E run.
+test-results/
+playwright-report/

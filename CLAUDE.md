@@ -153,7 +153,8 @@ docker compose build profile-service job-service discovery-service agent-service
 
 ### Code Style
 
-- Ruff for linting and formatting (`ruff check .` + `ruff format .`)
+- Ruff for linting and formatting Python (`ruff check .` + `ruff format .`)
+- Prettier formats the frontend (`cd frontend && npm run format`). Config is `frontend/.prettierrc` and deliberately holds ONE option — `printWidth: 100`, matching `[tool.ruff] line-length` so TS and Python wrap at the same column. Everything else is Prettier's default on purpose: `semi`, quotes and trailing commas are style choices with no architectural consequence here, so the tool's default wins over per-repo taste. Generated `lib/gen/` is in `.prettierignore` — CI regenerates it and fails on any diff, so formatting it would fight the generator.
 - mypy for type checking (strict mode per service)
 - No inline SQL strings — use SQLAlchemy ORM or `text()` with bound parameters
 - Structured JSON logging via shared `packages/shared/logging.py`; every log entry includes `trace_id`, `tenant_id`, `service`
@@ -294,6 +295,12 @@ Run these checks locally **before every `git push`**. CI runs the same steps —
 # 2b. Import boundaries — services must not import each other
 ~/.local/bin/uv run lint-imports
 
+# 2c. Frontend format — must produce zero diffs. Prettier runs on its own
+#     defaults except printWidth:100, which matches [tool.ruff] line-length in
+#     pyproject.toml so both languages wrap at the same column.
+#     lib/gen/ and Playwright artifacts are in .prettierignore.
+(cd frontend && npm run format:check)
+
 # 3. Type check — run for every service you touched
 ~/.local/bin/uv run mypy services/<name>/
 
@@ -333,7 +340,7 @@ Never scan with `gitleaks dir .` — it walks gitignored local artifacts (`infra
 
 ## CI Requirements
 
-1. **Lint**: `ruff check .` + `ruff format --check .` + `lint-imports` (service independence contracts)
+1. **Lint**: `ruff check .` + `ruff format --check .` + `lint-imports` (service independence contracts) + frontend `npm run lint` + `npm run format:check` (Prettier)
 2. **Type Check**: `mypy` per service
 3. **Unit Tests**: `pytest` (no real DB/queue)
 4. **Contract Checks**: `pytest tests/contracts` (consumer call sites vs provider OpenAPI, plus the ADR-008 layering contract — Core layer must not reach the Agent Service by URL, path or `depends_on`) + OpenAPI/TS-type freshness (`scripts/export_openapi.py` → `npm run gen:api-types` → `git diff --exit-code -- openapi frontend/lib/gen`). Entity types in `frontend/lib/api.ts` are re-exports of generated types — NEVER hand-write them.
