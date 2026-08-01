@@ -1,5 +1,5 @@
 # Build context: repository root
-FROM python:3.11-slim AS build
+FROM python:3.14-slim AS build
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -12,7 +12,7 @@ COPY services/notification ./services/notification/
 RUN uv sync --frozen --package notification-service --no-dev --no-editable --compile-bytecode
 
 # ---- runtime ----
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 RUN useradd -u 1000 -m appuser
 WORKDIR /app
