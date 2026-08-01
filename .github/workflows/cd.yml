@@ -185,6 +185,16 @@ jobs:
       fail-fast: false
       matrix:
         service: [profile, job, discovery, agent, notification, frontend]
+    # Trivy's default DB order is mirror.gcr.io/aquasec -> ghcr.io/aquasecurity,
+    # but it only falls back on TRANSIENT errors (429/5xx). A 404 from the GCR
+    # mirror is not transient, so Trivy fails the job without ever trying GHCR
+    # (seen on run 30409721180, attempt 1). Pin the chain explicitly: GHCR first
+    # — the docker/login-action step below already authenticated us to it, so we
+    # are not subject to anonymous pull limits — with ECR Public as the genuine
+    # 429/5xx fallback. All four tags verified to resolve before pinning.
+    env:
+      TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2,public.ecr.aws/aquasecurity/trivy-db:2
+      TRIVY_JAVA_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-java-db:1,public.ecr.aws/aquasecurity/trivy-java-db:1
     steps:
       - uses: docker/login-action@v4.2.0
         with:
