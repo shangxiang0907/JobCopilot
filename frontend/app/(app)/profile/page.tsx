@@ -1,53 +1,53 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { isAxiosError } from "axios"
-import { User, Key, ExternalLink, KeyRound } from "lucide-react"
-import api, { type Profile } from "@/lib/api"
-import { useAuth } from "@/components/auth/AuthProvider"
-import { ResumeLibrary } from "@/components/profile/ResumeLibrary"
-import { getKeycloak } from "@/lib/keycloak"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
+import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
+import { User, Key, ExternalLink, KeyRound } from "lucide-react";
+import api, { type Profile } from "@/lib/api";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { ResumeLibrary } from "@/components/profile/ResumeLibrary";
+import { getKeycloak } from "@/lib/keycloak";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 export default function ProfilePage() {
-  const queryClient = useQueryClient()
-  const { email, name, identityProvider } = useAuth()
-  const [llmApiKey, setLlmApiKey] = useState("")
+  const queryClient = useQueryClient();
+  const { email, name, identityProvider } = useAuth();
+  const [llmApiKey, setLlmApiKey] = useState("");
 
   // Deployment mode (ADR-007): hosted platform deployments hide the BYO key UI.
   // Read after mount — window.__ENV__ (served by /env.js) is a browser-only global.
-  const [byoKeyEnabled, setByoKeyEnabled] = useState(false)
+  const [byoKeyEnabled, setByoKeyEnabled] = useState(false);
   useEffect(() => {
-    setByoKeyEnabled(window.__ENV__?.LLM_KEY_MODE !== "platform")
-  }, [])
+    setByoKeyEnabled(window.__ENV__?.LLM_KEY_MODE !== "platform");
+  }, []);
 
   const { data: profile, isLoading } = useQuery<Profile>({
     queryKey: ["profile"],
     queryFn: () => api.get("/v1/profiles/me").then((r) => r.data),
-  })
-  const personalName = (profile?.personal_info as { name?: string } | null | undefined)?.name
+  });
+  const personalName = (profile?.personal_info as { name?: string } | null | undefined)?.name;
 
   const saveCredentials = useMutation({
     mutationFn: (payload: { llm_api_key?: string }) =>
       api.patch("/v1/profiles/me/credentials", payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] })
-      setLlmApiKey("")
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      setLlmApiKey("");
     },
-  })
+  });
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">Loading profile…</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -121,45 +121,45 @@ export default function ProfilePage() {
 
         {/* Credentials — self-hosted (byo) deployments only */}
         {byoKeyEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Key className="h-4 w-4" />
-              Credentials
-            </CardTitle>
-            <CardDescription>
-              Stored AES-256-GCM encrypted. Never logged or exposed.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="llm-key">LLM API Key</Label>
-              <Input
-                id="llm-key"
-                type="password"
-                placeholder="Your DashScope / OpenAI-compatible API key"
-                value={llmApiKey}
-                onChange={(e) => setLlmApiKey(e.target.value)}
-              />
-            </div>
-            <Button
-              disabled={saveCredentials.isPending || !llmApiKey.trim()}
-              onClick={() => saveCredentials.mutate({ llm_api_key: llmApiKey })}
-            >
-              {saveCredentials.isPending ? "Verifying key…" : "Save Credentials"}
-            </Button>
-            {saveCredentials.isError && (
-              <p className="text-sm text-destructive">
-                {(isAxiosError(saveCredentials.error) &&
-                  saveCredentials.error.response?.data?.error?.message) ||
-                  "Could not save the key. Please try again."}
-              </p>
-            )}
-            {saveCredentials.isSuccess && (
-              <p className="text-sm text-muted-foreground">Key verified and saved.</p>
-            )}
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Key className="h-4 w-4" />
+                Credentials
+              </CardTitle>
+              <CardDescription>
+                Stored AES-256-GCM encrypted. Never logged or exposed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="llm-key">LLM API Key</Label>
+                <Input
+                  id="llm-key"
+                  type="password"
+                  placeholder="Your DashScope / OpenAI-compatible API key"
+                  value={llmApiKey}
+                  onChange={(e) => setLlmApiKey(e.target.value)}
+                />
+              </div>
+              <Button
+                disabled={saveCredentials.isPending || !llmApiKey.trim()}
+                onClick={() => saveCredentials.mutate({ llm_api_key: llmApiKey })}
+              >
+                {saveCredentials.isPending ? "Verifying key…" : "Save Credentials"}
+              </Button>
+              {saveCredentials.isError && (
+                <p className="text-sm text-destructive">
+                  {(isAxiosError(saveCredentials.error) &&
+                    saveCredentials.error.response?.data?.error?.message) ||
+                    "Could not save the key. Please try again."}
+                </p>
+              )}
+              {saveCredentials.isSuccess && (
+                <p className="text-sm text-muted-foreground">Key verified and saved.</p>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         <ResumeLibrary />
@@ -170,5 +170,5 @@ export default function ProfilePage() {
         </p>
       </div>
     </div>
-  )
+  );
 }

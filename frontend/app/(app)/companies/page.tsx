@@ -1,22 +1,22 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { Building2, ChevronLeft, ChevronRight, Globe, Plus, Search } from "lucide-react"
-import api, { type Company, type Paginated } from "@/lib/api"
-import { CompanyFormDialog } from "@/components/companies/CompanyFormDialog"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { useState } from "react";
+import Link from "next/link";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { Building2, ChevronLeft, ChevronRight, Globe, Plus, Search } from "lucide-react";
+import api, { type Company, type Paginated } from "@/lib/api";
+import { CompanyFormDialog } from "@/components/companies/CompanyFormDialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 20;
 
 export default function CompaniesPage() {
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState("")
-  const [creating, setCreating] = useState(false)
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const { data, isLoading, error } = useQuery<Paginated<Company>>({
     queryKey: ["companies", page, search],
@@ -27,11 +27,11 @@ export default function CompaniesPage() {
         })
         .then((r) => r.data),
     placeholderData: keepPreviousData,
-  })
+  });
 
-  const companies = data?.items ?? []
-  const total = data?.total ?? 0
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const companies = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="flex flex-col h-full overflow-auto">
@@ -57,8 +57,8 @@ export default function CompaniesPage() {
             aria-label="Search companies"
             value={search}
             onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
+              setSearch(e.target.value);
+              setPage(1);
             }}
           />
         </div>
@@ -146,5 +146,5 @@ export default function CompaniesPage() {
 
       <CompanyFormDialog open={creating} onOpenChange={setCreating} />
     </div>
-  )
+  );
 }

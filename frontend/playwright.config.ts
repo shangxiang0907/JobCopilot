@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test"
+import { defineConfig } from "@playwright/test";
 
 /**
  * E2E suites. Both expect the stack to be running already
@@ -27,4 +27,4 @@ export default defineConfig({
     { name: "smoke", testMatch: /smoke\.spec\.ts/ },
     { name: "no-ai", testMatch: /no-ai\.spec\.ts/ },
   ],
-})
+});

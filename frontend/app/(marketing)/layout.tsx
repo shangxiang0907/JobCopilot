@@ -1,7 +1,7 @@
-import Link from "next/link"
-import { Briefcase, Github } from "lucide-react"
-import { HeaderCta } from "@/components/marketing/AuthCtas"
-import { GITHUB_URL, landing } from "@/lib/content/landing"
+import Link from "next/link";
+import { Briefcase, Github } from "lucide-react";
+import { HeaderCta } from "@/components/marketing/AuthCtas";
+import { GITHUB_URL, landing } from "@/lib/content/landing";
 
 // Public route group: no AuthProvider, no app chrome. Pages here are reachable
 // (and indexable) without a session — the SEO surface of the product.
@@ -47,5 +47,5 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         </div>
       </footer>
     </div>
-  )
+  );
 }

@@ -1,21 +1,21 @@
-"use client"
+"use client";
 
-import { useQuery } from "@tanstack/react-query"
-import api from "@/lib/api"
+import { useQuery } from "@tanstack/react-query";
+import api from "@/lib/api";
 
 interface AiUsage {
-  user_id: string
-  total_analyses: number
-  analyses_this_month: number
-  last_activity: string | null
+  user_id: string;
+  total_analyses: number;
+  analyses_this_month: number;
+  last_activity: string | null;
 }
 
 interface CrawlUsage {
-  user_id: string
-  total_runs: number
-  runs_this_month: number
-  jobs_discovered: number
-  last_run: string | null
+  user_id: string;
+  total_runs: number;
+  runs_this_month: number;
+  jobs_discovered: number;
+  last_run: string | null;
 }
 
 export default function AdminUsagePage() {
@@ -25,19 +25,19 @@ export default function AdminUsagePage() {
       api
         .get("/v1/admin/usage/ai")
         .then((r) => r.data as { users: AiUsage[]; total_analyses: number }),
-  })
+  });
   const crawls = useQuery({
     queryKey: ["admin-usage-crawls"],
     queryFn: () =>
       api
         .get("/v1/admin/usage/crawls")
         .then((r) => r.data as { users: CrawlUsage[]; total_runs: number }),
-  })
+  });
 
   // Merge the two per-user tables on user_id for a single overview row.
-  const crawlByUser = new Map((crawls.data?.users ?? []).map((u) => [u.user_id, u]))
-  const aiByUser = new Map((ai.data?.users ?? []).map((u) => [u.user_id, u]))
-  const userIds = Array.from(new Set([...aiByUser.keys(), ...crawlByUser.keys()]))
+  const crawlByUser = new Map((crawls.data?.users ?? []).map((u) => [u.user_id, u]));
+  const aiByUser = new Map((ai.data?.users ?? []).map((u) => [u.user_id, u]));
+  const userIds = Array.from(new Set([...aiByUser.keys(), ...crawlByUser.keys()]));
 
   return (
     <div className="flex flex-col h-full overflow-auto">
@@ -52,9 +52,7 @@ export default function AdminUsagePage() {
 
       <div className="flex-1 p-6">
         {ai.isError || crawls.isError ? (
-          <p className="text-sm text-destructive">
-            Failed to load usage — admin role required.
-          </p>
+          <p className="text-sm text-destructive">Failed to load usage — admin role required.</p>
         ) : ai.isLoading || crawls.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading usage…</p>
         ) : userIds.length === 0 ? (
@@ -72,12 +70,12 @@ export default function AdminUsagePage() {
             </thead>
             <tbody>
               {userIds.map((id) => {
-                const a = aiByUser.get(id)
-                const c = crawlByUser.get(id)
+                const a = aiByUser.get(id);
+                const c = crawlByUser.get(id);
                 const last = [a?.last_activity, c?.last_run]
                   .filter((d): d is string => Boolean(d))
                   .sort()
-                  .pop()
+                  .pop();
                 return (
                   <tr key={id} className="border-b last:border-0">
                     <td className="py-2 pr-4 font-mono text-xs">{id.slice(0, 8)}…</td>
@@ -92,12 +90,12 @@ export default function AdminUsagePage() {
                       {last ? new Date(last).toLocaleString() : "—"}
                     </td>
                   </tr>
-                )
+                );
               })}
             </tbody>
           </table>
         )}
       </div>
     </div>
-  )
+  );
 }

@@ -1,26 +1,26 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import api from "@/lib/api"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 interface AdminUser {
-  id: string
-  email: string
-  first_name: string
-  last_name: string
-  enabled: boolean
-  email_verified: boolean
-  created_at_ms: number
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  enabled: boolean;
+  email_verified: boolean;
+  created_at_ms: number;
 }
 
 export default function AdminUsersPage() {
-  const queryClient = useQueryClient()
-  const [q, setQ] = useState("")
-  const [page, setPage] = useState(1)
+  const queryClient = useQueryClient();
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["admin-users", q, page],
@@ -28,13 +28,13 @@ export default function AdminUsersPage() {
       api
         .get("/v1/admin/users", { params: { q, page } })
         .then((r) => r.data as { items: AdminUser[]; total: number; has_next: boolean }),
-  })
+  });
 
   const setEnabled = useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
       api.patch(`/v1/admin/users/${id}`, { enabled }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
-  })
+  });
 
   return (
     <div className="flex flex-col h-full overflow-auto">
@@ -48,8 +48,8 @@ export default function AdminUsersPage() {
         <Input
           value={q}
           onChange={(e) => {
-            setQ(e.target.value)
-            setPage(1)
+            setQ(e.target.value);
+            setPage(1);
           }}
           placeholder="Search by email or name…"
           className="w-64"
@@ -58,9 +58,7 @@ export default function AdminUsersPage() {
 
       <div className="flex-1 p-6">
         {isError ? (
-          <p className="text-sm text-destructive">
-            Failed to load users — admin role required.
-          </p>
+          <p className="text-sm text-destructive">Failed to load users — admin role required.</p>
         ) : isLoading ? (
           <p className="text-sm text-muted-foreground">Loading users…</p>
         ) : (
@@ -115,5 +113,5 @@ export default function AdminUsersPage() {
         )}
       </div>
     </div>
-  )
+  );
 }

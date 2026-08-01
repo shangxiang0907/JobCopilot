@@ -3,43 +3,43 @@
 // render exclusively from this structure and contain no hardcoded prose.
 
 export interface LandingFeature {
-  title: string
-  description: string
+  title: string;
+  description: string;
 }
 
 export interface LandingMode {
-  name: string
-  tagline: string
-  points: string[]
+  name: string;
+  tagline: string;
+  points: string[];
 }
 
 export interface LandingContent {
   hero: {
-    headline: string
-    subheadline: string
-    ctaPrimary: string
-    ctaSignIn: string
-    ctaDashboard: string
-    openSourceNote: string
-  }
+    headline: string;
+    subheadline: string;
+    ctaPrimary: string;
+    ctaSignIn: string;
+    ctaDashboard: string;
+    openSourceNote: string;
+  };
   features: {
-    heading: string
-    items: LandingFeature[]
-  }
+    heading: string;
+    items: LandingFeature[];
+  };
   modes: {
-    heading: string
-    subheading: string
-    hosted: LandingMode
-    selfHosted: LandingMode
-    githubCta: string
-  }
+    heading: string;
+    subheading: string;
+    hosted: LandingMode;
+    selfHosted: LandingMode;
+    githubCta: string;
+  };
   footer: {
-    tagline: string
-    github: string
-  }
+    tagline: string;
+    github: string;
+  };
 }
 
-export const GITHUB_URL = "https://github.com/shangxiang0907/JobCopilot"
+export const GITHUB_URL = "https://github.com/shangxiang0907/JobCopilot";
 
 export const landing: LandingContent = {
   hero: {
@@ -88,8 +88,7 @@ export const landing: LandingContent = {
   },
   modes: {
     heading: "Run it your way",
-    subheading:
-      "JobCopilot is open source with two first-class deployment modes.",
+    subheading: "JobCopilot is open source with two first-class deployment modes.",
     hosted: {
       name: "Hosted",
       tagline: "Sign up and start in minutes",
@@ -114,4 +113,4 @@ export const landing: LandingContent = {
     tagline: "Open-source intelligent job-search management.",
     github: "GitHub",
   },
-}
+};

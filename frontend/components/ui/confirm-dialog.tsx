@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,18 +8,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 
 interface Props {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  title: string
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
   /** What will happen — state the consequence, not just "are you sure?". */
-  description: React.ReactNode
-  confirmLabel?: string
-  pending?: boolean
-  errorMessage?: string | null
-  onConfirm: () => void
+  description: React.ReactNode;
+  confirmLabel?: string;
+  pending?: boolean;
+  errorMessage?: string | null;
+  onConfirm: () => void;
 }
 
 export function ConfirmDialog({
@@ -52,5 +52,5 @@ export function ConfirmDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

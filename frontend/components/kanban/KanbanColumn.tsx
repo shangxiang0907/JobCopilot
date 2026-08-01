@@ -1,12 +1,12 @@
-import { type Application, type ApplicationStatus } from "@/lib/api"
-import { JobCard } from "./JobCard"
-import { Badge } from "@/components/ui/badge"
+import { type Application, type ApplicationStatus } from "@/lib/api";
+import { JobCard } from "./JobCard";
+import { Badge } from "@/components/ui/badge";
 
 interface Props {
-  status: ApplicationStatus
-  label: string
-  color: string
-  applications: Application[]
+  status: ApplicationStatus;
+  label: string;
+  color: string;
+  applications: Application[];
 }
 
 export function KanbanColumn({ label, color, applications }: Props) {
@@ -29,5 +29,5 @@ export function KanbanColumn({ label, color, applications }: Props) {
         )}
       </div>
     </div>
-  )
+  );
 }

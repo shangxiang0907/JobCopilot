@@ -1,56 +1,56 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, Ban, Globe, MapPin, Pencil, Trash2 } from "lucide-react"
-import api, { apiErrorMessage, type Company, type Job, type Paginated } from "@/lib/api"
-import { CompanyFormDialog } from "@/components/companies/CompanyFormDialog"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Ban, Globe, MapPin, Pencil, Trash2 } from "lucide-react";
+import api, { apiErrorMessage, type Company, type Job, type Paginated } from "@/lib/api";
+import { CompanyFormDialog } from "@/components/companies/CompanyFormDialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function CompanyDetailPage() {
-  const { id } = useParams<{ id: string }>()
-  const router = useRouter()
-  const queryClient = useQueryClient()
-  const [editing, setEditing] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const { data: company, isLoading } = useQuery<Company>({
     queryKey: ["company", id],
     queryFn: () => api.get(`/v1/companies/${id}`).then((r) => r.data),
-  })
+  });
 
   const { data: jobs } = useQuery<Paginated<Job>>({
     queryKey: ["jobs", "by-company", id],
     queryFn: () =>
       api.get("/v1/jobs", { params: { company_id: id, size: 100 } }).then((r) => r.data),
     enabled: !!id,
-  })
+  });
 
   const toggleBlacklist = useMutation({
     mutationFn: (next: boolean) => api.patch(`/v1/companies/${id}`, { is_blacklisted: next }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["company", id] }),
-  })
+  });
 
   const remove = useMutation({
     mutationFn: () => api.delete(`/v1/companies/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["companies"] })
-      queryClient.invalidateQueries({ queryKey: ["jobs"] })
-      router.push("/companies")
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      router.push("/companies");
     },
-  })
+  });
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">Loading company…</p>
       </div>
-    )
+    );
   }
 
   if (!company) {
@@ -61,10 +61,10 @@ export default function CompanyDetailPage() {
           Back to companies
         </Button>
       </div>
-    )
+    );
   }
 
-  const jobCount = jobs?.total ?? 0
+  const jobCount = jobs?.total ?? 0;
 
   return (
     <div className="flex flex-col h-full overflow-auto">
@@ -132,9 +132,7 @@ export default function CompanyDetailPage() {
             </CardHeader>
             <CardContent>
               {jobCount === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No jobs linked to this company yet.
-                </p>
+                <p className="text-sm text-muted-foreground">No jobs linked to this company yet.</p>
               ) : (
                 <div className="space-y-2">
                   {jobs?.items.map((job) => (
@@ -218,5 +216,5 @@ export default function CompanyDetailPage() {
         }
       />
     </div>
-  )
+  );
 }

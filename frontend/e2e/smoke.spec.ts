@@ -1,9 +1,9 @@
-import { readFileSync } from "node:fs"
-import path from "node:path"
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
-import { expect, test } from "@playwright/test"
+import { expect, test } from "@playwright/test";
 
-import { loginViaLanding, sidebarNav, USER } from "./helpers"
+import { loginViaLanding, sidebarNav, USER } from "./helpers";
 
 /**
  * Smoke journey through the deployed stack: public landing page, Keycloak OIDC
@@ -16,55 +16,53 @@ import { loginViaLanding, sidebarNav, USER } from "./helpers"
  * the AI layer stopped (see no-ai.spec.ts).
  */
 
-test.describe.configure({ mode: "serial" })
+test.describe.configure({ mode: "serial" });
 
 test("landing page renders publicly without a redirect", async ({ page }) => {
-  await page.goto("/")
+  await page.goto("/");
   // Still on the app origin — anonymous visitors are NOT bounced to Keycloak.
-  await expect(
-    page.getByRole("heading", { name: /AI copilot for the job search/i })
-  ).toBeVisible()
-  await expect(page.getByRole("button", { name: "Get started free" })).toBeVisible()
-  await expect(page.getByRole("button", { name: "Sign in" }).first()).toBeVisible()
-  await expect(page.getByRole("link", { name: /GitHub repository/i })).toBeVisible()
-})
+  await expect(page.getByRole("heading", { name: /AI copilot for the job search/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Get started free" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /GitHub repository/i })).toBeVisible();
+});
 
 test("unauthenticated app route redirects to Keycloak login", async ({ page }) => {
-  await page.goto("/dashboard")
-  await page.waitForURL(/\/realms\/jobcopilot\/protocol\/openid-connect\//)
-  await expect(page.locator("#username")).toBeVisible()
+  await page.goto("/dashboard");
+  await page.waitForURL(/\/realms\/jobcopilot\/protocol\/openid-connect\//);
+  await expect(page.locator("#username")).toBeVisible();
   // Self-registration (v0.2) — keycloak-init must have enabled it on the realm.
-  await expect(page.getByRole("link", { name: /register/i })).toBeVisible()
-})
+  await expect(page.getByRole("link", { name: /register/i })).toBeVisible();
+});
 
 test("login from the landing page lands on the dashboard", async ({ page }) => {
-  await loginViaLanding(page)
-})
+  await loginViaLanding(page);
+});
 
 test("core pages render behind auth", async ({ page }) => {
   // Serial mode reuses nothing between tests — log in again in this context.
-  await loginViaLanding(page)
+  await loginViaLanding(page);
 
-  await sidebarNav(page).getByRole("link", { name: "Jobs" }).click()
+  await sidebarNav(page).getByRole("link", { name: "Jobs" }).click();
   await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible({
     timeout: 15_000,
-  })
+  });
 
-  await sidebarNav(page).getByRole("link", { name: "Discovery" }).click()
+  await sidebarNav(page).getByRole("link", { name: "Discovery" }).click();
   await expect(page.getByRole("heading", { name: "Discovery" })).toBeVisible({
     timeout: 15_000,
-  })
+  });
 
-  await sidebarNav(page).getByRole("link", { name: "Profile" }).click()
+  await sidebarNav(page).getByRole("link", { name: "Profile" }).click();
   await expect(page.getByRole("heading", { name: "Profile Settings" })).toBeVisible({
     timeout: 15_000,
-  })
+  });
 
   // AI assistant panel opens and its input is ready (no message sent — that
   // needs a real LLM key).
-  await page.getByRole("button", { name: "AI Assistant" }).click()
-  await expect(page.getByPlaceholder("Ask anything…")).toBeVisible()
-})
+  await page.getByRole("button", { name: "AI Assistant" }).click();
+  await expect(page.getByPlaceholder("Ask anything…")).toBeVisible();
+});
 
 test("uploaded resume appears immediately, without a reload", async ({ page }) => {
   // Regression net for the read-after-write race (fixed 2026-07-20): services
@@ -73,85 +71,85 @@ test("uploaded resume appears immediately, without a reload", async ({ page }) =
   // and the new resume only appeared after a manual refresh. Mutating endpoints
   // now commit before returning — the invalidate-refetch alone MUST surface the
   // row. No page.reload() may ever be added to this test.
-  await loginViaLanding(page)
-  await sidebarNav(page).getByRole("link", { name: "Profile" }).click()
+  await loginViaLanding(page);
+  await sidebarNav(page).getByRole("link", { name: "Profile" }).click();
   await expect(page.getByRole("heading", { name: "Profile Settings" })).toBeVisible({
     timeout: 15_000,
-  })
+  });
 
   // Unique name per run so a leftover row from an aborted earlier run can never
   // satisfy the visibility assertion.
-  const fileName = `e2e-resume-${Date.now()}.pdf`
+  const fileName = `e2e-resume-${Date.now()}.pdf`;
   // Scoped to the library's landmark: the delete dialog repeats the file name in
   // its title, so an unscoped getByText matches two elements while it is open.
-  const library = page.getByRole("region", { name: "Resume library" })
+  const library = page.getByRole("region", { name: "Resume library" });
   // Await the 201 explicitly so a failure here separates "upload broke" from
   // "refetch broke" — the two halves of the read-after-write contract.
   const uploadResponse = page.waitForResponse(
-    (r) => r.url().includes("/v1/resumes") && r.request().method() === "POST"
-  )
+    (r) => r.url().includes("/v1/resumes") && r.request().method() === "POST",
+  );
   await page.setInputFiles('input[type="file"]', {
     name: fileName,
     mimeType: "application/pdf",
     buffer: readFileSync(path.join(__dirname, "fixtures", "resume.pdf")),
-  })
-  expect((await uploadResponse).status()).toBe(201)
-  await expect(library.getByText(fileName)).toBeVisible({ timeout: 15_000 })
+  });
+  expect((await uploadResponse).status()).toBe(201);
+  await expect(library.getByText(fileName)).toBeVisible({ timeout: 15_000 });
 
   // Delete it again — cleans up AND exercises the delete path's commit the same
   // way: the row must disappear from the refetched list without a reload.
   // Deleting is a two-step flow (PRD v0.3): the trash icon opens a dialog
   // spelling out the consequences, and only confirming there issues the DELETE.
-  await library.getByRole("button", { name: `Delete ${fileName}` }).click()
-  const deleteDialog = page.getByRole("dialog")
-  await expect(deleteDialog.getByRole("heading", { name: `Delete ${fileName}` })).toBeVisible()
-  await deleteDialog.getByRole("button", { name: "Delete resume" }).click()
-  await expect(library.getByText(fileName)).toBeHidden({ timeout: 15_000 })
-})
+  await library.getByRole("button", { name: `Delete ${fileName}` }).click();
+  const deleteDialog = page.getByRole("dialog");
+  await expect(deleteDialog.getByRole("heading", { name: `Delete ${fileName}` })).toBeVisible();
+  await deleteDialog.getByRole("button", { name: "Delete resume" }).click();
+  await expect(library.getByText(fileName)).toBeHidden({ timeout: 15_000 });
+});
 
 test("admin pages render for the admin role", async ({ page }) => {
   // The test user carries realm role `admin` (create-test-user.sh), so the
   // role-gated sidebar section and both operator pages must work end-to-end
   // (JWT roles → sidebar gate → Kong admin routes → per-service endpoints).
-  await loginViaLanding(page)
+  await loginViaLanding(page);
 
-  await sidebarNav(page).getByRole("link", { name: "Users" }).click()
+  await sidebarNav(page).getByRole("link", { name: "Users" }).click();
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible({
     timeout: 15_000,
-  })
+  });
   // Real data, not just the page shell: the test user itself must be listed.
-  await expect(page.getByText(USER).first()).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText(USER).first()).toBeVisible({ timeout: 15_000 });
 
-  await sidebarNav(page).getByRole("link", { name: "Usage" }).click()
+  await sidebarNav(page).getByRole("link", { name: "Usage" }).click();
   await expect(page.getByRole("heading", { name: "Usage", exact: true })).toBeVisible({
     timeout: 15_000,
-  })
+  });
   // Subtitle renders this only after BOTH usage queries succeed (works for a
   // fresh stack too — zero counts still produce the "all time" summary line).
-  await expect(page.getByText(/discovery runs, all time/)).toBeVisible({ timeout: 15_000 })
-})
+  await expect(page.getByText(/discovery runs, all time/)).toBeVisible({ timeout: 15_000 });
+});
 
 test("sign out ends the session and returns to the landing page", async ({ page }) => {
   // Exercises RP-initiated logout end-to-end: keycloak-init must have the
   // frontend origin in post.logout.redirect.uris or Keycloak shows an
   // "Invalid redirect uri" error page instead of the landing page.
-  await loginViaLanding(page)
+  await loginViaLanding(page);
 
   // Returning user revisits the landing page: silent check-sso must detect the
   // session and swap the CTAs for "Go to Dashboard" (exercises
   // silent-check-sso.html + the shared init path end-to-end).
-  await page.goto("/")
-  await page.getByRole("link", { name: "Go to Dashboard" }).first().click()
-  await expect(
-    page.getByRole("heading", { name: "Job Applications" })
-  ).toBeVisible({ timeout: 20_000 })
+  await page.goto("/");
+  await page.getByRole("link", { name: "Go to Dashboard" }).first().click();
+  await expect(page.getByRole("heading", { name: "Job Applications" })).toBeVisible({
+    timeout: 20_000,
+  });
 
-  await page.getByRole("button", { name: "Sign out" }).click()
+  await page.getByRole("button", { name: "Sign out" }).click();
 
   // Logout redirects to the app origin, which is now the PUBLIC landing page —
   // a signed-out user must not be bounced straight back into Keycloak.
-  await expect(
-    page.getByRole("heading", { name: /AI copilot for the job search/i })
-  ).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByRole("button", { name: "Sign in" }).first()).toBeVisible()
-})
+  await expect(page.getByRole("heading", { name: /AI copilot for the job search/i })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(page.getByRole("button", { name: "Sign in" }).first()).toBeVisible();
+});

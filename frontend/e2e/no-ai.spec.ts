@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test"
+import { expect, test } from "@playwright/test";
 
-import { loginViaLanding, sidebarNav } from "./helpers"
+import { loginViaLanding, sidebarNav } from "./helpers";
 
 /**
  * No-AI mode: the executable definition of SAD ADR-008.
@@ -24,82 +24,82 @@ import { loginViaLanding, sidebarNav } from "./helpers"
 // Probing it directly is unambiguous: through Kong, the JWT plugin answers 401
 // before the upstream is ever consulted, so a dead agent looks identical to a
 // live one.
-const AGENT_HEALTH_URL = process.env.E2E_AGENT_HEALTH_URL ?? "http://127.0.0.1:8013/healthz/live"
+const AGENT_HEALTH_URL = process.env.E2E_AGENT_HEALTH_URL ?? "http://127.0.0.1:8013/healthz/live";
 
-test.describe.configure({ mode: "serial" })
+test.describe.configure({ mode: "serial" });
 
 test("the AI layer really is down", async ({ request }) => {
   // Without this guard the whole suite would pass with the agent running and
   // prove nothing at all — the same failure mode as a lint rule that never
   // fires. Everything below is only evidence because this test passed.
-  let reachable: boolean
+  let reachable: boolean;
   try {
-    const response = await request.get(AGENT_HEALTH_URL, { timeout: 5_000 })
-    reachable = response.ok()
+    const response = await request.get(AGENT_HEALTH_URL, { timeout: 5_000 });
+    reachable = response.ok();
   } catch {
-    reachable = false // connection refused — the container is stopped
+    reachable = false; // connection refused — the container is stopped
   }
 
   expect(
     reachable,
     `${AGENT_HEALTH_URL} answered: the Agent Service is running, so this suite ` +
       "cannot prove the Core layer works without it. Stop it first: " +
-      "docker compose stop agent-service"
-  ).toBe(false)
-})
+      "docker compose stop agent-service",
+  ).toBe(false);
+});
 
 test("a job can be added, edited, tracked and deleted entirely by hand", async ({ page }) => {
-  const stamp = Date.now()
-  const title = `No-AI Engineer ${stamp}`
-  const company = `NoAI Test Co ${stamp}`
-  const url = `https://example.com/jobs/no-ai-${stamp}`
+  const stamp = Date.now();
+  const title = `No-AI Engineer ${stamp}`;
+  const company = `NoAI Test Co ${stamp}`;
+  const url = `https://example.com/jobs/no-ai-${stamp}`;
 
-  await loginViaLanding(page)
+  await loginViaLanding(page);
 
   // ── Create ────────────────────────────────────────────────────────────────
-  await sidebarNav(page).getByRole("link", { name: "Jobs" }).click()
+  await sidebarNav(page).getByRole("link", { name: "Jobs" }).click();
   await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible({
     timeout: 15_000,
-  })
+  });
   // The header CTA and the empty-state CTA are deliberately the same action, so
   // which one is present depends on whether the library is empty. Either opens
   // the same form.
-  await page.getByRole("button", { name: "Add job" }).first().click()
+  await page.getByRole("button", { name: "Add job" }).first().click();
 
-  const createForm = page.getByRole("dialog")
-  await createForm.getByLabel("Title").fill(title)
-  await createForm.getByLabel("Company").fill(company)
-  await createForm.getByLabel("Posting URL").fill(url)
-  await createForm.getByLabel("Location").fill("Remote")
-  await createForm.getByRole("button", { name: "Add job" }).click()
-  await expect(createForm).toBeHidden({ timeout: 15_000 })
-  await expect(page.getByText(title)).toBeVisible({ timeout: 15_000 })
+  const createForm = page.getByRole("dialog");
+  await createForm.getByLabel("Title").fill(title);
+  await createForm.getByLabel("Company").fill(company);
+  await createForm.getByLabel("Posting URL").fill(url);
+  await createForm.getByLabel("Location").fill("Remote");
+  await createForm.getByRole("button", { name: "Add job" }).click();
+  await expect(createForm).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByText(title)).toBeVisible({ timeout: 15_000 });
 
   // ── The company library was populated by name resolution, not by AI ───────
-  await sidebarNav(page).getByRole("link", { name: "Companies" }).click()
-  await page.getByLabel("Search companies").fill(company)
-  await expect(page.getByText(company)).toBeVisible({ timeout: 15_000 })
+  await sidebarNav(page).getByRole("link", { name: "Companies" }).click();
+  await page.getByLabel("Search companies").fill(company);
+  await expect(page.getByText(company)).toBeVisible({ timeout: 15_000 });
 
   // ── Edit ──────────────────────────────────────────────────────────────────
-  await sidebarNav(page).getByRole("link", { name: "Jobs" }).click()
-  await page.getByLabel("Search jobs").fill(title)
-  await page.getByText(title).click()
-  await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 15_000 })
+  await sidebarNav(page).getByRole("link", { name: "Jobs" }).click();
+  await page.getByLabel("Search jobs").fill(title);
+  await page.getByText(title).click();
+  await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 15_000 });
   // The job is linked to the company record, so the name is a link, not text.
-  await expect(page.getByRole("link", { name: company })).toBeVisible()
+  await expect(page.getByRole("link", { name: company })).toBeVisible();
 
   // The AI layer is down, and the page says so. It used to swallow every
   // analysis error into `null` and render exactly as if the job had simply
   // never been analyzed — the user would wait for a result nobody is computing.
   // (react-query retries first, hence the longer wait.)
-  await expect(page.getByText(/Could not load the AI analysis/i)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/Could not load the AI analysis/i)).toBeVisible({ timeout: 30_000 });
 
-  await page.getByRole("button", { name: "Edit" }).click()
-  const editForm = page.getByRole("dialog")
-  await editForm.getByLabel("Location").fill("Berlin")
-  await editForm.getByRole("button", { name: "Save changes" }).click()
-  await expect(editForm).toBeHidden({ timeout: 15_000 })
-  await expect(page.getByText("Berlin")).toBeVisible({ timeout: 15_000 })
+  await page.getByRole("button", { name: "Edit" }).click();
+  const editForm = page.getByRole("dialog");
+  await editForm.getByLabel("Location").fill("Berlin");
+  await editForm.getByRole("button", { name: "Save changes" }).click();
+  await expect(editForm).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByText("Berlin")).toBeVisible({ timeout: 15_000 });
 
   // ── Track and advance the application ─────────────────────────────────────
   // Asserted through the offered transitions rather than the status text: the
@@ -107,39 +107,39 @@ test("a job can be added, edited, tracked and deleted entirely by hand", async (
   // occur in prose elsewhere on the card ("…which one you applied with", shown
   // only to a tenant with no resume — which is exactly what CI is). Roles and
   // legal moves are unambiguous; free text here is not.
-  await page.getByRole("button", { name: "Track this job" }).click()
-  const moveToApplied = page.getByRole("button", { name: "Applied" })
-  await expect(moveToApplied).toBeVisible({ timeout: 15_000 })
-  await moveToApplied.click()
+  await page.getByRole("button", { name: "Track this job" }).click();
+  const moveToApplied = page.getByRole("button", { name: "Applied" });
+  await expect(moveToApplied).toBeVisible({ timeout: 15_000 });
+  await moveToApplied.click();
   // Applied → its own legal successors, and no longer offered itself.
-  await expect(page.getByRole("button", { name: "Interviewing" })).toBeVisible({ timeout: 15_000 })
-  await expect(moveToApplied).toBeHidden()
+  await expect(page.getByRole("button", { name: "Interviewing" })).toBeVisible({ timeout: 15_000 });
+  await expect(moveToApplied).toBeHidden();
 
   // It reaches the pipeline board — the Core layer's home screen.
-  await sidebarNav(page).getByRole("link", { name: "Dashboard" }).click()
-  await expect(page.getByText(title)).toBeVisible({ timeout: 15_000 })
+  await sidebarNav(page).getByRole("link", { name: "Dashboard" }).click();
+  await expect(page.getByText(title)).toBeVisible({ timeout: 15_000 });
 
   // ── Delete both, leaving the tenant as we found it ────────────────────────
-  await sidebarNav(page).getByRole("link", { name: "Jobs" }).click()
-  await page.getByLabel("Search jobs").fill(title)
-  await page.getByText(title).click()
-  await page.getByRole("button", { name: "Delete" }).click()
-  const deleteJob = page.getByRole("dialog")
-  await deleteJob.getByRole("button", { name: "Delete job" }).click()
-  await expect(page).toHaveURL(/\/jobs$/, { timeout: 15_000 })
+  await sidebarNav(page).getByRole("link", { name: "Jobs" }).click();
+  await page.getByLabel("Search jobs").fill(title);
+  await page.getByText(title).click();
+  await page.getByRole("button", { name: "Delete" }).click();
+  const deleteJob = page.getByRole("dialog");
+  await deleteJob.getByRole("button", { name: "Delete job" }).click();
+  await expect(page).toHaveURL(/\/jobs$/, { timeout: 15_000 });
 
-  await sidebarNav(page).getByRole("link", { name: "Companies" }).click()
-  await page.getByLabel("Search companies").fill(company)
-  await page.getByText(company).click()
-  await expect(page.getByRole("heading", { name: company })).toBeVisible({ timeout: 15_000 })
-  await page.getByRole("button", { name: "Delete" }).click()
-  const deleteCompany = page.getByRole("dialog")
-  await deleteCompany.getByRole("button", { name: "Delete company" }).click()
-  await expect(page).toHaveURL(/\/companies$/, { timeout: 15_000 })
-})
+  await sidebarNav(page).getByRole("link", { name: "Companies" }).click();
+  await page.getByLabel("Search companies").fill(company);
+  await page.getByText(company).click();
+  await expect(page.getByRole("heading", { name: company })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Delete" }).click();
+  const deleteCompany = page.getByRole("dialog");
+  await deleteCompany.getByRole("button", { name: "Delete company" }).click();
+  await expect(page).toHaveURL(/\/companies$/, { timeout: 15_000 });
+});
 
 test("every Core page renders with the AI layer stopped", async ({ page }) => {
-  await loginViaLanding(page)
+  await loginViaLanding(page);
 
   for (const [link, heading] of [
     ["Jobs", "Jobs"],
@@ -148,31 +148,31 @@ test("every Core page renders with the AI layer stopped", async ({ page }) => {
     ["Profile", "Profile Settings"],
     ["Dashboard", "Job Applications"],
   ] as const) {
-    await sidebarNav(page).getByRole("link", { name: link }).click()
+    await sidebarNav(page).getByRole("link", { name: link }).click();
     await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible({
       timeout: 15_000,
-    })
+    });
   }
-})
+});
 
 test("the AI panel reports the outage instead of failing silently", async ({ page }) => {
   // The AI layer being down must be VISIBLE (CLAUDE.md, "No Silent Degradation")
   // and must not take the page with it — the sidebar still navigates afterwards.
-  await loginViaLanding(page)
-  await page.getByRole("button", { name: "AI Assistant" }).click()
+  await loginViaLanding(page);
+  await page.getByRole("button", { name: "AI Assistant" }).click();
 
-  const panel = page.getByRole("region", { name: "AI Assistant" })
-  const input = panel.getByPlaceholder("Ask anything…")
-  await expect(input).toBeVisible()
-  await input.fill("Is anyone there?")
-  await input.press("Enter")
+  const panel = page.getByRole("region", { name: "AI Assistant" });
+  const input = panel.getByPlaceholder("Ask anything…");
+  await expect(input).toBeVisible();
+  await input.fill("Is anyone there?");
+  await input.press("Enter");
 
   // Scoped to the panel: Next.js keeps a route announcer with role=alert in
   // every page, so an unscoped alert lookup is a strict-mode violation.
-  await expect(panel.getByRole("alert")).toBeVisible({ timeout: 30_000 })
+  await expect(panel.getByRole("alert")).toBeVisible({ timeout: 30_000 });
 
-  await sidebarNav(page).getByRole("link", { name: "Jobs" }).click()
+  await sidebarNav(page).getByRole("link", { name: "Jobs" }).click();
   await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible({
     timeout: 15_000,
-  })
-})
+  });
+});

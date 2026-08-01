@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ExternalLink,
@@ -13,8 +13,8 @@ import {
   Briefcase,
   Pencil,
   Trash2,
-} from "lucide-react"
-import { isAxiosError } from "axios"
+} from "lucide-react";
+import { isAxiosError } from "axios";
 import api, {
   apiErrorMessage,
   type Job,
@@ -23,19 +23,19 @@ import api, {
   type ApplicationStatus,
   type Paginated,
   type Resume,
-} from "@/lib/api"
+} from "@/lib/api";
 import {
   ApplicationResumeCard,
   snapshotOf,
   useResumes,
-} from "@/components/jobs/ApplicationResumeCard"
-import { JobFormDialog } from "@/components/jobs/JobFormDialog"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { Separator } from "@/components/ui/separator"
-import { useUIStore } from "@/lib/store"
+} from "@/components/jobs/ApplicationResumeCard";
+import { JobFormDialog } from "@/components/jobs/JobFormDialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Separator } from "@/components/ui/separator";
+import { useUIStore } from "@/lib/store";
 
 const STATUS_LABELS: Record<ApplicationStatus, string> = {
   discovered: "Discovered",
@@ -44,7 +44,7 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
   offer: "Offer",
   rejected: "Rejected",
   withdrawn: "Withdrawn",
-}
+};
 
 // Mirrors VALID_TRANSITIONS in services/job models/application.py
 const STATUS_TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
@@ -54,7 +54,7 @@ const STATUS_TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
   offer: [],
   rejected: [],
   withdrawn: [],
-}
+};
 
 const JOB_TYPE_LABELS: Record<string, string> = {
   full_time: "Full-time",
@@ -62,21 +62,21 @@ const JOB_TYPE_LABELS: Record<string, string> = {
   contract: "Contract",
   internship: "Internship",
   remote: "Remote",
-}
+};
 
 export default function JobDetailPage() {
-  const { id } = useParams<{ id: string }>()
-  const router = useRouter()
-  const queryClient = useQueryClient()
-  const openChat = useUIStore((s) => s.openChat)
-  const [editing, setEditing] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const { data: resumes = [] } = useResumes()
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const openChat = useUIStore((s) => s.openChat);
+  const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const { data: resumes = [] } = useResumes();
 
   const { data: job, isLoading: jobLoading } = useQuery<Job>({
     queryKey: ["job", id],
     queryFn: () => api.get(`/v1/jobs/${id}`).then((r) => r.data),
-  })
+  });
 
   const { data: application } = useQuery<Application | undefined>({
     queryKey: ["application-for-job", id],
@@ -85,7 +85,7 @@ export default function JobDetailPage() {
         .get<Paginated<Application>>("/v1/applications", { params: { job_id: id } })
         .then((r) => r.data.items[0]),
     enabled: !!id,
-  })
+  });
 
   const { data: analysis, isError: analysisUnavailable } = useQuery<JobAnalysis | null>({
     queryKey: ["analysis", id],
@@ -98,18 +98,18 @@ export default function JobDetailPage() {
           // Everything else means the AI layer failed, and swallowing it into
           // `null` rendered the page exactly as if no analysis existed — the
           // user would sit there waiting for an analysis nobody is running.
-          if (isAxiosError(error) && error.response?.status === 404) return null
-          throw error
+          if (isAxiosError(error) && error.response?.status === 404) return null;
+          throw error;
         }),
     enabled: !!id,
-  })
+  });
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["applications"] })
-    queryClient.invalidateQueries({ queryKey: ["application-for-job", id] })
-  }
+    queryClient.invalidateQueries({ queryKey: ["applications"] });
+    queryClient.invalidateQueries({ queryKey: ["application-for-job", id] });
+  };
 
-  const defaultResume: Resume | undefined = resumes.find((r) => r.is_default)
+  const defaultResume: Resume | undefined = resumes.find((r) => r.is_default);
 
   const trackJob = useMutation({
     // Pre-bind the default resume so "which resume did I apply with?" is
@@ -123,41 +123,43 @@ export default function JobDetailPage() {
           : {}),
       }),
     onSuccess: invalidate,
-  })
+  });
 
   const updateStatus = useMutation({
     mutationFn: (status: ApplicationStatus) =>
       api.patch(`/v1/applications/${application!.application_id}/status`, { status }),
     onSuccess: invalidate,
-  })
+  });
 
   const deleteJob = useMutation({
     mutationFn: () => api.delete(`/v1/jobs/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["jobs"] })
-      queryClient.invalidateQueries({ queryKey: ["applications"] })
-      router.push("/jobs")
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["applications"] });
+      router.push("/jobs");
     },
-  })
+  });
 
   if (jobLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">Loading job details…</p>
       </div>
-    )
+    );
   }
 
   if (!job) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <p className="text-muted-foreground">Job not found.</p>
-        <Button variant="outline" onClick={() => router.back()}>Go back</Button>
+        <Button variant="outline" onClick={() => router.back()}>
+          Go back
+        </Button>
       </div>
-    )
+    );
   }
 
-  const nextStatuses = application ? STATUS_TRANSITIONS[application.status] : []
+  const nextStatuses = application ? STATUS_TRANSITIONS[application.status] : [];
 
   return (
     <div className="flex flex-col h-full overflow-auto">
@@ -244,8 +246,8 @@ export default function JobDetailPage() {
                 {/* Says which of the two it is. "Nothing here" would be a lie
                     when the truth is "we could not ask". */}
                 <p className="text-sm text-muted-foreground">
-                  Could not load the AI analysis for this job. Everything else on this page is up
-                  to date — try again later.
+                  Could not load the AI analysis for this job. Everything else on this page is up to
+                  date — try again later.
                 </p>
               </CardContent>
             </Card>
@@ -275,7 +277,7 @@ export default function JobDetailPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    openChat()
+                    openChat();
                   }}
                 >
                   Ask AI about this job
@@ -294,9 +296,7 @@ export default function JobDetailPage() {
             <CardContent className="space-y-3">
               {application ? (
                 <>
-                  <Badge className="text-sm px-3 py-1">
-                    {STATUS_LABELS[application.status]}
-                  </Badge>
+                  <Badge className="text-sm px-3 py-1">{STATUS_LABELS[application.status]}</Badge>
                   {nextStatuses.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-xs text-muted-foreground">Move to:</p>
@@ -378,5 +378,5 @@ export default function JobDetailPage() {
         }
       />
     </div>
-  )
+  );
 }

@@ -4,5 +4,5 @@
 // /env.js runtime-config approach (12-factor: never bake a domain into the
 // image at build time; self-hosted deployments set their own SITE_URL).
 export function getSiteUrl(): URL {
-  return new URL(process.env.SITE_URL ?? "http://localhost:3000")
+  return new URL(process.env.SITE_URL ?? "http://localhost:3000");
 }

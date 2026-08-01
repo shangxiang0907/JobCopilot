@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   LogOut,
@@ -12,11 +12,11 @@ import {
   Building2,
   Users,
   BarChart3,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { useUIStore } from "@/lib/store"
-import { getKeycloak } from "@/lib/keycloak"
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useUIStore } from "@/lib/store";
+import { getKeycloak } from "@/lib/keycloak";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -24,30 +24,28 @@ const NAV_ITEMS = [
   { href: "/companies", label: "Companies", icon: Building2 },
   { href: "/discovery", label: "Discovery", icon: Search },
   { href: "/profile", label: "Profile", icon: User },
-]
+];
 
 // Platform-operator pages — shown only when the JWT carries realm role `admin`
 // (the backend enforces the same guard; hiding here is UX, not security).
 const ADMIN_ITEMS = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/usage", label: "Usage", icon: BarChart3 },
-]
+];
 
 function isAdmin(): boolean {
   try {
-    const parsed = getKeycloak().tokenParsed as
-      | { realm_access?: { roles?: string[] } }
-      | undefined
-    return parsed?.realm_access?.roles?.includes("admin") ?? false
+    const parsed = getKeycloak().tokenParsed as { realm_access?: { roles?: string[] } } | undefined;
+    return parsed?.realm_access?.roles?.includes("admin") ?? false;
   } catch {
-    return false
+    return false;
   }
 }
 
 export function Sidebar() {
-  const pathname = usePathname()
-  const { chatOpen, toggleChat } = useUIStore()
-  const items = isAdmin() ? [...NAV_ITEMS, ...ADMIN_ITEMS] : NAV_ITEMS
+  const pathname = usePathname();
+  const { chatOpen, toggleChat } = useUIStore();
+  const items = isAdmin() ? [...NAV_ITEMS, ...ADMIN_ITEMS] : NAV_ITEMS;
 
   return (
     <aside className="flex flex-col w-56 shrink-0 border-r bg-background h-full">
@@ -71,7 +69,7 @@ export function Sidebar() {
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                 pathname === href || pathname.startsWith(href + "/")
                   ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -96,14 +94,12 @@ export function Sidebar() {
           variant="ghost"
           size="sm"
           className="w-full justify-start gap-2 text-muted-foreground"
-          onClick={() =>
-            getKeycloak().logout({ redirectUri: window.location.origin })
-          }
+          onClick={() => getKeycloak().logout({ redirectUri: window.location.origin })}
         >
           <LogOut className="h-4 w-4" />
           Sign out
         </Button>
       </div>
     </aside>
-  )
+  );
 }

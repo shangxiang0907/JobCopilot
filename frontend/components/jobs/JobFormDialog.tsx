@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import api, { apiErrorMessage, type Job } from "@/lib/api"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import api, { apiErrorMessage, type Job } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -11,17 +11,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 /** Mirrors JOB_TYPES in services/job/.../schemas/job.py — change them together. */
 export const JOB_TYPE_OPTIONS = [
@@ -30,29 +30,29 @@ export const JOB_TYPE_OPTIONS = [
   { value: "contract", label: "Contract" },
   { value: "internship", label: "Internship" },
   { value: "remote", label: "Remote" },
-] as const
+] as const;
 
 // Radix Select has no "no value" item, and an empty string is not a valid item
 // value, so unset is carried by this sentinel and translated back to null.
-const NO_JOB_TYPE = "__none__"
+const NO_JOB_TYPE = "__none__";
 
 interface Props {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   /** Omit to create; pass a job to edit it. */
-  job?: Job
-  onSaved?: (job: Job) => void
+  job?: Job;
+  onSaved?: (job: Job) => void;
 }
 
 interface FormState {
-  title: string
-  company_name: string
-  url: string
-  location: string
-  job_type: string
-  salary_min: string
-  salary_max: string
-  raw_jd: string
+  title: string;
+  company_name: string;
+  url: string;
+  location: string;
+  job_type: string;
+  salary_min: string;
+  salary_max: string;
+  raw_jd: string;
 }
 
 const EMPTY: FormState = {
@@ -64,10 +64,10 @@ const EMPTY: FormState = {
   salary_min: "",
   salary_max: "",
   raw_jd: "",
-}
+};
 
 function toForm(job?: Job): FormState {
-  if (!job) return EMPTY
+  if (!job) return EMPTY;
   return {
     title: job.title,
     company_name: job.company_name,
@@ -77,30 +77,30 @@ function toForm(job?: Job): FormState {
     salary_min: job.salary_min?.toString() ?? "",
     salary_max: job.salary_max?.toString() ?? "",
     raw_jd: job.raw_jd ?? "",
-  }
+  };
 }
 
 /** Empty means "clear it" — an explicit null, never an omitted key (see the API). */
 function optionalText(value: string): string | null {
-  const trimmed = value.trim()
-  return trimmed === "" ? null : trimmed
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
 }
 
 function optionalNumber(value: string): number | null {
-  const trimmed = value.trim()
-  if (trimmed === "") return null
-  const parsed = Number(trimmed)
-  return Number.isFinite(parsed) ? Math.trunc(parsed) : null
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
 }
 
 export function JobFormDialog({ open, onOpenChange, job, onSaved }: Props) {
-  const queryClient = useQueryClient()
-  const [form, setForm] = useState<FormState>(() => toForm(job))
-  const isEdit = job !== undefined
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState<FormState>(() => toForm(job));
+  const isEdit = job !== undefined;
 
   useEffect(() => {
-    if (open) setForm(toForm(job))
-  }, [open, job])
+    if (open) setForm(toForm(job));
+  }, [open, job]);
 
   const save = useMutation({
     mutationFn: async (): Promise<Job> => {
@@ -113,30 +113,29 @@ export function JobFormDialog({ open, onOpenChange, job, onSaved }: Props) {
         salary_min: optionalNumber(form.salary_min),
         salary_max: optionalNumber(form.salary_max),
         raw_jd: optionalText(form.raw_jd),
-      }
+      };
       const response = isEdit
         ? await api.patch<Job>(`/v1/jobs/${job.job_id}`, common)
         : // source=manual marks this as hand-entered rather than crawled, which
           // is what makes the job library's provenance badges meaningful.
-          await api.post<Job>("/v1/jobs", { ...common, source: "manual" })
-      return response.data
+          await api.post<Job>("/v1/jobs", { ...common, source: "manual" });
+      return response.data;
     },
     onSuccess: (saved) => {
-      queryClient.invalidateQueries({ queryKey: ["jobs"] })
-      queryClient.invalidateQueries({ queryKey: ["job", saved.job_id] })
-      queryClient.invalidateQueries({ queryKey: ["companies"] })
-      onOpenChange(false)
-      onSaved?.(saved)
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["job", saved.job_id] });
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      onOpenChange(false);
+      onSaved?.(saved);
     },
-  })
+  });
 
   const set =
-    (field: keyof FormState) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm((f) => ({ ...f, [field]: e.target.value }))
+    (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((f) => ({ ...f, [field]: e.target.value }));
 
   const canSubmit =
-    form.title.trim() !== "" && form.company_name.trim() !== "" && form.url.trim() !== ""
+    form.title.trim() !== "" && form.company_name.trim() !== "" && form.url.trim() !== "";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -151,8 +150,8 @@ export function JobFormDialog({ open, onOpenChange, job, onSaved }: Props) {
         <form
           className="space-y-4"
           onSubmit={(e) => {
-            e.preventDefault()
-            save.mutate()
+            e.preventDefault();
+            save.mutate();
           }}
         >
           <div className="space-y-1.5">
@@ -273,5 +272,5 @@ export function JobFormDialog({ open, onOpenChange, job, onSaved }: Props) {
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

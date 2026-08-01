@@ -1,29 +1,21 @@
-import type { Metadata } from "next"
-import {
-  Bot,
-  FileScan,
-  Github,
-  KanbanSquare,
-  MessagesSquare,
-  Radar,
-  Target,
-} from "lucide-react"
-import { HeroCtas } from "@/components/marketing/AuthCtas"
-import { Button } from "@/components/ui/button"
-import { GITHUB_URL, landing } from "@/lib/content/landing"
-import { getSiteUrl } from "@/lib/site-url"
+import type { Metadata } from "next";
+import { Bot, FileScan, Github, KanbanSquare, MessagesSquare, Radar, Target } from "lucide-react";
+import { HeroCtas } from "@/components/marketing/AuthCtas";
+import { Button } from "@/components/ui/button";
+import { GITHUB_URL, landing } from "@/lib/content/landing";
+import { getSiteUrl } from "@/lib/site-url";
 
 // Rendered per request so SEO metadata reflects the deployment's runtime
 // SITE_URL (see lib/site-url.ts) — reading env in a static page would freeze
 // build-time values into the image.
-export const dynamic = "force-dynamic"
+export const dynamic = "force-dynamic";
 
-const TITLE = "JobCopilot — AI-powered job-search management"
+const TITLE = "JobCopilot — AI-powered job-search management";
 const DESCRIPTION =
-  "Open-source platform that discovers jobs from public boards, matches them against your resume with AI, and manages your application pipeline end to end."
+  "Open-source platform that discovers jobs from public boards, matches them against your resume with AI, and manages your application pipeline end to end.";
 
 export function generateMetadata(): Metadata {
-  const siteUrl = getSiteUrl()
+  const siteUrl = getSiteUrl();
   return {
     title: TITLE,
     description: DESCRIPTION,
@@ -41,19 +33,17 @@ export function generateMetadata(): Metadata {
       title: TITLE,
       description: DESCRIPTION,
     },
-  }
+  };
 }
 
-const FEATURE_ICONS = [Radar, FileScan, Target, MessagesSquare, KanbanSquare, Bot]
+const FEATURE_ICONS = [Radar, FileScan, Target, MessagesSquare, KanbanSquare, Bot];
 
 export default function LandingPage() {
   return (
     <>
       {/* Hero */}
       <section className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-4 py-24 text-center">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-          {landing.hero.headline}
-        </h1>
+        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{landing.hero.headline}</h1>
         <p className="text-lg text-muted-foreground">{landing.hero.subheadline}</p>
         <HeroCtas />
         <p className="text-sm text-muted-foreground">{landing.hero.openSourceNote}</p>
@@ -67,17 +57,14 @@ export default function LandingPage() {
           </h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {landing.features.items.map((feature, i) => {
-              const Icon = FEATURE_ICONS[i % FEATURE_ICONS.length]
+              const Icon = FEATURE_ICONS[i % FEATURE_ICONS.length];
               return (
-                <div
-                  key={feature.title}
-                  className="rounded-lg border bg-background p-6"
-                >
+                <div key={feature.title} className="rounded-lg border bg-background p-6">
                   <Icon className="mb-4 h-6 w-6 text-primary" />
                   <h3 className="mb-2 font-semibold">{feature.title}</h3>
                   <p className="text-sm text-muted-foreground">{feature.description}</p>
                 </div>
-              )
+              );
             })}
           </div>
         </div>
@@ -89,9 +76,7 @@ export default function LandingPage() {
           <h2 className="mb-3 text-center text-3xl font-semibold tracking-tight">
             {landing.modes.heading}
           </h2>
-          <p className="mb-12 text-center text-muted-foreground">
-            {landing.modes.subheading}
-          </p>
+          <p className="mb-12 text-center text-muted-foreground">{landing.modes.subheading}</p>
           <div className="mx-auto grid max-w-4xl gap-6 sm:grid-cols-2">
             {[landing.modes.hosted, landing.modes.selfHosted].map((mode) => (
               <div key={mode.name} className="rounded-lg border p-8">
@@ -121,5 +106,5 @@ export default function LandingPage() {
         </div>
       </section>
     </>
-  )
+  );
 }

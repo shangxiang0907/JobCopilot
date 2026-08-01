@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { getKeycloak, initKeycloak } from "@/lib/keycloak"
-import { Button } from "@/components/ui/button"
-import { landing } from "@/lib/content/landing"
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { getKeycloak, initKeycloak } from "@/lib/keycloak";
+import { Button } from "@/components/ui/button";
+import { landing } from "@/lib/content/landing";
 
-type SsoStatus = "unknown" | "anonymous" | "authenticated"
+type SsoStatus = "unknown" | "anonymous" | "authenticated";
 
 /**
  * Silently probe for an existing Keycloak session so the landing page can
@@ -14,19 +14,19 @@ type SsoStatus = "unknown" | "anonymous" | "authenticated"
  * visitors just see the sign-in/register CTAs.
  */
 function useSsoSession(): SsoStatus {
-  const [status, setStatus] = useState<SsoStatus>("unknown")
+  const [status, setStatus] = useState<SsoStatus>("unknown");
 
   useEffect(() => {
     initKeycloak("check-sso")
       .then((authenticated) => setStatus(authenticated ? "authenticated" : "anonymous"))
-      .catch(() => setStatus("anonymous"))
-  }, [])
+      .catch(() => setStatus("anonymous"));
+  }, []);
 
-  return status
+  return status;
 }
 
 function appRedirectUri(): string {
-  return `${window.location.origin}/dashboard`
+  return `${window.location.origin}/dashboard`;
 }
 
 /**
@@ -51,22 +51,22 @@ function appRedirectUri(): string {
  * is the complete action requested, not a degraded stand-in for it.
  */
 async function startAuth(action: "login" | "register"): Promise<void> {
-  await initKeycloak("check-sso").catch(() => undefined)
-  const kc = getKeycloak()
-  const options = { redirectUri: appRedirectUri() }
-  await (action === "login" ? kc.login(options) : kc.register(options))
+  await initKeycloak("check-sso").catch(() => undefined);
+  const kc = getKeycloak();
+  const options = { redirectUri: appRedirectUri() };
+  await (action === "login" ? kc.login(options) : kc.register(options));
 }
 
 /** Hero CTAs: register + sign-in for visitors, dashboard link for users. */
 export function HeroCtas() {
-  const status = useSsoSession()
+  const status = useSsoSession();
 
   if (status === "authenticated") {
     return (
       <Button size="lg" asChild>
         <Link href="/dashboard">{landing.hero.ctaDashboard}</Link>
       </Button>
-    )
+    );
   }
 
   return (
@@ -78,24 +78,24 @@ export function HeroCtas() {
         {landing.hero.ctaSignIn}
       </Button>
     </div>
-  )
+  );
 }
 
 /** Compact header CTA: sign-in for visitors, dashboard link for users. */
 export function HeaderCta() {
-  const status = useSsoSession()
+  const status = useSsoSession();
 
   if (status === "authenticated") {
     return (
       <Button size="sm" asChild>
         <Link href="/dashboard">{landing.hero.ctaDashboard}</Link>
       </Button>
-    )
+    );
   }
 
   return (
     <Button size="sm" variant="outline" onClick={() => startAuth("login")}>
       {landing.hero.ctaSignIn}
     </Button>
-  )
+  );
 }

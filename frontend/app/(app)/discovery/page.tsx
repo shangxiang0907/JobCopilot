@@ -1,13 +1,13 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Play, Plus, Settings2, RefreshCw } from "lucide-react"
-import api, { type DiscoveryConfig, type DiscoveryRun } from "@/lib/api"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Play, Plus, Settings2, RefreshCw } from "lucide-react";
+import api, { type DiscoveryConfig, type DiscoveryRun } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -15,15 +15,15 @@ const STATUS_COLOR: Record<string, string> = {
   completed: "bg-green-100 text-green-800",
   failed: "bg-red-100 text-red-800",
   cookie_expired: "bg-orange-100 text-orange-800",
-}
-const STATUS_COLOR_FALLBACK = "bg-gray-100 text-gray-800"
+};
+const STATUS_COLOR_FALLBACK = "bg-gray-100 text-gray-800";
 
 export default function DiscoveryPage() {
-  const queryClient = useQueryClient()
-  const [keywords, setKeywords] = useState("")
-  const [locations, setLocations] = useState("")
-  const [companyBoards, setCompanyBoards] = useState("")
-  const [showForm, setShowForm] = useState(false)
+  const queryClient = useQueryClient();
+  const [keywords, setKeywords] = useState("");
+  const [locations, setLocations] = useState("");
+  const [companyBoards, setCompanyBoards] = useState("");
+  const [showForm, setShowForm] = useState(false);
 
   // `isError` is read, not just `data`: defaulting a failed fetch to [] renders
   // "No discovery configs yet" — a service outage shown to the user as their own
@@ -35,39 +35,47 @@ export default function DiscoveryPage() {
   } = useQuery<DiscoveryConfig[]>({
     queryKey: ["discovery-configs"],
     queryFn: () => api.get("/v1/discovery/configs").then((r) => r.data.items ?? []),
-  })
+  });
 
   const { data: runs = [] } = useQuery<DiscoveryRun[]>({
     queryKey: ["discovery-runs"],
     queryFn: () => api.get("/v1/discovery/runs").then((r) => r.data.items ?? []),
     refetchInterval: 5_000,
-  })
+  });
 
   const createConfig = useMutation({
     mutationFn: (payload: { keywords: string[]; locations: string[]; company_boards: string[] }) =>
       api.post("/v1/discovery/configs", payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["discovery-configs"] })
-      setKeywords("")
-      setLocations("")
-      setCompanyBoards("")
-      setShowForm(false)
+      queryClient.invalidateQueries({ queryKey: ["discovery-configs"] });
+      setKeywords("");
+      setLocations("");
+      setCompanyBoards("");
+      setShowForm(false);
     },
-  })
+  });
 
   const triggerRun = useMutation({
-    mutationFn: (configId: string) =>
-      api.post("/v1/discovery/runs", { config_id: configId }),
+    mutationFn: (configId: string) => api.post("/v1/discovery/runs", { config_id: configId }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["discovery-runs"] }),
-  })
+  });
 
   const handleCreate = () => {
-    const kws = keywords.split(",").map((s) => s.trim()).filter(Boolean)
-    const locs = locations.split(",").map((s) => s.trim()).filter(Boolean)
-    const boards = companyBoards.split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
-    if (kws.length === 0 && boards.length === 0) return
-    createConfig.mutate({ keywords: kws, locations: locs, company_boards: boards })
-  }
+    const kws = keywords
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const locs = locations
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const boards = companyBoards
+      .split(/[\n,]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (kws.length === 0 && boards.length === 0) return;
+    createConfig.mutate({ keywords: kws, locations: locs, company_boards: boards });
+  };
 
   return (
     <div className="flex flex-col h-full overflow-auto">
@@ -139,8 +147,8 @@ export default function DiscoveryPage() {
           <p className="text-sm text-muted-foreground">Loading configs…</p>
         ) : configsFailed ? (
           <p className="text-sm text-destructive">
-            Could not load your discovery configs. This is a loading failure, not an empty list —
-            do not create a new one until it clears.
+            Could not load your discovery configs. This is a loading failure, not an empty list — do
+            not create a new one until it clears.
           </p>
         ) : configs.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -153,19 +161,15 @@ export default function DiscoveryPage() {
             </h2>
             {configs.map((cfg) => {
               const activeRun = runs.find(
-                (r) => r.config_id === cfg.config_id && r.status === "running"
-              )
+                (r) => r.config_id === cfg.config_id && r.status === "running",
+              );
               return (
                 <Card key={cfg.config_id}>
                   <CardContent className="flex items-center justify-between p-4">
                     <div className="space-y-1">
-                      <p className="text-sm font-medium">
-                        {cfg.keywords.join(", ")}
-                      </p>
+                      <p className="text-sm font-medium">{cfg.keywords.join(", ")}</p>
                       <p className="text-xs text-muted-foreground">
-                        {cfg.locations.length > 0
-                          ? cfg.locations.join(", ")
-                          : "Any location"}
+                        {cfg.locations.length > 0 ? cfg.locations.join(", ") : "Any location"}
                       </p>
                     </div>
                     <Button
@@ -188,7 +192,7 @@ export default function DiscoveryPage() {
                     </Button>
                   </CardContent>
                 </Card>
-              )
+              );
             })}
           </div>
         )}
@@ -222,5 +226,5 @@ export default function DiscoveryPage() {
         )}
       </div>
     </div>
-  )
+  );
 }

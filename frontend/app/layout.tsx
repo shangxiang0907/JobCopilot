@@ -1,14 +1,14 @@
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-import Script from "next/script"
-import "./globals.css"
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import Script from "next/script";
+import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "JobCopilot",
   description: "Intelligent job-search management platform",
-}
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // window.__ENV__ is served by the always-dynamic /env.js route handler and loaded
@@ -22,5 +22,5 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
       </body>
     </html>
-  )
+  );
 }

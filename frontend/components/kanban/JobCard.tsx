@@ -1,21 +1,21 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { Building2, MapPin, Star } from "lucide-react"
-import { type Application } from "@/lib/api"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import Link from "next/link";
+import { Building2, MapPin, Star } from "lucide-react";
+import { type Application } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface Props {
-  application: Application
+  application: Application;
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export function JobCard({ application }: Props) {
-  const job = application.job
+  const job = application.job;
 
   return (
     <Link href={`/jobs/${application.job_id}`}>
@@ -66,5 +66,5 @@ export function JobCard({ application }: Props) {
         </CardContent>
       </Card>
     </Link>
-  )
+  );
 }

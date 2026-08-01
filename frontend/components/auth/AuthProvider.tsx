@@ -1,16 +1,16 @@
-"use client"
+"use client";
 
-import { createContext, useContext, useEffect, useState } from "react"
-import { getKeycloak, initKeycloak } from "@/lib/keycloak"
+import { createContext, useContext, useEffect, useState } from "react";
+import { getKeycloak, initKeycloak } from "@/lib/keycloak";
 
 interface AuthState {
-  ready: boolean
-  userId: string | undefined
-  tenantId: string | undefined
-  email: string | undefined
-  name: string | undefined
+  ready: boolean;
+  userId: string | undefined;
+  tenantId: string | undefined;
+  email: string | undefined;
+  name: string | undefined;
   /** Broker alias (e.g. "google") when the session came from an IdP; absent for password logins. */
-  identityProvider: string | undefined
+  identityProvider: string | undefined;
 }
 
 const AuthContext = createContext<AuthState>({
@@ -20,10 +20,10 @@ const AuthContext = createContext<AuthState>({
   email: undefined,
   name: undefined,
   identityProvider: undefined,
-})
+});
 
 export function useAuth(): AuthState {
-  return useContext(AuthContext)
+  return useContext(AuthContext);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -34,10 +34,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: undefined,
     name: undefined,
     identityProvider: undefined,
-  })
+  });
 
   useEffect(() => {
-    const kc = getKeycloak()
+    const kc = getKeycloak();
 
     // The landing page may already have run a silent check-sso init on this
     // page load — initKeycloak reuses it. An unauthenticated result (either
@@ -45,10 +45,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initKeycloak("login-required")
       .then(() => {
         if (!kc.authenticated) {
-          kc.login()
-          return
+          kc.login();
+          return;
         }
-        const parsed = kc.tokenParsed
+        const parsed = kc.tokenParsed;
         setState({
           ready: true,
           userId: parsed?.sub,
@@ -56,23 +56,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: parsed?.email as string | undefined,
           name: parsed?.name as string | undefined,
           identityProvider: parsed?.identity_provider as string | undefined,
-        })
+        });
 
         // Silently refresh the token 30 s before it expires
         kc.onTokenExpired = () => {
-          kc.updateToken(30).catch(() => kc.login())
-        }
+          kc.updateToken(30).catch(() => kc.login());
+        };
       })
-      .catch(() => kc.login())
-  }, [])
+      .catch(() => kc.login());
+  }, []);
 
   if (!state.ready) {
     return (
       <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
         Loading…
       </div>
-    )
+    );
   }
 
-  return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;
 }

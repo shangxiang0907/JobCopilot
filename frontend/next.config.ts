@@ -1,6 +1,6 @@
-import type { NextConfig } from "next"
+import type { NextConfig } from "next";
 
-const KONG_URL = process.env.KONG_URL ?? "http://localhost:8000"
+const KONG_URL = process.env.KONG_URL ?? "http://localhost:8000";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -10,8 +10,8 @@ const nextConfig: NextConfig = {
         source: "/v1/:path*",
         destination: `${KONG_URL}/v1/:path*`,
       },
-    ]
+    ];
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;

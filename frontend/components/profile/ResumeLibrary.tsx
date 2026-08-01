@@ -1,18 +1,13 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, CheckCircle, Pencil, Trash2, Upload } from "lucide-react"
-import api, {
-  apiErrorMessage,
-  type Application,
-  type Paginated,
-  type Resume,
-} from "@/lib/api"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, CheckCircle, Pencil, Trash2, Upload } from "lucide-react";
+import api, { apiErrorMessage, type Application, type Paginated, type Resume } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -20,66 +15,66 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 /** Unique within a library: several resumes commonly share one file name. */
 function resumeIdentity(resume: Resume): string {
-  return `${resume.label ?? resume.file_name} v${resume.version}`
+  return `${resume.label ?? resume.file_name} v${resume.version}`;
 }
 
 export function ResumeLibrary() {
-  const queryClient = useQueryClient()
-  const [editing, setEditing] = useState<Resume | null>(null)
-  const [deleting, setDeleting] = useState<Resume | null>(null)
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState<Resume | null>(null);
+  const [deleting, setDeleting] = useState<Resume | null>(null);
 
   const { data: resumes = [], isSuccess } = useQuery<Resume[]>({
     queryKey: ["resumes"],
     queryFn: () => api.get<Paginated<Resume>>("/v1/resumes").then((r) => r.data.items ?? []),
-  })
+  });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["resumes"] })
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["resumes"] });
 
   const uploadResume = useMutation({
     mutationFn: (file: File) => {
-      const form = new FormData()
-      form.append("file", file)
+      const form = new FormData();
+      form.append("file", file);
       return api.post("/v1/resumes", form, {
         headers: { "Content-Type": "multipart/form-data" },
-      })
+      });
     },
     onSuccess: invalidate,
-  })
+  });
 
   const setDefaultResume = useMutation({
     mutationFn: (id: string) => api.patch(`/v1/resumes/${id}/default`, { is_default: true }),
     onSuccess: invalidate,
-  })
+  });
 
   const deleteResume = useMutation({
     mutationFn: (id: string) => api.delete(`/v1/resumes/${id}`),
     onSuccess: () => {
-      invalidate()
+      invalidate();
       // An application's resume binding may now be unresolvable — its card
       // needs to re-render from the snapshot rather than show a stale name.
-      queryClient.invalidateQueries({ queryKey: ["applications"] })
-      setDeleting(null)
+      queryClient.invalidateQueries({ queryKey: ["applications"] });
+      setDeleting(null);
     },
-  })
+  });
 
   // "Has resumes but none is default" is a real, reachable state: deleting the
   // default deliberately does not promote a replacement (owner decision, PRD
   // v0.3), and every AI action fails closed until the user picks one. Saying
   // nothing here would make that failure arrive far from its cause.
-  const hasNoDefault = isSuccess && resumes.length > 0 && !resumes.some((r) => r.is_default)
+  const hasNoDefault = isSuccess && resumes.length > 0 && !resumes.some((r) => r.is_default);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) uploadResume.mutate(file)
-    e.target.value = ""
-  }
+    const file = e.target.files?.[0];
+    if (file) uploadResume.mutate(file);
+    e.target.value = "";
+  };
 
   return (
     <>
@@ -118,7 +113,7 @@ export function ResumeLibrary() {
             <p className="text-sm text-destructive">
               {apiErrorMessage(
                 uploadResume.error,
-                "Could not read that file. Try exporting it as a text-based PDF or DOCX."
+                "Could not read that file. Try exporting it as a text-based PDF or DOCX.",
               )}
             </p>
           )}
@@ -213,24 +208,18 @@ export function ResumeLibrary() {
         />
       )}
     </>
-  )
+  );
 }
 
-function ResumeMetadataDialog({
-  resume,
-  onClose,
-}: {
-  resume: Resume | null
-  onClose: () => void
-}) {
-  const queryClient = useQueryClient()
-  const [label, setLabel] = useState("")
-  const [notes, setNotes] = useState("")
+function ResumeMetadataDialog({ resume, onClose }: { resume: Resume | null; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [label, setLabel] = useState("");
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    setLabel(resume?.label ?? "")
-    setNotes(resume?.notes ?? "")
-  }, [resume])
+    setLabel(resume?.label ?? "");
+    setNotes(resume?.notes ?? "");
+  }, [resume]);
 
   const save = useMutation({
     // The API reads "" as "clear this field" and omission as "leave unchanged",
@@ -238,10 +227,10 @@ function ResumeMetadataDialog({
     mutationFn: () =>
       api.patch(`/v1/resumes/${resume!.resume_id}`, { label: label.trim(), notes: notes.trim() }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resumes"] })
-      onClose()
+      queryClient.invalidateQueries({ queryKey: ["resumes"] });
+      onClose();
     },
-  })
+  });
 
   return (
     <Dialog open={resume !== null} onOpenChange={(open) => !open && onClose()}>
@@ -255,8 +244,8 @@ function ResumeMetadataDialog({
         <form
           className="space-y-4"
           onSubmit={(e) => {
-            e.preventDefault()
-            save.mutate()
+            e.preventDefault();
+            save.mutate();
           }}
         >
           <div className="space-y-1.5">
@@ -298,7 +287,7 @@ function ResumeMetadataDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function DeleteResumeDialog({
@@ -308,11 +297,11 @@ function DeleteResumeDialog({
   pending,
   errorMessage,
 }: {
-  resume: Resume
-  onCancel: () => void
-  onConfirm: () => void
-  pending: boolean
-  errorMessage: string | null
+  resume: Resume;
+  onCancel: () => void;
+  onConfirm: () => void;
+  pending: boolean;
+  errorMessage: string | null;
 }) {
   // How much history references this resume. Deleting is never blocked (owner
   // decision) — the applications keep a snapshot of the file name, version and
@@ -323,8 +312,8 @@ function DeleteResumeDialog({
       api
         .get("/v1/applications", { params: { resume_id: resume.resume_id, size: 1 } })
         .then((r) => r.data),
-  })
-  const count = references?.total
+  });
+  const count = references?.total;
 
   return (
     <ConfirmDialog
@@ -353,5 +342,5 @@ function DeleteResumeDialog({
         </>
       }
     />
-  )
+  );
 }

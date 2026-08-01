@@ -1,51 +1,53 @@
-"use client"
+"use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, FileText } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, FileText } from "lucide-react";
 import api, {
   apiErrorMessage,
   type Application,
   type Paginated,
   type Resume,
   type ResumeSnapshot,
-} from "@/lib/api"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+} from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 
 // Radix Select cannot carry an empty value, so "not recorded" travels as this
 // sentinel and is translated back to a null binding on the wire.
-const NOT_RECORDED = "__none__"
+const NOT_RECORDED = "__none__";
 
 /** The identity the Job Service stores alongside resume_id (it cannot look it up). */
 export function snapshotOf(resume: Resume): ResumeSnapshot {
-  return { file_name: resume.file_name, version: resume.version, label: resume.label ?? null }
+  return { file_name: resume.file_name, version: resume.version, label: resume.label ?? null };
 }
 
 export function resumeDisplayName(resume: Pick<Resume, "file_name" | "label" | "version">): string {
-  return resume.label ? `${resume.label} (v${resume.version})` : `${resume.file_name} v${resume.version}`
+  return resume.label
+    ? `${resume.label} (v${resume.version})`
+    : `${resume.file_name} v${resume.version}`;
 }
 
 export function useResumes() {
   return useQuery<Resume[]>({
     queryKey: ["resumes"],
     queryFn: () => api.get<Paginated<Resume>>("/v1/resumes").then((r) => r.data.items ?? []),
-  })
+  });
 }
 
 interface Props {
-  application: Application
+  application: Application;
 }
 
 export function ApplicationResumeCard({ application }: Props) {
-  const queryClient = useQueryClient()
-  const { data: resumes = [], isSuccess: libraryLoaded } = useResumes()
+  const queryClient = useQueryClient();
+  const { data: resumes = [], isSuccess: libraryLoaded } = useResumes();
 
   const bind = useMutation({
     mutationFn: (resumeId: string) => {
@@ -56,17 +58,17 @@ export function ApplicationResumeCard({ application }: Props) {
         resumeId === NOT_RECORDED
           ? { resume_id: null, resume_snapshot: null }
           : (() => {
-              const resume = resumes.find((r) => r.resume_id === resumeId)
-              if (!resume) throw new Error("That resume is no longer in your library.")
-              return { resume_id: resume.resume_id, resume_snapshot: snapshotOf(resume) }
-            })()
-      return api.patch(`/v1/applications/${application.application_id}`, body)
+              const resume = resumes.find((r) => r.resume_id === resumeId);
+              if (!resume) throw new Error("That resume is no longer in your library.");
+              return { resume_id: resume.resume_id, resume_snapshot: snapshotOf(resume) };
+            })();
+      return api.patch(`/v1/applications/${application.application_id}`, body);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["applications"] })
-      queryClient.invalidateQueries({ queryKey: ["application-for-job", application.job_id] })
+      queryClient.invalidateQueries({ queryKey: ["applications"] });
+      queryClient.invalidateQueries({ queryKey: ["application-for-job", application.job_id] });
     },
-  })
+  });
 
   // Three distinct states, deliberately not collapsed into one:
   //   null                    → the user never recorded which resume they used
@@ -79,8 +81,8 @@ export function ApplicationResumeCard({ application }: Props) {
   // merely still loading is the same lie in the other direction.
   const boundResume = application.resume_id
     ? resumes.find((r) => r.resume_id === application.resume_id)
-    : undefined
-  const wasDeleted = application.resume_id != null && libraryLoaded && !boundResume
+    : undefined;
+  const wasDeleted = application.resume_id != null && libraryLoaded && !boundResume;
 
   return (
     <Card>
@@ -155,5 +157,5 @@ export function ApplicationResumeCard({ application }: Props) {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

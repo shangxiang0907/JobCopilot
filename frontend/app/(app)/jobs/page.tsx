@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { useQuery, keepPreviousData } from "@tanstack/react-query"
+import { useState } from "react";
+import Link from "next/link";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import {
   Building2,
   MapPin,
@@ -11,41 +11,41 @@ import {
   ExternalLink,
   Plus,
   Search,
-} from "lucide-react"
-import api, { type Job, type Paginated } from "@/lib/api"
-import { JOB_TYPE_OPTIONS, JobFormDialog } from "@/components/jobs/JobFormDialog"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+} from "lucide-react";
+import api, { type Job, type Paginated } from "@/lib/api";
+import { JOB_TYPE_OPTIONS, JobFormDialog } from "@/components/jobs/JobFormDialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 const JOB_TYPE_LABELS: Record<string, string> = Object.fromEntries(
-  JOB_TYPE_OPTIONS.map((o) => [o.value, o.label])
-)
+  JOB_TYPE_OPTIONS.map((o) => [o.value, o.label]),
+);
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 20;
 
 function formatDate(iso?: string | null) {
-  if (!iso) return null
+  if (!iso) return null;
   return new Date(iso).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
-  })
+  });
 }
 
 function formatSalary(min?: number | null, max?: number | null) {
-  if (min == null && max == null) return null
-  const fmt = (n: number) => `$${n.toLocaleString("en-US")}`
-  if (min != null && max != null) return `${fmt(min)} – ${fmt(max)}`
-  return min != null ? `From ${fmt(min)}` : `Up to ${fmt(max!)}`
+  if (min == null && max == null) return null;
+  const fmt = (n: number) => `$${n.toLocaleString("en-US")}`;
+  if (min != null && max != null) return `${fmt(min)} – ${fmt(max)}`;
+  return min != null ? `From ${fmt(min)}` : `Up to ${fmt(max!)}`;
 }
 
 export default function JobsPage() {
-  const [page, setPage] = useState(1)
-  const [jobType, setJobType] = useState<string | null>(null)
-  const [search, setSearch] = useState("")
-  const [creating, setCreating] = useState(false)
+  const [page, setPage] = useState(1);
+  const [jobType, setJobType] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const { data, isLoading, error } = useQuery<Paginated<Job>>({
     queryKey: ["jobs", page, jobType, search],
@@ -61,16 +61,16 @@ export default function JobsPage() {
         })
         .then((r) => r.data),
     placeholderData: keepPreviousData,
-  })
+  });
 
-  const jobs = data?.items ?? []
-  const total = data?.total ?? 0
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const jobs = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const selectJobType = (t: string | null) => {
-    setJobType(t)
-    setPage(1)
-  }
+    setJobType(t);
+    setPage(1);
+  };
 
   return (
     <div className="flex flex-col h-full overflow-auto">
@@ -78,7 +78,9 @@ export default function JobsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Jobs</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {total > 0 ? `${total} job${total === 1 ? "" : "s"} in your library` : "Your job library"}
+            {total > 0
+              ? `${total} job${total === 1 ? "" : "s"} in your library`
+              : "Your job library"}
           </p>
         </div>
         <Button size="sm" onClick={() => setCreating(true)}>
@@ -96,8 +98,8 @@ export default function JobsPage() {
             aria-label="Search jobs"
             value={search}
             onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
+              setSearch(e.target.value);
+              setPage(1);
             }}
           />
         </div>
@@ -151,8 +153,8 @@ export default function JobsPage() {
         ) : (
           <div className="space-y-3">
             {jobs.map((job) => {
-              const salary = formatSalary(job.salary_min, job.salary_max)
-              const discovered = formatDate(job.discovered_at ?? job.created_at)
+              const salary = formatSalary(job.salary_min, job.salary_max);
+              const discovered = formatDate(job.discovered_at ?? job.created_at);
               return (
                 <Link key={job.job_id} href={`/jobs/${job.job_id}`} className="block">
                   <Card className="cursor-pointer hover:shadow-md transition-shadow">
@@ -195,7 +197,7 @@ export default function JobsPage() {
                     </CardContent>
                   </Card>
                 </Link>
-              )
+              );
             })}
           </div>
         )}
@@ -231,5 +233,5 @@ export default function JobsPage() {
 
       <JobFormDialog open={creating} onOpenChange={setCreating} />
     </div>
-  )
+  );
 }

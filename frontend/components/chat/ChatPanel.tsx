@@ -1,19 +1,19 @@
-"use client"
+"use client";
 
-import { useRef, useEffect, useState } from "react"
-import { useChat } from "ai/react"
-import { Check, Loader2, X, Send, Bot, User, ImagePlus } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { useUIStore } from "@/lib/store"
-import { getKeycloak } from "@/lib/keycloak"
+import { useRef, useEffect, useState } from "react";
+import { useChat } from "ai/react";
+import { Check, Loader2, X, Send, Bot, User, ImagePlus } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useUIStore } from "@/lib/store";
+import { getKeycloak } from "@/lib/keycloak";
 
 async function fetchWithAuth(url: URL | RequestInfo, options?: RequestInit): Promise<Response> {
-  const kc = getKeycloak()
+  const kc = getKeycloak();
   if (kc.authenticated) {
-    await kc.updateToken(30).catch(() => kc.login())
+    await kc.updateToken(30).catch(() => kc.login());
   }
   return fetch(url, {
     ...options,
@@ -23,7 +23,7 @@ async function fetchWithAuth(url: URL | RequestInfo, options?: RequestInit): Pro
       // sub/tenant_id from it and never trust client-declared headers.
       Authorization: `Bearer ${kc.token ?? ""}`,
     },
-  })
+  });
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -34,40 +34,40 @@ const TOOL_LABELS: Record<string, string> = {
   prepare_interview: "Preparing interview questions",
   add_job_from_url: "Fetching job posting from URL",
   add_job_from_text: "Adding job from description",
-}
+};
 
 export function ChatPanel() {
-  const closeChat = useUIStore((s) => s.closeChat)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [attachments, setAttachments] = useState<FileList | undefined>(undefined)
+  const closeChat = useUIStore((s) => s.closeChat);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<FileList | undefined>(undefined);
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: "/api/chat",
     fetch: fetchWithAuth,
-  })
+  });
 
   const clearAttachments = () => {
-    setAttachments(undefined)
-    if (fileInputRef.current) fileInputRef.current.value = ""
-  }
+    setAttachments(undefined);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const submitWithAttachments = (e: React.FormEvent<HTMLFormElement>) => {
-    handleSubmit(e, { experimental_attachments: attachments })
-    clearAttachments()
-  }
+    handleSubmit(e, { experimental_attachments: attachments });
+    clearAttachments();
+  };
 
   const handlePaste = (e: React.ClipboardEvent) => {
-    const images = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"))
-    if (images.length === 0) return
-    const dt = new DataTransfer()
-    images.forEach((f) => dt.items.add(f))
-    setAttachments(dt.files)
-  }
+    const images = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+    if (images.length === 0) return;
+    const dt = new DataTransfer();
+    images.forEach((f) => dt.items.add(f));
+    setAttachments(dt.files);
+  };
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   return (
     // Named landmark: the AI layer is one region among several on screen, and
@@ -101,17 +101,14 @@ export function ChatPanel() {
             {messages.map((m) => (
               <div
                 key={m.id}
-                className={cn(
-                  "flex gap-2.5",
-                  m.role === "user" ? "flex-row-reverse" : "flex-row"
-                )}
+                className={cn("flex gap-2.5", m.role === "user" ? "flex-row-reverse" : "flex-row")}
               >
                 <div
                   className={cn(
                     "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border",
                     m.role === "user"
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
+                      : "bg-muted text-muted-foreground",
                   )}
                 >
                   {m.role === "user" ? (
@@ -125,7 +122,7 @@ export function ChatPanel() {
                     "rounded-xl px-3.5 py-2.5 text-sm max-w-[85%] leading-relaxed",
                     m.role === "user"
                       ? "bg-primary text-primary-foreground rounded-tr-sm"
-                      : "bg-muted text-foreground rounded-tl-sm"
+                      : "bg-muted text-foreground rounded-tl-sm",
                   )}
                 >
                   {m.toolInvocations && m.toolInvocations.length > 0 && (
@@ -229,5 +226,5 @@ export function ChatPanel() {
         </div>
       </form>
     </div>
-  )
+  );
 }

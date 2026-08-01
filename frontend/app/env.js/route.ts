@@ -10,7 +10,7 @@
 // `force-dynamic` opts this single tiny endpoint out of Next.js 15's default GET
 // caching so process.env is read on every request. Pages stay statically
 // optimizable; only this config route is dynamic.
-export const dynamic = "force-dynamic"
+export const dynamic = "force-dynamic";
 
 export function GET() {
   const env = {
@@ -19,11 +19,11 @@ export function GET() {
     KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID ?? "frontend",
     // Deployment mode for LLM key sourcing (ADR-007); platform hides the BYO key UI.
     LLM_KEY_MODE: process.env.LLM_KEY_MODE === "platform" ? "platform" : "byo",
-  }
+  };
   return new Response(`window.__ENV__=${JSON.stringify(env)}`, {
     headers: {
       "Content-Type": "application/javascript; charset=utf-8",
       "Cache-Control": "no-store",
     },
-  })
+  });
 }
