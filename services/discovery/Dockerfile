@@ -1,5 +1,5 @@
 # Build context: repository root
-FROM python:3.11-slim AS build
+FROM python:3.14-slim AS build
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -16,7 +16,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 RUN /app/.venv/bin/playwright install chromium
 
 # ---- runtime ----
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 # Runtime system libs required by Chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
