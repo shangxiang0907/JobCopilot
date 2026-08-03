@@ -240,6 +240,14 @@ jobs:
     name: Deploy to production
     runs-on: ubuntu-latest
     needs: [image-scan, e2e-smoke]
+    # Explicit on-switch, set once the server side and the secrets are in place
+    # (`gh variable set DEPLOY_ENABLED --body true`). Until then this job is
+    # SKIPPED rather than failing on absent secrets — a pipeline that is red for
+    # a known, intended reason trains everyone to ignore red. It doubles as the
+    # kill switch: set it to anything else to stop deploying without reverting.
+    # `secrets` is not available to a job-level `if`, so the gate is a variable
+    # and the secrets themselves are checked in the first step below.
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
     timeout-minutes: 20
     permissions: {}
     environment:
