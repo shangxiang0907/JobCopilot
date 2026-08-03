@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────────────────────
+# Forced-command shim for the CD deploy key. Install ON THE SERVER as
+# /usr/local/bin/jobcopilot-deploy (owned by root, mode 0755), then restrict the
+# CD public key to it in the deploy user's authorized_keys:
+#
+#   restrict,command="/usr/local/bin/jobcopilot-deploy" ssh-ed25519 AAAA... cd
+#
+# With that entry the key cannot run a shell, forward ports, or read a file. The
+# only thing it can express is "deploy <sha>" — everything else is refused here,
+# before any repo code is fetched. That is what keeps the production secrets in
+# infra/.env out of GitHub entirely: CD never needs to carry them.
+#
+# Kept deliberately small and stable, because updating it means logging into the
+# server. Everything that changes often lives in the repo, in remote-deploy.sh,
+# which this execs from the checkout of the commit being deployed.
+#
+# THREAT MODEL, stated plainly: this shim executes infra/scripts/remote-deploy.sh
+# out of the commit it was asked to deploy. Whoever can land a commit on main can
+# therefore run code as the deploy user. That is inherent to continuous
+# deployment — CD already builds and ships that same code — and it is why the
+# SHA is required to be an ancestor of origin/main below, so a side branch cannot
+# be deployed even by someone who can push one.
+#
+# Also accepts an argv form so the manual path (infra/scripts/deploy.sh, over a
+# root login with no forced command) validates through exactly this gate:
+#   /usr/local/bin/jobcopilot-deploy deploy <sha>
+# ─────────────────────────────────────────────────────────────────────────────
+set -euo pipefail
+
+REPO_URL="${JOBCOPILOT_REPO_URL:-https://github.com/shangxiang0907/JobCopilot.git}"
+REPO_DIR="${JOBCOPILOT_REPO_DIR:-/opt/jobcopilot/repo}"
+
+# The forced-command path puts the client's request in SSH_ORIGINAL_COMMAND and
+# leaves argv empty; the manual path passes it as argv. Both land in one string
+# so there is a single place where a request is accepted or refused.
+request="${SSH_ORIGINAL_COMMAND:-$*}"
+
+deny() {
+  # Refusals go to the auth log, not just the client: a key that is being probed
+  # should leave a trace on the server. Never echo the request back verbatim.
+  logger -t jobcopilot-deploy "refused request from ${SSH_CONNECTION%% *}" || true
+  echo "ERROR: this key may only run: deploy <40-hex-commit-sha>" >&2
+  exit 1
+}
+
+[[ "$request" =~ ^deploy\ ([0-9a-f]{40})$ ]] || deny
+SHA="${BASH_REMATCH[1]}"
+
+logger -t jobcopilot-deploy "deploy ${SHA:0:12} requested" || true
+
+# Fetch the requested commit. --filter=blob:none keeps the clone small; only the
+# infra/ blobs actually get materialised on checkout.
+if [ ! -d "${REPO_DIR}/.git" ]; then
+  echo "==> First run: cloning ${REPO_URL} -> ${REPO_DIR}"
+  git clone --quiet --filter=blob:none "$REPO_URL" "$REPO_DIR"
+fi
+
+git -C "$REPO_DIR" fetch --quiet origin main
+# GitHub allows fetching a reachable SHA directly; do it explicitly so a commit
+# that main has already moved past is still deployable (that is what a rollback
+# to an older commit IS).
+git -C "$REPO_DIR" fetch --quiet origin "$SHA" 2>/dev/null || true
+
+git -C "$REPO_DIR" cat-file -e "${SHA}^{commit}" 2>/dev/null || {
+  echo "ERROR: commit ${SHA:0:12} does not exist in ${REPO_URL}." >&2; exit 1; }
+
+# Only commits that are on main may be deployed. Blocks deploying a side branch,
+# and blocks a SHA that was force-pushed away from main after CD built it.
+git -C "$REPO_DIR" merge-base --is-ancestor "$SHA" origin/main || {
+  echo "ERROR: ${SHA:0:12} is not an ancestor of origin/main — refusing." >&2
+  exit 1
+}
+
+git -C "$REPO_DIR" checkout --quiet --detach "$SHA"
+
+exec "${REPO_DIR}/infra/scripts/remote-deploy.sh" "$SHA"

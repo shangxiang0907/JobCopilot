@@ -144,7 +144,9 @@ infra/
   docker-compose.yml        # 本地开发——完整技术栈
   docker-compose.prod.yml   # 生产覆盖层（Caddy TLS、回环绑定、digest 锁定）
   k8s/                      # Kubernetes 清单（NetworkPolicy、HPA、kustomize）
-  scripts/deploy.sh         # digest 锁定部署 + 回滚到任意绿色提交
+  scripts/deploy.sh         # 手动部署：校验 CD 为绿、下发密钥，然后交棒给服务器
+  scripts/remote-deploy.sh  # 部署实现本体，在服务器上执行——CD 与手动共用同一份
+  scripts/jobcopilot-deploy # CD 部署密钥被钉死的 forced-command 包装器
 docs/               # PRD + 软件架构设计（双语）
 ```
 

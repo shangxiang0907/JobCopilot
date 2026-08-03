@@ -145,7 +145,9 @@ infra/
   docker-compose.yml        # Local dev — full stack
   docker-compose.prod.yml   # Production overlay (Caddy TLS, loopback binds, digest pins)
   k8s/                      # Kubernetes manifests (NetworkPolicies, HPA, kustomize)
-  scripts/deploy.sh         # Digest-pinned deploy + rollback to any green commit
+  scripts/deploy.sh         # Manual deploy: proves CD is green, installs secrets, hands off
+  scripts/remote-deploy.sh  # The deploy itself, run on the server — shared by CD and by hand
+  scripts/jobcopilot-deploy # Forced-command shim the CD deploy key is pinned to
 docs/               # PRD + Software Architecture Design (bilingual)
 ```
 

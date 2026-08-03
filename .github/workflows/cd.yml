@@ -223,31 +223,53 @@ jobs:
           severity: CRITICAL,HIGH
           ignore-unfixed: false
 
-  # ── 3. Deploy to Kubernetes ───────────────────────────────────────────────────
+  # ── 3. Deploy to production ───────────────────────────────────────────────────
+  #
+  # Gated twice over. The `production` GitHub Environment carries a required
+  # reviewer, so nothing reaches the server until a human approves this run; and
+  # the deploy key on the server is pinned to a forced command that accepts only
+  # "deploy <40-hex-sha>", so approving cannot be parlayed into shell access.
+  #
+  # The deploy itself runs ON the server (infra/scripts/remote-deploy.sh, reached
+  # through /usr/local/bin/jobcopilot-deploy) — the same entry point a hand-run
+  # infra/scripts/deploy.sh uses, so the two paths cannot drift apart. That is
+  # also why this job needs no checkout, no registry login and no production
+  # secrets: the server already has its own infra/.env, installed by a human, and
+  # CD has no way to read or replace it.
   deploy:
-    name: Deploy to Kubernetes
+    name: Deploy to production
     runs-on: ubuntu-latest
     needs: [image-scan, e2e-smoke]
-    environment: production
+    timeout-minutes: 20
+    permissions: {}
+    environment:
+      name: production
+      url: https://jobcopilot.arnoldshang.com
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Apply manifests
+      - name: Authorise the deploy key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
-          # To activate this step:
-          #   1. Add a KUBECONFIG repository secret (Settings → Secrets → Actions).
-          #   2. Uncomment the lines below.
-          #
-          # echo "${{ secrets.KUBECONFIG }}" > /tmp/kubeconfig.yaml
-          # chmod 600 /tmp/kubeconfig.yaml
-          # export KUBECONFIG=/tmp/kubeconfig.yaml
-          #
-          # Apply all manifests via kustomize (respects resource ordering in kustomization.yaml).
-          # kubectl apply -k infra/k8s/
-          #
-          # Force a rolling restart so pods pull the new :latest image.
-          # kubectl rollout restart deployment -n jobcopilot
-          #
-          # Block until all deployments are healthy (fail CD if rollout gets stuck).
-          # kubectl rollout status deployment -n jobcopilot --timeout=5m
-          echo "Deploy step ready. Add KUBECONFIG secret and uncomment kubectl commands to activate."
+          if [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "::error::DEPLOY_SSH_KEY / DEPLOY_KNOWN_HOSTS are not configured." >&2
+            echo "See infra/scripts/jobcopilot-deploy for the one-time setup." >&2
+            exit 1
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Pinning the host key matters more here than usual: every run starts on
+          # a fresh runner, so trust-on-first-use would mean trusting a different
+          # first connection every time — an open MITM window on each deploy.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Deploy ${{ github.event.workflow_run.head_sha }}
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER || 'deploy' }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          ssh -o StrictHostKeyChecking=yes -o BatchMode=yes \
+              "${DEPLOY_USER}@${DEPLOY_HOST}" "deploy ${SHA}"
