@@ -65,6 +65,91 @@ if [ -f "$SHIM_INSTALLED" ] && \
   echo "         reinstall it (see infra/scripts/jobcopilot-deploy header)." >&2
 fi
 
+# 1b. Supply-chain gate, enforced HERE because this is where the decision is
+#     actually made. deploy.sh checks the same thing client-side, but a client
+#     check only protects callers who run the client — and the whole point of
+#     the forced-command shim is that anyone holding the CD key can invoke this
+#     directly. CD pushes images BEFORE scanning them, so a commit whose Trivy
+#     scan found a Critical CVE still has perfectly pullable images: resolving a
+#     digest proves an image exists, never that it should be trusted.
+#
+#     Checked per-JOB rather than per-run, and that distinction is load-bearing:
+#     when CD itself calls us, the deploy job is part of the very run we are
+#     asking about, so that run can never be "completed" while we look at it.
+#     The gating jobs (build, E2E, image scan) HAVE concluded by then — they are
+#     the deploy job's `needs` — so their conclusions are the honest signal.
+#
+#     The repo is public, so this needs no credentials. Unreachable API fails
+#     CLOSED; JOBCOPILOT_CD_GATE=skip overrides for an emergency rollback during
+#     a GitHub outage. That override is only settable from a real shell, i.e. by
+#     root — the CD key cannot pass environment variables through the shim.
+CD_GATE="${JOBCOPILOT_CD_GATE:-enforce}"
+if [ "$CD_GATE" != "enforce" ]; then
+  echo "WARNING: CD supply-chain gate SKIPPED by JOBCOPILOT_CD_GATE=${CD_GATE}." >&2
+  echo "         Images for ${SHA:0:12} may never have passed the Trivy scan." >&2
+else
+  echo "==> Verifying the CD gating jobs for ${SHA:0:12} went green ..."
+  verdict="$(python3 - "$SHA" <<'PY'
+import json, sys, urllib.request
+
+REPO = "shangxiang0907/JobCopilot"
+# The deploy job's `needs`, by display-name prefix (they are matrix jobs).
+GATING = ("Build & Push", "E2E Smoke", "Image Scan")
+sha = sys.argv[1]
+
+
+def get(url):
+    req = urllib.request.Request(
+        url,
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "jobcopilot-deploy"},
+    )
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        return json.load(resp)
+
+
+try:
+    runs = get(f"https://api.github.com/repos/{REPO}/actions/runs?head_sha={sha}&per_page=100")
+    cd_runs = [r for r in runs["workflow_runs"] if r.get("name") == "CD"]
+    if not cd_runs:
+        print("missing no CD workflow run exists for this commit")
+        raise SystemExit(0)
+    # Latest attempt wins, so a re-run after a fix is what counts.
+    run = max(cd_runs, key=lambda r: r["run_number"])
+    jobs = get(f"https://api.github.com/repos/{REPO}/actions/runs/{run['id']}/jobs?per_page=100")
+except Exception as exc:  # noqa: BLE001 - any failure to ASK must not read as a pass
+    print(f"unavailable {type(exc).__name__}: {exc}")
+    raise SystemExit(0)
+
+gating = [j for j in jobs["jobs"] if j["name"].startswith(GATING)]
+if not gating:
+    print(f"missing run {run['id']} has not started its gating jobs")
+elif bad := [f"{j['name']}={j['status']}/{j['conclusion']}" for j in gating if j["conclusion"] != "success"]:
+    print("failed " + ", ".join(bad[:4]))
+else:
+    print(f"ok {len(gating)} gating jobs green in run {run['id']}")
+PY
+)" || verdict="unavailable python3 failed"
+
+  case "$verdict" in
+    ok\ *)
+      echo "    ${verdict#ok }" ;;
+    failed\ *)
+      echo "ERROR: CD gating jobs for ${SHA:0:12} did not pass: ${verdict#failed }" >&2
+      echo "       Its images may carry a Critical CVE. Refusing to deploy." >&2
+      exit 9 ;;
+    missing\ *)
+      echo "ERROR: ${verdict#missing } (${SHA:0:12})." >&2
+      echo "       Only commits CD has built and scanned may be deployed." >&2
+      exit 9 ;;
+    *)
+      echo "ERROR: could not reach the GitHub API to verify the CD run:" >&2
+      echo "       ${verdict#unavailable }" >&2
+      echo "       Failing closed. For an emergency rollback during a GitHub" >&2
+      echo "       outage, re-run as root with JOBCOPILOT_CD_GATE=skip." >&2
+      exit 9 ;;
+  esac
+fi
+
 echo "==> Deploying ${SHA:0:12} on $(hostname) as $(id -un)"
 
 # 2. Ship this commit's infra/ config into the live project dir. Deploying a

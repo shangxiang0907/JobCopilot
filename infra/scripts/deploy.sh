@@ -75,6 +75,13 @@ fi
 #     must have concluded green. Resolving a digest only proves an image EXISTS
 #     in GHCR — CD pushes images BEFORE scanning them, so a commit whose
 #     image-scan job failed still has pullable images. Never deploy those.
+#
+#     remote-deploy.sh enforces this again server-side, and that is the
+#     authoritative copy: it also covers anyone invoking the shim directly with
+#     the CD key. This one is kept deliberately — it fails in a second, before
+#     provisioning and before the secrets are shipped, and it can be stricter
+#     because a human deploying by hand should wait for the WHOLE run to be
+#     green, not just the jobs the deploy job happens to depend on.
 command -v gh >/dev/null 2>&1 || {
   echo "ERROR: gh CLI not found — required to verify the CD run (incl. Trivy" >&2
   echo "       image scan) passed for ${TAG:0:12}. Install: https://cli.github.com" >&2
