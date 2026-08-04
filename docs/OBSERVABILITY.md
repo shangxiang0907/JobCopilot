@@ -37,7 +37,7 @@ LangSmith is a **hosted SaaS**: the tracing SDK sends trace data over the intern
 1. Register at https://smith.langchain.com (GitHub/Google sign-in; the default workspace is created automatically; free tier suffices).
 2. Settings → API Keys → Create API Key. **In a Personal organization choose PERSONAL ACCESS TOKEN — Service Keys are silently rejected with bare 403s even on the correct regional endpoint (empirically verified 2026-07-12).** The key is shown only once — copy it immediately.
 3. In the env file set `LANGSMITH_API_KEY=lsv2_...`, `LANGCHAIN_TRACING_V2=true`, and **`LANGSMITH_ENDPOINT` matching your account's region** — a mismatch also produces bare 403s on every endpoint. Our account is AWS US: `https://aws.api.smith.langchain.com` (other regions: `https://eu.api.smith.langchain.com`, `https://apac.api.smith.langchain.com`, GCP-US default `https://api.smith.langchain.com`).
-4. Local: `docker compose up -d agent-service`. Production: same variables in the server's env file + redeploy (`infra/scripts/deploy.sh`) — read the privacy note first.
+4. Local: `docker compose up -d agent-service`. Production: set the same variables in **your local `infra/.env.production`** and run `infra/scripts/deploy.sh` — read the privacy note first. **Pushing a commit will not do it**: CD never carries `infra/.env` (SAD ADR-010), so a manual deploy is the only channel by which an environment variable reaches production.
 5. Open https://smith.langchain.com → Projects. The `jobcopilot-local` / `jobcopilot-prod` projects are created automatically on the first trace — nothing to pre-create.
 
 Troubleshooting learned the hard way: a bare `403 {"detail":"Forbidden"}` on *every* endpoint means key-type (Service Key in a Personal org) or region mismatch — NOT an invalid key, geo-blocking, or plan problems. Both issues were present simultaneously here.
@@ -62,7 +62,7 @@ LangSmith 是**托管 SaaS**：追踪 SDK 把数据经互联网发送到 smith.l
 1. 在 https://smith.langchain.com 注册（GitHub/Google 登录即可，默认工作区自动创建，免费档足够）。
 2. Settings → API Keys → Create API Key。**个人组织（Personal organization）必须选 PERSONAL ACCESS TOKEN——Service Key 即使在正确的区域端点上也会被静默拒绝、全端点裸 403（2026-07-12 实测验证）**。Key 只显示一次——当场复制。
 3. 在 env 文件中设置 `LANGSMITH_API_KEY=lsv2_...`、`LANGCHAIN_TRACING_V2=true`，以及**与账号所在区域匹配的 `LANGSMITH_ENDPOINT`**——区域不匹配同样导致全端点裸 403。本账号在 AWS US 区：`https://aws.api.smith.langchain.com`（其他区域：`https://eu.api.smith.langchain.com`、`https://apac.api.smith.langchain.com`、GCP-US 默认 `https://api.smith.langchain.com`）。
-4. 本地：`docker compose up -d agent-service`。生产：在服务器 env 文件设置同样变量并重新部署（`infra/scripts/deploy.sh`）——启用前先阅读隐私注意。
+4. 本地：`docker compose up -d agent-service`。生产：在**本机的 `infra/.env.production`** 中设置同样变量，然后执行 `infra/scripts/deploy.sh`——启用前先阅读隐私注意。**推送提交不会生效**：CD 从不下发 `infra/.env`（SAD ADR-010），手动部署是环境变量抵达生产的唯一通道。
 5. 打开 https://smith.langchain.com → Projects。`jobcopilot-local` / `jobcopilot-prod` 项目在首条追踪到达时自动创建——无需预建。
 
 排障经验（学费已付）：所有端点都返回裸 `403 {"detail":"Forbidden"}` 时，原因是 Key 类型（个人组织用了 Service Key）或区域端点不匹配——不是 Key 无效、不是地区封锁、也不是计划问题。本次两个问题同时存在。

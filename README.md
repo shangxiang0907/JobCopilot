@@ -155,7 +155,11 @@ docs/               # PRD + Software Architecture Design (bilingual)
 
 ## Production Deployment
 
-Single-node deployment (running live on Hetzner): CI builds and Trivy-scans images to GHCR on every green `main` commit; [`infra/scripts/deploy.sh`](infra/scripts/deploy.sh) verifies the commit's CD run is green, resolves image tags to **immutable digests**, ships config over SSH, and starts the stack behind Caddy (automatic Let's Encrypt TLS). Every internal service is bound to loopback; only 80/443 are public. Every image is stamped with its git revision (`/healthz/*` and `/metrics` expose it), and the deploy script fails on any revision mismatch. Rollback = redeploy any older green commit.
+Single-node deployment (running live on Hetzner). CI builds and Trivy-scans images to GHCR on every green `main` commit, then CD deploys them — **after a required human approval** on the `production` environment. The deploy itself runs on the server ([`infra/scripts/remote-deploy.sh`](infra/scripts/remote-deploy.sh)): it re-verifies that this commit's build, E2E and image-scan jobs went green, resolves image tags to **immutable digests**, and restarts the stack behind Caddy (automatic Let's Encrypt TLS).
+
+CD reaches the server through an SSH key pinned to a forced command that accepts only `deploy <commit-sha>`, so a compromised pipeline cannot obtain a shell — and **the production secrets never enter GitHub at all**: `infra/.env` lives on the server and is installed only by a human run of [`infra/scripts/deploy.sh`](infra/scripts/deploy.sh), which is also the manual deploy path and shares the same server-side implementation.
+
+Every internal service is bound to loopback; only 80/443 are public. Every image is stamped with its git revision (`/healthz/*` and `/metrics` expose it), and the deploy fails if any running container's revision does not match the commit deployed. Rollback = redeploy any older green commit, which reverts its `infra/` config too. Design rationale: [SAD ADR-010](docs/SAD.md).
 
 ---
 

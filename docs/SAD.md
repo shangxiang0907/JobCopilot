@@ -2,9 +2,9 @@
 
 Version / 版本：v0.3  
 Status / 状态：Active / 生效  
-Last Updated / 最后更新：2026-07-26
+Last Updated / 最后更新：2026-08-04
 
-> **v0.3 change summary / 变更摘要：** Aligned with PRD v0.3 layering correction. New **ADR-008** makes "AI is an augmentation layer over a self-sufficient non-AI core" an architectural constraint with a one-way dependency rule enforced by `import-linter`, and new **ADR-009** fixes the design constraints for browser-extension job ingestion (recorded, not scheduled). Data model changes: `applications.resume_id` records which resume was used per application (plain UUID — `applications` and `resumes` live in different schemas and cross-schema JOINs are forbidden); `resumes.is_active` → `is_default` with default-resume semantics, plus `label` / `notes`; `companies` gains a per-tenant unique index on the normalized name so jobs can be auto-linked by company name. / 与 PRD v0.3 分层修正对齐。新增 **ADR-008**：将"AI 是自足的非 AI 基础层之上的叠加层"确立为架构约束，层间单向依赖由 `import-linter` 强制；新增 **ADR-009**：固化浏览器插件式岗位录入的设计约束（入档，不排期）。数据模型变更：`applications.resume_id` 记录每次投递所用简历（普通 UUID——`applications` 与 `resumes` 分属不同 Schema，禁止跨 Schema JOIN）；`resumes.is_active` 改为 `is_default` 并采用默认简历语义，另加 `label` / `notes`；`companies` 增加按租户的规范化名称唯一索引，使岗位可按公司名自动挂接。
+> **v0.3 change summary / 变更摘要：** Aligned with PRD v0.3 layering correction. New **ADR-008** makes "AI is an augmentation layer over a self-sufficient non-AI core" an architectural constraint with a one-way dependency rule enforced by `import-linter`, and new **ADR-009** fixes the design constraints for browser-extension job ingestion (recorded, not scheduled). Data model changes: `applications.resume_id` records which resume was used per application (plain UUID — `applications` and `resumes` live in different schemas and cross-schema JOINs are forbidden); `resumes.is_active` → `is_default` with default-resume semantics, plus `label` / `notes`; `companies` gains a per-tenant unique index on the normalized name so jobs can be auto-linked by company name. Added 2026-08-04: **ADR-010** records how production is deployed — on the server, behind a forced-command key, with the production secrets deliberately kept out of CI. / 与 PRD v0.3 分层修正对齐。新增 **ADR-008**：将"AI 是自足的非 AI 基础层之上的叠加层"确立为架构约束，层间单向依赖由 `import-linter` 强制；新增 **ADR-009**：固化浏览器插件式岗位录入的设计约束（入档，不排期）。数据模型变更：`applications.resume_id` 记录每次投递所用简历（普通 UUID——`applications` 与 `resumes` 分属不同 Schema，禁止跨 Schema JOIN）；`resumes.is_active` 改为 `is_default` 并采用默认简历语义，另加 `label` / `notes`；`companies` 增加按租户的规范化名称唯一索引，使岗位可按公司名自动挂接。2026-08-04 新增：**ADR-010** 记录生产部署方式——部署在服务器上执行，经由被 forced command 钉死的密钥接入，并刻意将生产密钥排除在 CI 之外。
 
 > **v0.2 change summary / 变更摘要：** Aligned with PRD v0.2 re-scope: credential-free public-source discovery replaces LinkedIn cookie crawling (ADR-004 superseded by ADR-006); notifications converge to email; tool signatures and messaging contracts corrected to match the verified implementation (in-process tool delegation, no `job.analyze.priority` queue, no WebSocket push); Keycloak 26; Grafana Alloy replaces Promtail; deployment section reflects the actual single-node Docker Compose production with Kubernetes as the scaling path. / 与 PRD v0.2 重构对齐：无凭证公开源爬取取代 LinkedIn Cookie 爬取（ADR-004 被 ADR-006 取代）；通知收敛为邮件；工具签名与消息契约修正为与已验证实现一致（工具进程内委托、不存在 `job.analyze.priority` 队列与 WebSocket 推送）；Keycloak 26；Grafana Alloy 取代 Promtail；部署章节反映真实的单节点 Docker Compose 生产形态，Kubernetes 为扩容路径。
 
@@ -704,10 +704,10 @@ graph LR
 ## 11. Deployment Architecture / 部署架构
 
 **EN:**  
-**Current production** is a single-node Docker Compose deployment (Hetzner) behind a Caddy TLS edge: CI builds and Trivy-scans images to GHCR; `infra/scripts/deploy.sh` resolves tags to immutable digests and ships over SSH; internal services bind to loopback only. All services are stateless, so the **Kubernetes manifests** (`infra/k8s/`) remain the horizontal-scaling path: Agent Service scales via KEDA on RabbitMQ queue depth; Profile and Job Services via HPA on CPU.
+**Current production** is a single-node Docker Compose deployment (Hetzner) behind a Caddy TLS edge: CI builds and Trivy-scans images to GHCR, then CD deploys them after a required human approval; the deploy runs on the server (`infra/scripts/remote-deploy.sh`), resolving tags to immutable digests, with `infra/scripts/deploy.sh` as the manual path over the same implementation (ADR-010); internal services bind to loopback only. All services are stateless, so the **Kubernetes manifests** (`infra/k8s/`) remain the horizontal-scaling path: Agent Service scales via KEDA on RabbitMQ queue depth; Profile and Job Services via HPA on CPU.
 
 **中文：**  
-**当前生产**为 Caddy TLS 边缘之后的单节点 Docker Compose 部署（Hetzner）：CI 构建镜像并经 Trivy 扫描推送 GHCR；`infra/scripts/deploy.sh` 将 tag 解析为不可变 digest 后经 SSH 下发；内部服务仅绑定回环地址。所有服务无状态，因此 **Kubernetes 清单**（`infra/k8s/`）作为水平扩容路径保留：Agent Service 基于 RabbitMQ 队列深度由 KEDA 伸缩，Profile / Job Service 基于 CPU 由 HPA 伸缩。
+**当前生产**为 Caddy TLS 边缘之后的单节点 Docker Compose 部署（Hetzner）：CI 构建镜像并经 Trivy 扫描推送 GHCR，随后由 CD 在人工审批后完成部署；部署在服务器上执行（`infra/scripts/remote-deploy.sh`），将 tag 解析为不可变 digest，`infra/scripts/deploy.sh` 则是共用同一实现的手动路径（ADR-010）；内部服务仅绑定回环地址。所有服务无状态，因此 **Kubernetes 清单**（`infra/k8s/`）作为水平扩容路径保留：Agent Service 基于 RabbitMQ 队列深度由 KEDA 伸缩，Profile / Job Service 基于 CPU 由 HPA 伸缩。
 
 ```mermaid
 graph TB
@@ -898,3 +898,31 @@ Every application service must provide / 每个应用服务须提供：
 5. **独立发布物。** 拥有独立的仓库目录、版本、隐私声明与商店条目；且绝不能成为任何基础层功能的前置依赖（ADR-008）。
 
 **结果。** 暂缓的代价很小：手动表单已能覆盖这些站点，只是多打些字。实现的代价是一条独立发布渠道（商店审核 + 隐私政策）、长期的站点结构兼容性负担，以及平台服务条款变动的风险——这正是它只入档、不排期的原因。
+
+### ADR-010: Server-Side Deployment Behind a Forced-Command Key
+
+**Status:** Accepted (2026-08-04)
+
+**EN:**
+**Context.** CD built, scanned and pushed images on every green `main` commit, but the `deploy` job had never been anything more than an `echo` — every production release was a human running `infra/scripts/deploy.sh`. Automating it raises a question that has a bad default answer: what does the pipeline need in order to deploy? The obvious wiring — give the CI runner an SSH key and a copy of the production env file, then run the existing script from the runner — puts every production secret (database, Keycloak admin, `ENCRYPTION_KEY`, SMTP, Google IdP) into GitHub Actions secrets, and hands whoever compromises the pipeline a root shell on the host. It also cannot be reconciled with an SSH forced command, because the script issues eight distinct remote commands and two rsyncs.
+
+**Decision.** Invert the direction: the deploy runs **on the server**, and CI is only allowed to ask for it.
+1. `infra/scripts/remote-deploy.sh` is the deploy, executed on the host from a checkout of the commit being deployed. Both callers — CD and a hand-run `deploy.sh` — enter through it, so the automated and manual paths are the same code. Divergence here is the classic failure where the manual path still works while the pipeline has been broken for weeks.
+2. The CD key is pinned in `authorized_keys` to `restrict,command="/usr/local/bin/jobcopilot-deploy"`. That shim is root-owned, accepts exactly `deploy <40-hex-sha>`, and refuses any commit that is not an ancestor of `origin/main`. The key cannot express a shell, a port forward, or a file read.
+3. **Production secrets are never given to CI.** `infra/.env` is server-owned state, installed only by a human `deploy.sh` run. CD has no copy and no way to request one. The corollary is operational and easy to forget: changing an environment variable is not a matter of pushing a commit.
+4. The supply-chain gate is enforced server-side, per **job** rather than per run. CD pushes images before scanning them, so a digest resolving proves an image exists, never that it passed Trivy. Checking the run's own conclusion is impossible here — when CD calls the deploy, the deploy job is inside the run being asked about, so that run can never read `completed`. The gating jobs (build, E2E, image scan) are the deploy job's `needs` and have concluded by then, so their conclusions are the honest signal. An unreachable GitHub API fails closed: being unable to ask whether the scan passed must not read as "it passed".
+5. Two independent gates sit in front of all of it: the `production` GitHub Environment requires an owner approval and restricts the key to `main`, and a `DEPLOY_ENABLED` repository variable turns the job off entirely. The variable exists because a job-level `if` cannot read the `secrets` context; it doubles as a kill switch that needs no revert.
+
+**Consequences.** A compromised pipeline can trigger a deploy of a commit already on `main` — nothing more. It cannot read the secrets, cannot deploy a side branch, and cannot skip the scan. Deploying commit X now also ships X's `infra/` config, so a rollback reverts compose files and the Caddyfile rather than only the images; reproducibility stops being accidental. Costs: the server needs a git checkout and `python3` (both already present), the shim lives outside the repo and can therefore drift — `remote-deploy.sh` compares it against the committed copy and warns — and an emergency rollback during a GitHub outage needs the root-only `JOBCOPILOT_CD_GATE=skip` override.
+
+**中文：**
+**背景。** CD 在每个绿色 `main` 提交上构建、扫描并推送镜像，但 `deploy` job 从来只是一句 `echo`——每次生产发布都靠人工执行 `infra/scripts/deploy.sh`。将其自动化会引出一个「默认答案很糟糕」的问题：流水线究竟需要什么才能完成部署？最直观的接法——给 CI runner 一把 SSH 密钥和一份生产 env 文件，然后在 runner 上跑现有脚本——会把全部生产密钥（数据库、Keycloak 管理员、`ENCRYPTION_KEY`、SMTP、Google IdP）塞进 GitHub Actions secrets，并把主机的 root shell 交给任何攻破流水线的人。它也无法与 SSH forced command 共存，因为该脚本会发起八条不同的远程命令和两次 rsync。
+
+**决策。** 反转方向：部署在**服务器上**执行，CI 只被允许「请求」它。
+1. `infra/scripts/remote-deploy.sh` 即部署本身，在主机上从所部署提交的检出中执行。两个调用方——CD 与人工执行的 `deploy.sh`——都经由它进入，因此自动与手动路径是同一份代码。此处的分叉正是那种经典失效：手动路径一直好用，而流水线已经坏了好几周。
+2. CD 密钥在 `authorized_keys` 中被钉为 `restrict,command="/usr/local/bin/jobcopilot-deploy"`。该包装器由 root 拥有，只接受 `deploy <40 位十六进制 SHA>`，并拒绝任何不在 `origin/main` 祖先链上的提交。这把密钥无法表达 shell、端口转发或读文件。
+3. **生产密钥绝不交给 CI。** `infra/.env` 属服务器自有状态，只在人工执行 `deploy.sh` 时下发。CD 既无副本，也无从索取。由此得出一条容易被忘记的运维推论：修改环境变量不是「推一个提交」就能生效的事。
+4. 供应链门禁在服务器端强制，且按 **job** 而非按 run 校验。CD 是先推镜像后扫描的，因此能解析出 digest 只证明镜像存在，绝不证明它通过了 Trivy。而在此处校验该 run 自身的结论是不可能的——当 CD 发起部署时，deploy job 就在被询问的那次 run 里，该 run 永远不可能读作 `completed`。把关 job（构建、E2E、镜像扫描）是 deploy job 的 `needs`，此时均已结束，因此它们的结论才是诚实的信号。GitHub API 不可达时失败关闭：无法「询问扫描是否通过」不能被读作「它通过了」。
+5. 在这一切之前还有两道彼此独立的闸门：`production` 环境要求 owner 审批并将密钥限定于 `main`；仓库变量 `DEPLOY_ENABLED` 可整体关闭该 job。之所以用变量，是因为 job 级 `if` 读不到 `secrets` 上下文；它同时充当无需回滚的停机开关。
+
+**结果。** 被攻破的流水线至多能触发一次「已在 `main` 上的提交」的部署，仅此而已：读不到密钥、部署不了侧分支、跳不过扫描。部署提交 X 现在也会一并下发 X 的 `infra/` 配置，因此回滚会连同 compose 文件与 Caddyfile 一起回退，而不只是镜像；可复现性不再是碰巧成立。代价：服务器需要一份 git 检出与 `python3`（两者本已具备）；包装器位于仓库之外因而可能漂移——`remote-deploy.sh` 会将其与提交内的副本比对并告警；GitHub 故障期间的紧急回滚需要仅 root 可用的 `JOBCOPILOT_CD_GATE=skip` 覆盖开关。

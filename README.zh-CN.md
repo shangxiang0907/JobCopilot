@@ -154,7 +154,11 @@ docs/               # PRD + 软件架构设计（双语）
 
 ## 生产部署
 
-单节点部署（Hetzner 线上运行中）：CI 在每个绿色 `main` 提交上构建镜像、经 Trivy 扫描后推送 GHCR；[`infra/scripts/deploy.sh`](infra/scripts/deploy.sh) 先校验该提交的 CD 流水线为绿色，再将镜像 tag 解析为**不可变 digest**、经 SSH 下发配置，并在 Caddy（自动 Let's Encrypt TLS）之后启动整个栈。所有内部服务仅绑定回环地址，公网只开放 80/443。每个镜像都烙有其 git 版本号（`/healthz/*` 与 `/metrics` 可查），部署脚本在任何版本不一致时直接失败。回滚 = 重新部署任意历史绿色提交。
+单节点部署（Hetzner 线上运行中）。CI 在每个绿色 `main` 提交上构建镜像、经 Trivy 扫描后推送 GHCR，随后由 CD 完成部署——但**必须先经过人工审批**（`production` 环境的必需审批人）。部署本身在服务器上执行（[`infra/scripts/remote-deploy.sh`](infra/scripts/remote-deploy.sh)）：重新核验该提交的构建、E2E 与镜像扫描 job 是否全绿，将镜像 tag 解析为**不可变 digest**，并在 Caddy（自动 Let's Encrypt TLS）之后重启整个栈。
+
+CD 经由一把被 forced command 钉死的 SSH 密钥接入服务器，该密钥只接受 `deploy <提交 SHA>` 这一种指令，因此即便流水线被攻破也无法取得 shell——而且**生产密钥根本不会进入 GitHub**：`infra/.env` 只存在于服务器，仅由人工执行 [`infra/scripts/deploy.sh`](infra/scripts/deploy.sh) 时下发；该脚本同时也是手动部署路径，与 CD 共用同一份服务器端实现。
+
+所有内部服务仅绑定回环地址，公网只开放 80/443。每个镜像都烙有其 git 版本号（`/healthz/*` 与 `/metrics` 可查），任何运行中容器的版本号与所部署提交不一致都会使部署失败。回滚 = 重新部署任意历史绿色提交，其 `infra/` 配置也会一并回退。设计理由见 [SAD ADR-010](docs/SAD.md)。
 
 ---
 
