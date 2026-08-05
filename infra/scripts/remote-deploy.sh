@@ -54,15 +54,37 @@ if [ "$head_sha" != "$SHA" ]; then
   exit 4
 fi
 
-# The shim lives outside the repo (/usr/local/bin) so it survives checkouts —
-# which also means it can fall behind. Warn rather than fail: a stale shim still
-# works, it just may lack a fix, and failing here would block deploying the very
-# commit that updates it.
+# The shim is the security boundary for the CD key, and it lives outside the
+# repo (/usr/local/bin, root-owned) so it survives checkouts — which also means
+# it can fall behind the repo. Drift FAILS the deploy rather than warning.
+#
+# It is deliberately NOT auto-installed from here or from deploy.sh. A security
+# control must change deliberately, visibly and rarely; refreshing it as a side
+# effect of every routine deploy would mean nobody ever notices it changed. The
+# shim belongs to the same category as the deploy user, the authorized_keys
+# entry and the firewall rules — host provisioning, done by hand, once.
+#
+# Failing therefore forces the correct order for a shim change: install it, THEN
+# deploy the commit that carries it. The override exists for the one case that
+# order cannot serve — rolling back to an older commit whose shim differs — and
+# is reachable only from a real shell (i.e. root), because the CD key cannot
+# pass environment variables through the shim.
 SHIM_INSTALLED="/usr/local/bin/jobcopilot-deploy"
-if [ -f "$SHIM_INSTALLED" ] && \
-   ! cmp -s "$REPO_DIR/infra/scripts/jobcopilot-deploy" "$SHIM_INSTALLED"; then
-  echo "WARNING: ${SHIM_INSTALLED} differs from this commit's copy —" >&2
-  echo "         reinstall it (see infra/scripts/jobcopilot-deploy header)." >&2
+SHIM_REPO="${REPO_DIR}/infra/scripts/jobcopilot-deploy"
+if [ "${JOBCOPILOT_SHIM_DRIFT:-enforce}" != "enforce" ]; then
+  echo "WARNING: shim drift check SKIPPED by JOBCOPILOT_SHIM_DRIFT=${JOBCOPILOT_SHIM_DRIFT}." >&2
+elif [ ! -f "$SHIM_INSTALLED" ]; then
+  echo "ERROR: ${SHIM_INSTALLED} is not installed — the CD key has no gate." >&2
+  echo "       From a checkout of this commit, as root:" >&2
+  echo "         scp infra/scripts/jobcopilot-deploy <host>:${SHIM_INSTALLED}" >&2
+  echo "         ssh <host> 'chown root:root ${SHIM_INSTALLED} && chmod 755 ${SHIM_INSTALLED}'" >&2
+  exit 10
+elif ! cmp -s "$SHIM_REPO" "$SHIM_INSTALLED"; then
+  echo "ERROR: the installed shim differs from this commit's copy." >&2
+  echo "       Install it first, then deploy this commit again (docs/DEPLOYMENT.md §5)." >&2
+  echo "       For a rollback to an older shim, re-run as root with" >&2
+  echo "       JOBCOPILOT_SHIM_DRIFT=allow." >&2
+  exit 10
 fi
 
 # 1b. Supply-chain gate, enforced HERE because this is where the decision is

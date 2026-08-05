@@ -158,7 +158,9 @@ docs/               # PRD + 软件架构设计（双语）
 
 CD 经由一把被 forced command 钉死的 SSH 密钥接入服务器，该密钥只接受 `deploy <提交 SHA>` 这一种指令，因此即便流水线被攻破也无法取得 shell——而且**生产密钥根本不会进入 GitHub**：`infra/.env` 只存在于服务器，仅由人工执行 [`infra/scripts/deploy.sh`](infra/scripts/deploy.sh) 时下发；该脚本同时也是手动部署路径，与 CD 共用同一份服务器端实现。
 
-所有内部服务仅绑定回环地址，公网只开放 80/443。每个镜像都烙有其 git 版本号（`/healthz/*` 与 `/metrics` 可查），任何运行中容器的版本号与所部署提交不一致都会使部署失败。回滚 = 重新部署任意历史绿色提交，其 `infra/` 配置也会一并回退。设计理由见 [SAD ADR-010](docs/SAD.md)。
+所有内部服务仅绑定回环地址，公网只开放 80/443。每个镜像都烙有其 git 版本号（`/healthz/*` 与 `/metrics` 可查），任何运行中容器的版本号与所部署提交不一致都会使部署失败。回滚 = 重新部署任意历史绿色提交，其 `infra/` 配置也会一并回退。
+
+操作手册——日常发布、首次配置、回滚，以及每道闸门失败的含义：**[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**。设计理由见 [SAD ADR-010](docs/SAD.md)。
 
 ---
 
