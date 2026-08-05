@@ -235,7 +235,7 @@ gh api -X POST repos/<OWNER>/<REPO>/environments/production/deployment-branch-po
 
 ```bash
 SERVER_IP=<SERVER_IP> SSH_KEY=~/.ssh/<root-key> ./infra/scripts/deploy.sh
-GIT_REF=<older-sha> SERVER_IP=<SERVER_IP> SSH_KEY=~/.ssh/<root-key> ./infra/scripts/deploy.sh   # rollback
+ROLLBACK=1 GIT_REF=<older-sha> SERVER_IP=<SERVER_IP> SSH_KEY=~/.ssh/<root-key> ./infra/scripts/deploy.sh
 ```
 
 A rollback reverts the `infra/` config as well as the images, because the server
@@ -243,16 +243,37 @@ checks out the commit being deployed. Only commits that are ancestors of
 `origin/main` and whose CD gating jobs went green can be deployed — by either
 path.
 
+**`ROLLBACK=1` is required to move production backwards**, and is deliberately
+not implied by `GIT_REF`: the commonest way to roll production back by accident
+is deploying `HEAD` from a local `main` that is simply behind origin. Migrations
+are what make it expensive — `alembic upgrade head` never goes backwards, so old
+code meets a newer schema (v0.3's `is_active` → `is_default` rename is exactly
+that shape).
+
+**If an old CD approval is queued**, cancel that run rather than approving it.
+GitHub's `cd-main` concurrency group serializes CD runs, so only one is ever
+approvable at a time — but it cannot see a manual `deploy.sh` run at all, so a
+long-queued approval can still be behind production by the time you click it.
+
 **中文：** 要求工作树干净、`gh` 已认证、具备 root SSH 访问权限。
 
 ```bash
 SERVER_IP=<SERVER_IP> SSH_KEY=~/.ssh/<root 密钥> ./infra/scripts/deploy.sh
-GIT_REF=<旧提交 SHA> SERVER_IP=<SERVER_IP> SSH_KEY=~/.ssh/<root 密钥> ./infra/scripts/deploy.sh   # 回滚
+ROLLBACK=1 GIT_REF=<旧提交 SHA> SERVER_IP=<SERVER_IP> SSH_KEY=~/.ssh/<root 密钥> ./infra/scripts/deploy.sh
 ```
 
 回滚会连同 `infra/` 配置一起回退（不只是镜像），因为服务器会检出所部署的那个提
 交。无论走哪条路径，只有位于 `origin/main` 祖先链上、且 CD 把关 job 全绿的提交
 才可被部署。
+
+**让生产往回走必须显式设置 `ROLLBACK=1`**，且刻意不由 `GIT_REF` 隐含推导：最常
+见的意外回退方式，是在一个落后于 origin 的本地 `main` 上直接部署 `HEAD`。真正让
+它代价高昂的是迁移——`alembic upgrade head` 只前进不后退，于是旧代码遇上新
+schema（v0.3 的 `is_active` → `is_default` 改名正是这种形态）。
+
+**若有旧的 CD 审批排队，应取消该运行而不是批准它。** GitHub 的 `cd-main` 并发组
+会串行化 CD 运行，因此同一时刻只有一个可被审批——但它完全看不到手动执行的
+`deploy.sh`，所以一个长期排队的审批在你点下去时仍可能落后于生产。
 
 ---
 
@@ -339,10 +360,18 @@ construction, because the CD key cannot pass environment variables.
 |---|---|---|
 | Supply chain | This commit's CD build / E2E / image-scan jobs are not green, or the GitHub API is unreachable | `JOBCOPILOT_CD_GATE=skip` |
 | Shim drift | The installed shim differs from this commit's copy, or is missing | `JOBCOPILOT_SHIM_DRIFT=allow` |
+| Monotonicity | The commit is an ancestor of the revision already running — the deploy would move production backwards | `JOBCOPILOT_ALLOW_ROLLBACK=1`, or `ROLLBACK=1` via `deploy.sh` |
 | Revision check | A running container's revision ≠ the deployed commit | none — investigate |
 
 Being unable to *ask* whether the scan passed must never read as "it passed",
 which is why an unreachable API fails closed.
+
+One limit applies to all of them: the shim runs the copy of `remote-deploy.sh`
+that ships **with the commit being deployed**, so deploying a commit older than
+a given check runs a version that never had it. The accidents these gates exist
+for all name a recent commit, so they are covered; rolling back far enough steps
+outside them. The shim is the only version-independent enforcement point, and
+keeping it small is the deliberate trade (ADR-010).
 
 **中文：** 三者都是宁可拒绝也不猜测。覆盖开关在设计上仅 root 可用，因为 CD 密钥
 无法传递环境变量。
@@ -351,7 +380,14 @@ which is why an unreachable API fails closed.
 |---|---|---|
 | 供应链 | 该提交的 CD 构建 / E2E / 镜像扫描 job 未全绿，或 GitHub API 不可达 | `JOBCOPILOT_CD_GATE=skip` |
 | 包装器漂移 | 已安装包装器与该提交的副本不一致，或根本未安装 | `JOBCOPILOT_SHIM_DRIFT=allow` |
+| 单调性 | 该提交是当前运行 revision 的祖先——本次部署会让生产往回走 | `JOBCOPILOT_ALLOW_ROLLBACK=1`，或经 `deploy.sh` 的 `ROLLBACK=1` |
 | 版本核验 | 运行中容器的 revision ≠ 所部署提交 | 无——需排查 |
 
 无法**询问**扫描是否通过，绝不能被读作「它通过了」——这正是 API 不可达时失败关
 闭的原因。
+
+有一条局限对以上全部检查同样成立：包装器执行的是**随所部署提交一同发布**的那份
+`remote-deploy.sh`，因此部署一个早于某项检查的提交，跑的就是从未包含该检查的版
+本。这些闸门所针对的意外场景都指向较新的提交，故均被覆盖；只有回滚到足够旧的提
+交才会走出它们的射程。包装器是唯一与版本无关的强制点，而保持它小巧是刻意的取舍
+（ADR-010）。

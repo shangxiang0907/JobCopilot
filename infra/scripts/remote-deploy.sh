@@ -172,6 +172,82 @@ PY
   esac
 fi
 
+# 1d. Monotonicity: refuse to move production BACKWARDS unless asked to.
+#
+#     Every other gate passes for an older commit — it is an ancestor of main,
+#     its CD jobs are green, and the revision check at the end confirms the
+#     containers match what was requested. None of them asks whether the commit
+#     is newer than what is already running, so a backward deploy looks
+#     completely healthy in the logs.
+#
+#     Two realistic ways to get there, both accidents rather than attacks:
+#     approving a CD run that has been sitting in the queue while production
+#     moved on (GitHub's concurrency group serializes CD runs, but it cannot see
+#     a manual deploy.sh run at all), and running deploy.sh from a local main
+#     that is behind origin.
+#
+#     Migrations are what make this expensive rather than merely surprising:
+#     containers run `alembic upgrade head` at startup and alembic never goes
+#     backwards, so old code meets a newer schema. v0.3's is_active -> is_default
+#     rename is exactly that shape — the old code queries a column that no longer
+#     exists, and Profile Service crash-loops.
+#
+#     Rollback stays fully supported, it just has to be deliberate:
+#     JOBCOPILOT_ALLOW_ROLLBACK=1 (root-only, like the other overrides —
+#     deploy.sh forwards it when invoked with ROLLBACK=1).
+#
+#     KNOWN LIMIT, and it applies to every check in this file: the shim runs the
+#     copy of this script that ships WITH the commit being deployed, so
+#     deploying a commit older than a given check simply runs a version that
+#     never had it. The accidents this gate exists for are covered — a queued CD
+#     approval and a behind-origin deploy.sh both name a recent commit — but
+#     rolling back far enough steps outside all of them. The only
+#     version-independent enforcement point is the shim itself; keeping these
+#     checks here instead is the deliberate trade for a small, rarely-changed
+#     boundary (ADR-010).
+#     Read the running revision the same way step 5c does — through compose,
+#     not `docker ps --format {{.Image}}`: digest-pinned containers report a
+#     short image ID there, so a name-prefix match silently finds nothing and
+#     the whole gate becomes a no-op. Third-party images (keycloak, for one)
+#     also set org.opencontainers.image.revision to THEIR upstream commit, so
+#     "first container carrying the label" is wrong too. Several services are
+#     tried because any single one may be momentarily absent.
+current_rev=""
+if [ -f "${REMOTE_DIR}/infra/docker-compose.yml" ]; then
+  for s in frontend job-service profile-service; do
+    cid="$( ( cd "${REMOTE_DIR}/infra" && docker compose "${COMPOSE[@]}" ps -q "$s" ) 2>/dev/null || true )"
+    [ -n "$cid" ] || continue
+    current_rev="$(docker inspect --format \
+      '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$cid" 2>/dev/null || true)"
+    [ -n "$current_rev" ] && break
+  done
+fi
+if [ "${JOBCOPILOT_ALLOW_ROLLBACK:-0}" = "1" ]; then
+  echo "==> Rollback explicitly allowed (JOBCOPILOT_ALLOW_ROLLBACK=1)."
+elif [ -z "$current_rev" ]; then
+  echo "==> No JobCopilot containers running — nothing to move backwards from."
+elif [ "$current_rev" = "$SHA" ]; then
+  echo "==> Already running ${SHA:0:12}; redeploying the same commit."
+elif ! git -C "$REPO_DIR" cat-file -e "${current_rev}^{commit}" 2>/dev/null; then
+  # The running revision is not in the repo at all, which means history was
+  # rewritten under it. Direction is genuinely undecidable, and refusing would
+  # strand the host until someone overrode every deploy, so continue — loudly.
+  echo "WARNING: the running revision ${current_rev:0:12} no longer exists in the" >&2
+  echo "         repository (history rewritten?). Cannot tell whether this deploy" >&2
+  echo "         moves forwards or backwards. Continuing." >&2
+elif git -C "$REPO_DIR" merge-base --is-ancestor "$SHA" "$current_rev"; then
+  echo "ERROR: ${SHA:0:12} is an ANCESTOR of the running ${current_rev:0:12} —" >&2
+  echo "       this deploy would move production backwards." >&2
+  echo "       Schema migrations only go forwards, so older code would meet a" >&2
+  echo "       newer database. If you mean to roll back, say so explicitly:" >&2
+  echo "         deploy.sh  ->  ROLLBACK=1 GIT_REF=${SHA:0:12} ... ./infra/scripts/deploy.sh" >&2
+  echo "         by hand    ->  JOBCOPILOT_ALLOW_ROLLBACK=1 (as root)" >&2
+  echo "       If instead an old CD approval is queued, cancel that run." >&2
+  exit 11
+else
+  echo "==> Moving forwards: ${current_rev:0:12} -> ${SHA:0:12}."
+fi
+
 echo "==> Deploying ${SHA:0:12} on $(hostname) as $(id -un)"
 
 # 2. Ship this commit's infra/ config into the live project dir. Deploying a

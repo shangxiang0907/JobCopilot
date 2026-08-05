@@ -16,8 +16,11 @@
 #     drift apart — the failure mode where the manual path quietly still works
 #     and the CI path has been broken for weeks.
 #
-# Rollback: redeploy any older commit whose images CD already built.
-#   GIT_REF=<old-commit-sha> SERVER_IP=<ip> ./infra/scripts/deploy.sh
+# Rollback: redeploy any older commit whose images CD already built. Moving
+# production backwards must be stated explicitly — the server refuses otherwise,
+# because every other gate happily passes for an older commit while alembic only
+# ever migrates forwards (old code, newer schema):
+#   ROLLBACK=1 GIT_REF=<old-commit-sha> SERVER_IP=<ip> ./infra/scripts/deploy.sh
 # Since 2026-08-04 this rolls back the infra/ CONFIG as well as the images: the
 # server checks out the commit being deployed, so deploying commit X ships X's
 # compose files and Caddyfile. (Previously the config came from your current
@@ -36,6 +39,10 @@
 # Env vars:
 #   SERVER_IP    (required) public IP of the server
 #   GIT_REF      (default: HEAD) commit to deploy; set to an older SHA to roll back
+#   ROLLBACK     set to 1 to permit moving production backwards (see above).
+#                Deliberately NOT implied by GIT_REF: the commonest way to roll
+#                production back by accident is deploying HEAD from a local main
+#                that is simply behind origin.
 #   SSH_USER     (default: root) — needs root: provisions the host and installs .env
 #   SSH_KEY      (optional) private key path; unset = your default SSH config
 #   REMOTE_DIR   (default: /opt/jobcopilot)
@@ -144,7 +151,9 @@ ssh_ "chmod 600 ${REMOTE_DIR}/infra/.env"
 
 # 5. Hand off to the server. Same entry point CD uses, same validation, same
 #    deploy implementation — see infra/scripts/remote-deploy.sh.
-ssh_ "/usr/local/bin/jobcopilot-deploy deploy ${TAG}" || {
+ROLLBACK_ENV=""
+[ "${ROLLBACK:-0}" = "1" ] && ROLLBACK_ENV="JOBCOPILOT_ALLOW_ROLLBACK=1 "
+ssh_ "${ROLLBACK_ENV}/usr/local/bin/jobcopilot-deploy deploy ${TAG}" || {
   echo "" >&2
   echo "ERROR: the deploy failed on the server. If the shim is missing, install" >&2
   echo "       it once (from this checkout):" >&2
