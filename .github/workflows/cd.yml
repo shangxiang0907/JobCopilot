@@ -22,6 +22,12 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # Keyless signing: the runner exchanges this OIDC token for a short-lived
+      # Fulcio certificate that records WHICH repo and workflow produced the
+      # image. That provenance is the whole point — a signature from some other
+      # workflow, or from a developer laptop, will not satisfy the deploy-time
+      # verification in infra/scripts/remote-deploy.sh.
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -59,6 +65,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v7.2.0
         with:
           context: ${{ matrix.service.context }}
@@ -78,6 +85,25 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Closes the one window digest pinning cannot: the deploy resolves the
+      # <sha> TAG to a digest at deploy time, and a tag is mutable. Anyone who
+      # can write to this registry could push a different image to that tag and
+      # the deploy would faithfully resolve, pin and ship THEIR digest — with
+      # Trivy having scanned ours. A signature is bound to the digest, so an
+      # image we did not build cannot carry one.
+      - uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: v3.1.2
+
+      - name: Sign the image by digest
+        env:
+          # Sign the digest, never the tag: signing a tag would re-point along
+          # with it and prove nothing.
+          IMAGE: ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service.name }}@${{ steps.build.outputs.digest }}
+        run: |
+          cosign sign --yes "$IMAGE"
+          echo "Signed $IMAGE"
 
   # ── 1b. E2E smoke against the exact images just pushed ───────────────────────
   e2e-smoke:

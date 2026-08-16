@@ -14,7 +14,7 @@
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
-echo "==> [1/6] Installing Docker (official apt repository) ..."
+echo "==> [1/7] Installing Docker (official apt repository) ..."
 if ! command -v docker >/dev/null 2>&1; then
   apt-get update -qq
   apt-get install -y -qq ca-certificates curl
@@ -29,7 +29,7 @@ if ! command -v docker >/dev/null 2>&1; then
   systemctl enable --now docker
 fi
 
-echo "==> [2/6] Configuring Docker daemon (log rotation + live-restore) ..."
+echo "==> [2/7] Configuring Docker daemon (log rotation + live-restore) ..."
 # Without this, Docker's json-file logs grow UNBOUNDED — a crash-looping or
 # chatty container eventually fills the disk and takes the node down. Loki only
 # reads container logs (via the Docker API); it never truncates the source
@@ -53,7 +53,7 @@ if [ "$(cat /etc/docker/daemon.json 2>/dev/null)" != "$DAEMON_JSON" ]; then
   systemctl restart docker
 fi
 
-echo "==> [3/6] Capping journald disk usage ..."
+echo "==> [3/7] Capping journald disk usage ..."
 mkdir -p /etc/systemd/journald.conf.d
 cat > /etc/systemd/journald.conf.d/99-jobcopilot.conf <<'EOF'
 [Journal]
@@ -61,21 +61,45 @@ SystemMaxUse=500M
 EOF
 systemctl restart systemd-journald
 
-echo "==> [4/6] Installing fail2ban + ufw ..."
+echo "==> [4/7] Installing fail2ban + ufw ..."
 apt-get install -y -qq fail2ban ufw
 
-echo "==> [5/6] Firewall: allow SSH + HTTP + HTTPS only ..."
+echo "==> [5/7] Firewall: allow SSH + HTTP + HTTPS only ..."
 ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw --force enable
 
-echo "==> [6/6] Hardening SSH (key-only auth) + enabling fail2ban ..."
+echo "==> [6/7] Hardening SSH (key-only auth) + enabling fail2ban ..."
 cat > /etc/ssh/sshd_config.d/99-jobcopilot-hardening.conf <<'EOF'
 PasswordAuthentication no
 PermitRootLogin prohibit-password
 EOF
 systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
 systemctl enable --now fail2ban
+
+echo "==> [7/7] Installing cosign (image signature verification) ..."
+# remote-deploy.sh verifies every image signature before pinning a digest, and
+# fails closed without this binary. Pinned by version AND checksum: fetching a
+# verification tool over an unverified channel would undo the point of having
+# one. Upgrading is a deliberate edit here, never an unpinned re-download.
+COSIGN_VERSION="v3.1.2"
+COSIGN_SHA256="f7622ed3cf22e55e1ae6377c080979ff77a22da9981c11df222a2e444991e7cf"
+# `cosign version` prints GitVersion WITH the leading v (verified on v3.1.2), so
+# compare against COSIGN_VERSION as-is — stripping it makes this never match and
+# re-downloads on every provisioning run.
+if [ "$(cosign version 2>/dev/null | awk '/GitVersion:/{print $2}')" = "${COSIGN_VERSION}" ]; then
+  echo "    cosign ${COSIGN_VERSION} already installed"
+else
+  tmp="$(mktemp -d)"
+  curl -sSLo "${tmp}/cosign" \
+    "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+  echo "${COSIGN_SHA256}  ${tmp}/cosign" | sha256sum -c - || {
+    echo "ERROR: cosign checksum mismatch — refusing to install." >&2
+    rm -rf "$tmp"; exit 1; }
+  install -m 0755 -o root -g root "${tmp}/cosign" /usr/local/bin/cosign
+  rm -rf "$tmp"
+  echo "    cosign $(cosign version 2>/dev/null | awk '/GitVersion:/{print $2}') installed"
+fi
 
 echo "==> Provisioning complete."
