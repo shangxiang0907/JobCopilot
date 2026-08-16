@@ -146,6 +146,11 @@ gh api -X PUT repos/<OWNER>/<REPO>/environments/production \
 gh api -X POST repos/<OWNER>/<REPO>/environments/production/deployment-branch-policies -f 'name=main'
 ```
 
+**cosign** is installed by `server-setup.sh`, which `deploy.sh` runs as root
+before handing off — so step 5's accept-path deploy provisions it. Nothing to do
+by hand; it is pinned there by version and sha256. A server missing it fails the
+signature gate closed rather than deploying unverified.
+
 **8. Turn it on:** `gh variable set DEPLOY_ENABLED --body true`. A job-level `if`
 cannot read the `secrets` context, which is why the switch is a variable — and
 why it doubles as the kill switch in §2.
@@ -223,6 +228,10 @@ gh api -X PUT repos/<OWNER>/<REPO>/environments/production \
 gh api -X POST repos/<OWNER>/<REPO>/environments/production/deployment-branch-policies -f 'name=main'
 ```
 
+**cosign** 由 `server-setup.sh` 安装，而 `deploy.sh` 在交棒之前会以 root 身份运
+行它——因此第 5 步的接受路径部署会顺带完成 provisioning。无需手工操作；版本与
+sha256 都钉死在那里。缺少它的服务器会让签名闸门失败关闭，而不是不验证就部署。
+
 **8. 打开开关：** `gh variable set DEPLOY_ENABLED --body true`。job 级 `if` 读不
 到 `secrets` 上下文，这正是开关必须是变量的原因——也是它能兼作 §2 停机开关的
 原因。
@@ -250,6 +259,10 @@ are what make it expensive — `alembic upgrade head` never goes backwards, so o
 code meets a newer schema (v0.3's `is_active` → `is_default` rename is exactly
 that shape).
 
+**Rolling back past `af8155b`** (where signing began) additionally needs
+`JOBCOPILOT_COSIGN=skip`: those images were never signed, so verification
+correctly refuses them.
+
 **If an old CD approval is queued**, cancel that run rather than approving it.
 GitHub's `cd-main` concurrency group serializes CD runs, so only one is ever
 approvable at a time — but it cannot see a manual `deploy.sh` run at all, so a
@@ -270,6 +283,9 @@ ROLLBACK=1 GIT_REF=<旧提交 SHA> SERVER_IP=<SERVER_IP> SSH_KEY=~/.ssh/<root �
 见的意外回退方式，是在一个落后于 origin 的本地 `main` 上直接部署 `HEAD`。真正让
 它代价高昂的是迁移——`alembic upgrade head` 只前进不后退，于是旧代码遇上新
 schema（v0.3 的 `is_active` → `is_default` 改名正是这种形态）。
+
+**回滚到 `af8155b` 之前**（签名从该提交开始）还需额外设置
+`JOBCOPILOT_COSIGN=skip`：那些镜像从未被签名，验签拒绝它们是正确行为。
 
 **若有旧的 CD 审批排队，应取消该运行而不是批准它。** GitHub 的 `cd-main` 并发组
 会串行化 CD 运行，因此同一时刻只有一个可被审批——但它完全看不到手动执行的
@@ -359,6 +375,7 @@ construction, because the CD key cannot pass environment variables.
 | Gate | Fails when | Override |
 |---|---|---|
 | Supply chain | This commit's CD build / E2E / image-scan jobs are not green, or the GitHub API is unreachable | `JOBCOPILOT_CD_GATE=skip` |
+| Image signature | An image carries no valid cosign signature from this repo's `cd.yml` on `main`, or cosign is missing / older than v3 | `JOBCOPILOT_COSIGN=skip` |
 | Shim drift | The installed shim differs from this commit's copy, or is missing | `JOBCOPILOT_SHIM_DRIFT=allow` |
 | Monotonicity | The commit is an ancestor of the revision already running — the deploy would move production backwards | `JOBCOPILOT_ALLOW_ROLLBACK=1`, or `ROLLBACK=1` via `deploy.sh` |
 | Revision check | A running container's revision ≠ the deployed commit | none — investigate |
@@ -379,6 +396,7 @@ keeping it small is the deliberate trade (ADR-010).
 | 闸门 | 何时失败 | 覆盖开关 |
 |---|---|---|
 | 供应链 | 该提交的 CD 构建 / E2E / 镜像扫描 job 未全绿，或 GitHub API 不可达 | `JOBCOPILOT_CD_GATE=skip` |
+| 镜像签名 | 某镜像没有本仓库 `main` 上 `cd.yml` 签发的有效 cosign 签名，或 cosign 缺失 / 版本低于 v3 | `JOBCOPILOT_COSIGN=skip` |
 | 包装器漂移 | 已安装包装器与该提交的副本不一致，或根本未安装 | `JOBCOPILOT_SHIM_DRIFT=allow` |
 | 单调性 | 该提交是当前运行 revision 的祖先——本次部署会让生产往回走 | `JOBCOPILOT_ALLOW_ROLLBACK=1`，或经 `deploy.sh` 的 `ROLLBACK=1` |
 | 版本核验 | 运行中容器的 revision ≠ 所部署提交 | 无——需排查 |

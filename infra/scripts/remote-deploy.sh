@@ -29,6 +29,7 @@ SHA="${1:?usage: remote-deploy.sh <40-hex-commit-sha>}"
   echo "ERROR: '${SHA}' is not a full 40-hex commit SHA." >&2; exit 2; }
 
 GHCR_OWNER="${GHCR_OWNER:-shangxiang0907}"
+GH_REPO="${JOBCOPILOT_GH_REPO:-shangxiang0907/JobCopilot}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/jobcopilot}"
 SERVICES=(profile job discovery agent notification frontend)
 COMPOSE=(-f docker-compose.yml -f docker-compose.prod.yml)
@@ -111,10 +112,10 @@ if [ "$CD_GATE" != "enforce" ]; then
   echo "         Images for ${SHA:0:12} may never have passed the Trivy scan." >&2
 else
   echo "==> Verifying the CD gating jobs for ${SHA:0:12} went green ..."
-  verdict="$(python3 - "$SHA" <<'PY'
+  verdict="$(python3 - "$SHA" "$GH_REPO" <<'PY'
 import json, sys, urllib.request
 
-REPO = "shangxiang0907/JobCopilot"
+REPO = sys.argv[2]  # passed in, so the repo name is not a second hardcoded copy
 # The deploy job's `needs`, by display-name prefix (they are matrix jobs).
 GATING = ("Build & Push", "E2E Smoke", "Image Scan")
 sha = sys.argv[1]
@@ -263,9 +264,47 @@ rsync -a --delete --exclude '.env' --exclude '.env.*' \
   exit 5
 }
 
-# 3. Resolve every image tag to its IMMUTABLE digest, then pin the overlay to
-#    <image>@sha256:... A tag can be moved; a digest cannot. GHCR packages are
-#    public, so no registry login is needed.
+# 3. Resolve every image tag to its IMMUTABLE digest, verify the digest carries
+#    a signature from OUR CD workflow, then pin the overlay to
+#    <image>@sha256:... A tag can be moved; a digest cannot.
+#
+#    Resolution is the one step digest pinning cannot protect: we ask the
+#    registry what `<sha>` points to, and whoever can write to it decides the
+#    answer. Everything after this line is content-addressed and safe; this line
+#    is not. Verification closes it, because a Fulcio certificate binds the
+#    signature to the repository and workflow that produced the image, and an
+#    attacker's image cannot carry one.
+#
+#    COSIGN_IDENTITY is exact rather than a regexp, and was read off a real
+#    certificate rather than guessed — under a workflow_run trigger the ref is
+#    still refs/heads/main (verified 2026-08-06 on the af8155b signatures).
+COSIGN_ISSUER="https://token.actions.githubusercontent.com"
+COSIGN_IDENTITY="https://github.com/${GH_REPO}/.github/workflows/cd.yml@refs/heads/main"
+
+#    Assert the tool before trusting its verdict. The realistic failure is not an
+#    attacker — replacing this binary needs root, and root ends the discussion —
+#    it is an accidentally stale install: cosign v2 and v3 differ in verification
+#    semantics and flags, so an old binary could behave differently from what
+#    this script expects. Deliberately a MINIMUM MAJOR check, not an exact
+#    version: the precise pin lives in server-setup.sh, and a second copy here
+#    would be one more constant to keep in sync.
+if [ "${JOBCOPILOT_COSIGN:-enforce}" != "enforce" ]; then
+  echo "WARNING: image signature verification SKIPPED by JOBCOPILOT_COSIGN=${JOBCOPILOT_COSIGN}." >&2
+  echo "         Images for ${SHA:0:12} are being deployed unverified." >&2
+elif ! command -v cosign >/dev/null 2>&1; then
+  echo "ERROR: cosign is not installed, so image signatures cannot be verified." >&2
+  echo "       It is installed by infra/scripts/server-setup.sh — run a manual" >&2
+  echo "       deploy (infra/scripts/deploy.sh) to provision it." >&2
+  exit 12
+else
+  cosign_major="$(cosign version 2>/dev/null | awk '/GitVersion:/{print $2}' | sed 's/^v//' | cut -d. -f1)"
+  if [ -z "$cosign_major" ] || [ "$cosign_major" -lt 3 ] 2>/dev/null; then
+    echo "ERROR: cosign v3 or newer is required (found '${cosign_major:-unknown}')." >&2
+    echo "       Re-provision with infra/scripts/deploy.sh to install the pinned version." >&2
+    exit 12
+  fi
+fi
+
 echo "==> Resolving image digests for ${SHA:0:12} (owner: ${GHCR_OWNER}) ..."
 PIN_ENV="IMAGE_TAG=${SHA}"
 for svc in "${SERVICES[@]}"; do
@@ -286,8 +325,26 @@ for svc in "${SERVICES[@]}"; do
     echo "       Did CD finish building and pushing ${SHA:0:12} to GHCR?" >&2
     exit 6
   fi
+  # Verify BEFORE the digest is allowed into PIN_ENV, so an image we did not
+  # build can never reach the compose overlay even transiently.
+  if [ "${JOBCOPILOT_COSIGN:-enforce}" = "enforce" ]; then
+    if ! cosign verify \
+           --certificate-oidc-issuer "$COSIGN_ISSUER" \
+           --certificate-identity "$COSIGN_IDENTITY" \
+           "ghcr.io/${GHCR_OWNER}/jobcopilot-${svc}@${digest}" >/dev/null 2>&1; then
+      echo "ERROR: no valid signature for jobcopilot-${svc}@${digest:0:19}..." >&2
+      echo "       Expected a cosign signature from:" >&2
+      echo "         identity ${COSIGN_IDENTITY}" >&2
+      echo "         issuer   ${COSIGN_ISSUER}" >&2
+      echo "       Either the tag now points at an image this CD did not build," >&2
+      echo "       or the commit predates signing (which began at af8155b) — a" >&2
+      echo "       rollback that far back needs JOBCOPILOT_COSIGN=skip as root." >&2
+      exit 12
+    fi
+  fi
+
   var="$(printf '%s' "$svc" | tr '[:lower:]' '[:upper:]')_IMAGE_DIGEST"
-  echo "    jobcopilot-${svc} -> ${digest}"
+  echo "    jobcopilot-${svc} -> ${digest} (signature ok)"
   PIN_ENV="${PIN_ENV}"$'\n'"${var}=${digest}"
 done
 
