@@ -182,7 +182,7 @@ services:
     restart: unless-stopped
 
   kong:
-    image: kong:3.9@sha256:62721edc9669e2a96fe9d188ab8950b9105e69abb033129624a72d3e10da6777
+    image: kong:3.9@sha256:2a8cf3b110cdaba1cb00adc665b8635ed1fc75c907f7a4298613c68e4976de0a
     depends_on:
       profile-service:
         condition: service_healthy
@@ -475,7 +475,7 @@ services:
   #   ssh -L 3001:localhost:3001 <server>
 
   prometheus:
-    image: prom/prometheus:v3.13.0@sha256:c6b27ea434f8389bfe233fbc7be381cf50587c286e871bc842008f5a1b1908a7
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=15d
@@ -487,7 +487,7 @@ services:
     restart: unless-stopped
 
   loki:
-    image: grafana/loki:3.7.3@sha256:70b9f699fc9bb868b62f1cfd4f787dfa50242f1fd92e6089787d5d7daea75fe8
+    image: grafana/loki:3.7.7@sha256:d70e4659623f3e109af669cae76fe2a5dd5be54e2298fe8aed380d982fbc2500
     command: ["-config.file=/etc/loki/loki-config.yaml"]
     volumes:
       - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
@@ -497,7 +497,7 @@ services:
     restart: unless-stopped
 
   alloy:
-    image: grafana/alloy:v1.17.1@sha256:4f6ddc56ffdcf8a6316748fc5162972e20cb301523cac1bb4a31957df733ae9b
+    image: grafana/alloy:v1.19.2@sha256:b8ec653c44235fbe910879145dac3597d66b0aaecf60bcbbe82580767771a839
     command: ["run", "/etc/alloy/config.alloy"]
     depends_on:
       - loki
@@ -508,7 +508,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:13.1.0@sha256:121a7a9ece6dc10b969f1f96eed64b4f07dfac0d0b8abc070f7cb83bbde86f63
+    image: grafana/grafana:13.2.0@sha256:3fd54ae1214669f8355f065ec9f6445d5279a3d77095ab048ca045685272429b
     depends_on:
       - prometheus
       - loki
@@ -530,7 +530,7 @@ services:
   # the records also hold PII of people who never completed sign-up. Uses the
   # least-privilege admin-api service account, never master admin credentials.
   keycloak-cleanup:
-    image: python:3.14-alpine@sha256:26730869004e2b9c4b9ad09cab8625e81d256d1ce97e72df5520e806b1709f92
+    image: python:3.14-alpine@sha256:3f818d6811ff5f3f2b5e5d836df3d25c2dd2e588d3b4981338a8ba17e422f74f
     depends_on:
       keycloak:
         condition: service_healthy
@@ -546,7 +546,7 @@ services:
     restart: unless-stopped
 
   keycloak-init:
-    image: python:3.14-alpine@sha256:26730869004e2b9c4b9ad09cab8625e81d256d1ce97e72df5520e806b1709f92
+    image: python:3.14-alpine@sha256:3f818d6811ff5f3f2b5e5d836df3d25c2dd2e588d3b4981338a8ba17e422f74f
     depends_on:
       keycloak:
         condition: service_healthy
@@ -578,7 +578,7 @@ services:
   # makes the full registration → verify-link → set-password flow testable
   # locally without sending real mail. Web UI: http://localhost:8025
   mailpit:
-    image: axllent/mailpit:v1.30.4@sha256:5a49a77c5bdbe7c5474450b4f46348d09949df3695257729c93a30369382d4f6
+    image: axllent/mailpit:v1.31.0@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
     profiles: ["dev"]
     ports:
       - "127.0.0.1:8025:8025"
