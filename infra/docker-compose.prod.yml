@@ -32,7 +32,7 @@ services:
 
   # ── Edge proxy: terminates TLS, the only service bound to public 80/443 ──────
   caddy:
-    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
     restart: unless-stopped
     depends_on:
       - frontend
@@ -184,7 +184,7 @@ services:
   #    a compromised/dead server cannot take the offsite copies with it. Enable
   #    object versioning on the bucket for extra protection against overwrites.
   pg-backup-sync:
-    image: rclone/rclone:1@sha256:c61954aaa32328a5486715dd063a81c7879f5195ad3505cd362deddd509dc4a1
+    image: rclone/rclone:1@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5
     restart: unless-stopped
     profiles: ["offsite-backup"]
     depends_on:
