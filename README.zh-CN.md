@@ -5,7 +5,6 @@
 **你的 AI 求职副驾** —— 自动从公开职位源发现岗位、将每条职位与你的简历智能匹配打分，并通过自然语言管理完整投递流程。
 
 [![CI](https://github.com/shangxiang0907/JobCopilot/actions/workflows/ci.yml/badge.svg)](https://github.com/shangxiang0907/JobCopilot/actions/workflows/ci.yml)
-[![CD](https://github.com/shangxiang0907/JobCopilot/actions/workflows/cd.yml/badge.svg)](https://github.com/shangxiang0907/JobCopilot/actions/workflows/cd.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)

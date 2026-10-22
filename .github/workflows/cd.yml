@@ -1,13 +1,11 @@
 name: CD
 
-# Triggered only after the CI workflow completes successfully on main.
-# This guarantees CD never runs on a red commit, even on direct pushes.
+# Manual only since 2026-10-22: the production server was deleted, so pushes no
+# longer build, scan and wait on a deploy that has nowhere to go. Run it from
+# Actions → CD → Run workflow on main once CI is green for that commit.
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: cd-main
@@ -18,7 +16,7 @@ jobs:
   build-push:
     name: Build & Push / ${{ matrix.service.name }}
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     permissions:
       contents: read
       packages: write
@@ -54,7 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
 
       - uses: docker/setup-buildx-action@v4.1.0
 
@@ -72,16 +70,16 @@ jobs:
           file: ${{ matrix.service.dockerfile }}
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service.name }}:${{ github.event.workflow_run.head_sha }}
+            ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service.name }}:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service.name }}:latest
           # GIT_SHA is baked into every image (ENV) and mirrored as the standard
           # OCI revision label — /healthz, jobcopilot_build_info, and deploy.sh's
           # post-deploy verification all read the same value.
           build-args: |
-            GIT_SHA=${{ github.event.workflow_run.head_sha }}
+            GIT_SHA=${{ github.sha }}
             ${{ matrix.service.build_args }}
           labels: |
-            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+            org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -115,7 +113,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
 
       - uses: docker/login-action@v4.2.0
         with:
@@ -127,7 +125,7 @@ jobs:
         working-directory: infra
         env:
           E2E_IMAGE_OWNER: ${{ github.repository_owner }}
-          E2E_IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+          E2E_IMAGE_TAG: ${{ github.sha }}
         run: |
           # .env.e2e, NOT .env.example — the latter is the production template
           # and would point the browser at the production Keycloak.
@@ -231,7 +229,7 @@ jobs:
       - name: Scan ${{ matrix.service }} for Critical CVEs (blocking)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service }}:${{ github.event.workflow_run.head_sha }}
+          image-ref: ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service }}:${{ github.sha }}
           format: table
           exit-code: "1"
           vuln-type: os,library
@@ -242,7 +240,7 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         if: always()
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service }}:${{ github.event.workflow_run.head_sha }}
+          image-ref: ghcr.io/${{ github.repository_owner }}/jobcopilot-${{ matrix.service }}:${{ github.sha }}
           format: table
           exit-code: "0"
           vuln-type: os,library
@@ -299,11 +297,11 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
-      - name: Deploy ${{ github.event.workflow_run.head_sha }}
+      - name: Deploy ${{ github.sha }}
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ vars.DEPLOY_USER || 'deploy' }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
+          SHA: ${{ github.sha }}
         run: |
           ssh -o StrictHostKeyChecking=yes -o BatchMode=yes \
               "${DEPLOY_USER}@${DEPLOY_HOST}" "deploy ${SHA}"

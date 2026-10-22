@@ -5,7 +5,6 @@
 **Your AI copilot for the job search** — discovers openings from public job boards, scores every posting against your resume, and manages your whole application pipeline through natural language.
 
 [![CI](https://github.com/shangxiang0907/JobCopilot/actions/workflows/ci.yml/badge.svg)](https://github.com/shangxiang0907/JobCopilot/actions/workflows/ci.yml)
-[![CD](https://github.com/shangxiang0907/JobCopilot/actions/workflows/cd.yml/badge.svg)](https://github.com/shangxiang0907/JobCopilot/actions/workflows/cd.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
