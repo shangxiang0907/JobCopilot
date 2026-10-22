@@ -704,10 +704,10 @@ graph LR
 ## 11. Deployment Architecture / 部署架构
 
 **EN:**  
-**Current production** is a single-node Docker Compose deployment (Hetzner) behind a Caddy TLS edge: CI builds and Trivy-scans images to GHCR, then CD deploys them after a required human approval; the deploy runs on the server (`infra/scripts/remote-deploy.sh`), resolving tags to immutable digests, with `infra/scripts/deploy.sh` as the manual path over the same implementation (ADR-010); internal services bind to loopback only. All services are stateless, so the **Kubernetes manifests** (`infra/k8s/`) remain the horizontal-scaling path: Agent Service scales via KEDA on RabbitMQ queue depth; Profile and Job Services via HPA on CPU.
+**Production (until 2026-10-22, when the server was shut down to save cost)** was a single-node Docker Compose deployment (Hetzner) behind a Caddy TLS edge: CI builds and Trivy-scans images to GHCR, then CD deploys them after a required human approval; the deploy runs on the server (`infra/scripts/remote-deploy.sh`), resolving tags to immutable digests, with `infra/scripts/deploy.sh` as the manual path over the same implementation (ADR-010); internal services bind to loopback only. All services are stateless, so the **Kubernetes manifests** (`infra/k8s/`) remain the horizontal-scaling path: Agent Service scales via KEDA on RabbitMQ queue depth; Profile and Job Services via HPA on CPU.
 
 **中文：**  
-**当前生产**为 Caddy TLS 边缘之后的单节点 Docker Compose 部署（Hetzner）：CI 构建镜像并经 Trivy 扫描推送 GHCR，随后由 CD 在人工审批后完成部署；部署在服务器上执行（`infra/scripts/remote-deploy.sh`），将 tag 解析为不可变 digest，`infra/scripts/deploy.sh` 则是共用同一实现的手动路径（ADR-010）；内部服务仅绑定回环地址。所有服务无状态，因此 **Kubernetes 清单**（`infra/k8s/`）作为水平扩容路径保留：Agent Service 基于 RabbitMQ 队列深度由 KEDA 伸缩，Profile / Job Service 基于 CPU 由 HPA 伸缩。
+**生产环境（至 2026-10-22，之后为节省费用关停服务器）**为 Caddy TLS 边缘之后的单节点 Docker Compose 部署（Hetzner）：CI 构建镜像并经 Trivy 扫描推送 GHCR，随后由 CD 在人工审批后完成部署；部署在服务器上执行（`infra/scripts/remote-deploy.sh`），将 tag 解析为不可变 digest，`infra/scripts/deploy.sh` 则是共用同一实现的手动路径（ADR-010）；内部服务仅绑定回环地址。所有服务无状态，因此 **Kubernetes 清单**（`infra/k8s/`）作为水平扩容路径保留：Agent Service 基于 RabbitMQ 队列深度由 KEDA 伸缩，Profile / Job Service 基于 CPU 由 HPA 伸缩。
 
 ```mermaid
 graph TB

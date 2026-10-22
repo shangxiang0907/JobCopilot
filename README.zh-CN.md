@@ -11,7 +11,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
 ![LangGraph](https://img.shields.io/badge/LangGraph-multi--agent-1C3C3C?logo=langchain&logoColor=white)
 
-**[🌐 在线体验](https://jobcopilot.arnoldshang.com)** · [功能特性](#功能特性) · [系统架构](#系统架构) · [快速开始](#快速开始) · [**English**](README.md)
+[功能特性](#功能特性) · [系统架构](#系统架构) · [快速开始](#快速开始) · [**English**](README.md)
 
 <img src="docs/images/landing.png" alt="JobCopilot 落地页" width="85%" />
 
@@ -154,7 +154,7 @@ docs/               # PRD + 软件架构设计（双语）
 
 ## 生产部署
 
-单节点部署（Hetzner 线上运行中）。CI 在每个绿色 `main` 提交上构建镜像、经 Trivy 扫描后推送 GHCR，随后由 CD 完成部署——但**必须先经过人工审批**（`production` 环境的必需审批人）。部署本身在服务器上执行（[`infra/scripts/remote-deploy.sh`](infra/scripts/remote-deploy.sh)）：重新核验该提交的构建、E2E 与镜像扫描 job 是否全绿，将镜像 tag 解析为**不可变 digest**，并在 Caddy（自动 Let's Encrypt TLS）之后重启整个栈。
+单节点部署（曾在 Hetzner 上线运行，2026 年 10 月为节省费用关停服务器，目前没有公开演示——请按[快速开始](#快速开始)在本地运行）。CI 在每个绿色 `main` 提交上构建镜像、经 Trivy 扫描后推送 GHCR，随后由 CD 完成部署——但**必须先经过人工审批**（`production` 环境的必需审批人）。部署本身在服务器上执行（[`infra/scripts/remote-deploy.sh`](infra/scripts/remote-deploy.sh)）：重新核验该提交的构建、E2E 与镜像扫描 job 是否全绿，将镜像 tag 解析为**不可变 digest**，并在 Caddy（自动 Let's Encrypt TLS）之后重启整个栈。
 
 CD 经由一把被 forced command 钉死的 SSH 密钥接入服务器，该密钥只接受 `deploy <提交 SHA>` 这一种指令，因此即便流水线被攻破也无法取得 shell——而且**生产密钥根本不会进入 GitHub**：`infra/.env` 只存在于服务器，仅由人工执行 [`infra/scripts/deploy.sh`](infra/scripts/deploy.sh) 时下发；该脚本同时也是手动部署路径，与 CD 共用同一份服务器端实现。
 

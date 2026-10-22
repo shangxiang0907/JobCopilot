@@ -11,7 +11,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
 ![LangGraph](https://img.shields.io/badge/LangGraph-multi--agent-1C3C3C?logo=langchain&logoColor=white)
 
-**[🌐 Live Demo](https://jobcopilot.arnoldshang.com)** · [Features](#features) · [Architecture](#architecture) · [Quick Start](#quick-start) · [**中文文档**](README.zh-CN.md)
+[Features](#features) · [Architecture](#architecture) · [Quick Start](#quick-start) · [**中文文档**](README.zh-CN.md)
 
 <img src="docs/images/landing.png" alt="JobCopilot landing page" width="85%" />
 
@@ -155,7 +155,7 @@ docs/               # PRD + Software Architecture Design (bilingual)
 
 ## Production Deployment
 
-Single-node deployment (running live on Hetzner). CI builds and Trivy-scans images to GHCR on every green `main` commit, then CD deploys them — **after a required human approval** on the `production` environment. The deploy itself runs on the server ([`infra/scripts/remote-deploy.sh`](infra/scripts/remote-deploy.sh)): it re-verifies that this commit's build, E2E and image-scan jobs went green, resolves image tags to **immutable digests**, and restarts the stack behind Caddy (automatic Let's Encrypt TLS).
+Single-node deployment (ran live on Hetzner until October 2026; the server was then shut down to save cost, so there is no public demo — run it locally with the [Quick Start](#quick-start)). CI builds and Trivy-scans images to GHCR on every green `main` commit, then CD deploys them — **after a required human approval** on the `production` environment. The deploy itself runs on the server ([`infra/scripts/remote-deploy.sh`](infra/scripts/remote-deploy.sh)): it re-verifies that this commit's build, E2E and image-scan jobs went green, resolves image tags to **immutable digests**, and restarts the stack behind Caddy (automatic Let's Encrypt TLS).
 
 CD reaches the server through an SSH key pinned to a forced command that accepts only `deploy <commit-sha>`, so a compromised pipeline cannot obtain a shell — and **the production secrets never enter GitHub at all**: `infra/.env` lives on the server and is installed only by a human run of [`infra/scripts/deploy.sh`](infra/scripts/deploy.sh), which is also the manual deploy path and shares the same server-side implementation.
 
